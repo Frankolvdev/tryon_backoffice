@@ -26,3 +26,29 @@ export interface WorkflowDefinitionListResponse {
   skip: number;
   limit: number;
 }
+
+export interface WorkflowDefinitionCreate {
+  key: string;
+  name: string;
+  description: string | null;
+  version: number;
+  category: string;
+  workflow: Record<string, unknown>;
+  parameter_schema: Record<string, unknown>;
+  execution_modes: WorkflowExecutionMode[];
+  metadata: Record<string, unknown>;
+  is_active: boolean;
+  is_default: boolean;
+}
+
+export interface WorkflowDefinitionUpdate {
+  name?: string | null;
+  description?: string | null;
+  category?: string | null;
+  workflow?: Record<string, unknown> | null;
+  parameter_schema?: Record<string, unknown> | null;
+  execution_modes?: WorkflowExecutionMode[] | null;
+  metadata?: Record<string, unknown> | null;
+  is_active?: boolean | null;
+  is_default?: boolean | null;
+}

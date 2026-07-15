@@ -17,6 +17,7 @@ import {
 import { TryOnEmptyState } from "@/components/backoffice/tryon/tryon-empty-state";
 import { TryOnModuleHeader } from "@/components/backoffice/tryon/tryon-module-header";
 import { WorkflowDetailOverview } from "@/components/backoffice/tryon/workflow-detail-overview";
+import { WorkflowEditor } from "@/components/backoffice/tryon/workflow-editor";
 import { WorkflowJsonPanel } from "@/components/backoffice/tryon/workflow-json-panel";
 import { browserApiRequest } from "@/lib/api/browser-api";
 
@@ -94,13 +95,7 @@ export default function WorkflowDetailPage() {
         />
 
         <section className="luxia-panel mt-7 flex min-h-96 items-center justify-center rounded-3xl">
-          <div className="text-center">
-            <LoaderCircle className="mx-auto animate-spin text-red-500" />
-
-            <p className="mt-4 text-sm text-zinc-500">
-              Cargando workflow...
-            </p>
-          </div>
+          <LoaderCircle className="animate-spin text-red-500" />
         </section>
       </div>
     );
@@ -130,7 +125,7 @@ export default function WorkflowDetailPage() {
 
         <Link
           href="/dashboard/tryon/workflows"
-          className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl border border-white/8 bg-white/[0.025] px-4 text-sm text-zinc-400 transition hover:text-white"
+          className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl border border-white/8 bg-white/[0.025] px-4 text-sm text-zinc-400 hover:text-white"
         >
           <ArrowLeft size={16} />
           Volver a workflows
@@ -143,13 +138,13 @@ export default function WorkflowDetailPage() {
     <div>
       <TryOnModuleHeader
         title={workflow.name}
-        description="Detalle completo de la definición, esquema de parámetros, metadata y JSON de ejecución."
+        description="Detalle, edición, esquemas y JSON de ejecución del workflow."
       />
 
       <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Link
           href="/dashboard/tryon/workflows"
-          className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/8 bg-white/[0.025] px-4 text-sm text-zinc-400 transition hover:text-white"
+          className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/8 bg-white/[0.025] px-4 text-sm text-zinc-400 hover:text-white"
         >
           <ArrowLeft size={16} />
           Volver a workflows
@@ -160,7 +155,7 @@ export default function WorkflowDetailPage() {
           onClick={() =>
             void loadWorkflow()
           }
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/8 bg-white/[0.025] px-4 text-sm text-zinc-400 transition hover:text-white"
+          className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/8 bg-white/[0.025] px-4 text-sm text-zinc-400 hover:text-white"
         >
           <RefreshCcw size={16} />
           Actualizar
@@ -170,6 +165,13 @@ export default function WorkflowDetailPage() {
       <WorkflowDetailOverview
         workflow={workflow}
       />
+
+      <div className="mt-5">
+        <WorkflowEditor
+          workflow={workflow}
+          onSaved={setWorkflow}
+        />
+      </div>
 
       <div className="mt-5 grid gap-5 xl:grid-cols-2">
         <WorkflowJsonPanel
