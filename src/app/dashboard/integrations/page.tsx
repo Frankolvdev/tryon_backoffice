@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   CircleOff,
   Gauge,
+  HeartPulse,
   LoaderCircle,
   Pencil,
   RefreshCcw,
@@ -197,9 +198,7 @@ export default function IntegrationsPage() {
           <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
             <div className="flex items-start gap-4">
               <div className="luxia-red-glow flex size-14 shrink-0 items-center justify-center rounded-2xl border border-red-500/20 bg-red-950/25 text-red-400">
-                <Settings2
-                  size={24}
-                />
+                <Settings2 size={24} />
               </div>
 
               <div>
@@ -220,6 +219,14 @@ export default function IntegrationsPage() {
             </div>
 
             <div className="flex flex-wrap gap-3">
+              <Link
+                href="/dashboard/integrations/health"
+                className="inline-flex h-11 items-center gap-2 rounded-xl border border-emerald-500/15 bg-emerald-950/15 px-4 text-sm text-emerald-300"
+              >
+                <HeartPulse size={16} />
+                Estado global
+              </Link>
+
               <button
                 type="button"
                 onClick={() =>
@@ -234,9 +241,7 @@ export default function IntegrationsPage() {
                     className="animate-spin"
                   />
                 ) : (
-                  <Sparkles
-                    size={16}
-                  />
+                  <Sparkles size={16} />
                 )}
 
                 Crear defaults
@@ -289,8 +294,7 @@ export default function IntegrationsPage() {
             icon: TriangleAlert,
           },
         ].map((metric) => {
-          const Icon =
-            metric.icon;
+          const Icon = metric.icon;
 
           return (
             <article
@@ -358,8 +362,7 @@ export default function IntegrationsPage() {
 
       {!isLoading &&
         !errorMessage &&
-        integrations.length >
-          0 && (
+        integrations.length > 0 && (
           <section className="mt-5 grid gap-5 lg:grid-cols-2 2xl:grid-cols-3">
             {integrations.map(
               (integration) => {
@@ -368,8 +371,7 @@ export default function IntegrationsPage() {
                     integration.provider,
                   );
 
-                const Icon =
-                  catalog.icon;
+                const Icon = catalog.icon;
 
                 const editable =
                   editableProviders.includes(
@@ -384,22 +386,16 @@ export default function IntegrationsPage() {
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex min-w-0 items-start gap-4">
                         <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-red-500/15 bg-red-950/20 text-red-400">
-                          <Icon
-                            size={19}
-                          />
+                          <Icon size={19} />
                         </div>
 
                         <div className="min-w-0">
                           <p className="font-semibold text-white">
-                            {
-                              integration.name
-                            }
+                            {integration.name}
                           </p>
 
                           <p className="mt-1 font-mono text-[10px] text-zinc-700">
-                            {
-                              integration.provider
-                            }
+                            {integration.provider}
                           </p>
                         </div>
                       </div>
@@ -415,9 +411,7 @@ export default function IntegrationsPage() {
                     </div>
 
                     <p className="mt-5 text-sm leading-6 text-zinc-600">
-                      {
-                        catalog.description
-                      }
+                      {catalog.description}
                     </p>
 
                     <dl className="mt-5 space-y-3 text-xs">
@@ -482,9 +476,7 @@ export default function IntegrationsPage() {
                             className="animate-spin"
                           />
                         ) : (
-                          <Gauge
-                            size={15}
-                          />
+                          <Gauge size={15} />
                         )}
 
                         Salud
@@ -495,14 +487,12 @@ export default function IntegrationsPage() {
                           href={`/dashboard/integrations/${integration.provider}`}
                           className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-red-500/15 bg-red-950/15 text-sm text-red-300"
                         >
-                          <Pencil
-                            size={15}
-                          />
+                          <Pencil size={15} />
                           Configurar
                         </Link>
                       ) : (
                         <span className="inline-flex h-10 items-center justify-center rounded-xl border border-white/6 bg-black/20 text-xs text-zinc-700">
-                          Próximo paquete
+                          No administrable
                         </span>
                       )}
                     </div>
