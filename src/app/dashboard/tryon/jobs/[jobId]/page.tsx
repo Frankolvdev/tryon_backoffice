@@ -24,6 +24,7 @@ import { TryOnCopyButton } from "@/components/backoffice/tryon/tryon-copy-button
 import { TryOnEmptyState } from "@/components/backoffice/tryon/tryon-empty-state";
 import { TryOnJobCoreCard } from "@/components/backoffice/tryon/tryon-job-core-card";
 import { TryOnJobFilesPanel } from "@/components/backoffice/tryon/tryon-job-files-panel";
+import { TryOnJobJsonPanel } from "@/components/backoffice/tryon/tryon-job-json-panel";
 import { TryOnJobMetricsPanel } from "@/components/backoffice/tryon/tryon-job-metrics-panel";
 import { TryOnJobStatusBadge } from "@/components/backoffice/tryon/tryon-job-status-badge";
 import { TryOnModuleHeader } from "@/components/backoffice/tryon/tryon-module-header";
@@ -147,7 +148,7 @@ export default function TryOnJobDetailPage() {
     <div>
       <TryOnModuleHeader
         title={`Job #${job.id}`}
-        description="Información central, consumo GPU, archivos y tiempos registrados del trabajo Try-On."
+        description="Información central, métricas, archivos y datos técnicos del trabajo Try-On."
       />
 
       <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -402,6 +403,8 @@ export default function TryOnJobDetailPage() {
           )}
         </article>
       </section>
+
+      <TryOnJobJsonPanel job={job} />
     </div>
   );
 }
