@@ -125,13 +125,13 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
       },
       {
         label: "Suscripciones",
+        href: "/dashboard/billing/subscriptions",
         icon: CircleDollarSign,
-        disabled: true,
       },
       {
         label: "Tokens",
+        href: "/dashboard/billing/tokens",
         icon: PackageOpen,
-        disabled: true,
       },
       {
         label: "Cupones",
