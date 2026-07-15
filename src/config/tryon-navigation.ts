@@ -5,7 +5,9 @@ import {
   Workflow,
 } from "lucide-react";
 
-import type { TryOnModuleSection } from "@/types/admin-tryon";
+import type {
+  TryOnModuleSection,
+} from "@/types/admin-tryon";
 
 export const tryOnSections: Array<
   TryOnModuleSection & {
@@ -24,7 +26,7 @@ export const tryOnSections: Array<
     key: "jobs",
     label: "Trabajos",
     description:
-      "Cola, ejecuciones, resultados, errores y acciones de jobs.",
+      "Cola, ejecuciones, resultados, errores y acciones administrativas.",
     href: "/dashboard/tryon/jobs",
     icon: Workflow,
   },
@@ -32,7 +34,7 @@ export const tryOnSections: Array<
     key: "workflows",
     label: "Workflows",
     description:
-      "Administración de definiciones y versiones de workflows.",
+      "Definiciones, versiones, validación y administración de workflows.",
     href: "/dashboard/tryon/workflows",
     icon: Boxes,
   },
@@ -40,7 +42,7 @@ export const tryOnSections: Array<
     key: "integrations",
     label: "Motor IA",
     description:
-      "Estado y configuración disponible de ComfyUI y RunPod.",
+      "ComfyUI, RunPod, Storage y monitoreo operativo del motor.",
     href: "/dashboard/tryon/integrations",
     icon: Cpu,
   },
