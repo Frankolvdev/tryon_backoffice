@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   FileClock,
   Files,
+  RotateCcw,
   Wrench,
 } from "lucide-react";
 
@@ -26,6 +27,11 @@ const tabs = [
     label: "Operaciones",
     href: "/dashboard/audit/operations",
     icon: Wrench,
+  },
+  {
+    label: "Restaurar y exportar",
+    href: "/dashboard/audit/restore-export",
+    icon: RotateCcw,
   },
 ];
 
