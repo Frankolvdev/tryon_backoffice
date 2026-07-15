@@ -10,28 +10,52 @@ export type TryOnJobStatus =
   | "retrying"
   | string;
 
+export type TryOnItemType =
+  | "clothing"
+  | "shoes"
+  | "garment"
+  | "footwear"
+  | string;
+
+export type TryOnQualityMode =
+  | "standard"
+  | "high"
+  | "premium"
+  | "fast"
+  | string;
+
 export interface TryOnJobSummary {
-  id: number | string;
-  user_id?: number | null;
-  workflow_id?: number | string | null;
-  workflow_name?: string | null;
+  id: number;
+  user_id: number;
+  person_image_file_id: number;
+  item_image_file_id: number;
+  result_file_id: number | null;
+  pricing_rule_id: number | null;
+  runpod_config_id: number | null;
+  item_type: TryOnItemType;
+  quality_mode: TryOnQualityMode;
   status: TryOnJobStatus;
-  tokens_consumed?: number | null;
-  estimated_gpu_cost_cents?: number | null;
-  actual_gpu_cost_cents?: number | null;
-  created_at?: string | null;
-  started_at?: string | null;
-  completed_at?: string | null;
-  error_message?: string | null;
-  [key: string]: unknown;
+  tokens_cost: number;
+  estimated_gpu_seconds: number | null;
+  estimated_gpu_cost_cents: number | null;
+  actual_gpu_seconds: number | null;
+  actual_gpu_cost_cents: number | null;
+  prompt: string | null;
+  error_message: string | null;
+  runpod_job_id: string | null;
+  comfy_workflow_name: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
 }
 
-export interface TryOnJobListResponse {
-  items?: TryOnJobSummary[];
-  total?: number;
-  skip?: number;
-  limit?: number;
-  [key: string]: unknown;
+export interface TryOnJobAdminUpdate {
+  status?: TryOnJobStatus | null;
+  error_message?: string | null;
+  runpod_job_id?: string | null;
+  comfy_workflow_name?: string | null;
+  actual_gpu_seconds?: number | null;
+  actual_gpu_cost_cents?: number | null;
 }
 
 export interface TryOnOverviewMetrics {
