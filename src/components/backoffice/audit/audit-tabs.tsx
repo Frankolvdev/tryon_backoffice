@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 import {
   FileClock,
+  Files,
   Wrench,
 } from "lucide-react";
 
@@ -15,6 +16,11 @@ const tabs = [
     label: "Registros",
     href: "/dashboard/audit",
     icon: FileClock,
+  },
+  {
+    label: "Entradas avanzadas",
+    href: "/dashboard/audit/entries",
+    icon: Files,
   },
   {
     label: "Operaciones",
