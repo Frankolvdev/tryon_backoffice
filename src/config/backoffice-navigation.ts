@@ -119,6 +119,11 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         disabled: true,
       },
       {
+        label: "Planes",
+        href: "/dashboard/billing/plans",
+        icon: CircleDollarSign,
+      },
+      {
         label: "Suscripciones",
         icon: CircleDollarSign,
         disabled: true,
