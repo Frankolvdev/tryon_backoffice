@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   Globe2,
   Settings,
+  ShieldCheck,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -20,6 +21,11 @@ const tabs = [
     label: "Configuración pública",
     href: "/dashboard/settings/public",
     icon: Globe2,
+  },
+  {
+    label: "Configuración avanzada",
+    href: "/dashboard/settings/advanced",
+    icon: ShieldCheck,
   },
 ];
 
