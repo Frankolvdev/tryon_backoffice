@@ -144,8 +144,8 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
       },
       {
         label: "Auditoría",
+        href: "/dashboard/audit",
         icon: FileClock,
-        disabled: true,
       },
       {
         label: "Eventos operativos",
