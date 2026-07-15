@@ -194,8 +194,8 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
       },
       {
         label: "Configuración",
+        href: "/dashboard/settings",
         icon: Settings,
-        disabled: true,
       },
       {
         label: "Tickets",
