@@ -21,6 +21,7 @@ import { toast } from "sonner";
 
 import { IntegrationEditor } from "@/components/backoffice/integrations/integration-editor";
 import { IntegrationStatusBadge } from "@/components/backoffice/integrations/integration-status-badge";
+import { StripeIntegrationEditor } from "@/components/backoffice/integrations/stripe-integration-editor";
 import { browserApiRequest } from "@/lib/api/browser-api";
 import {
   getIntegrationCatalogItem,
@@ -37,6 +38,7 @@ const editableProviders:
     "comfyui",
     "runpod",
     "s3",
+    "stripe",
   ];
 
 export default function IntegrationDetailPage() {
@@ -120,9 +122,13 @@ export default function IntegrationDetailPage() {
       if (
         response.status === "healthy"
       ) {
-        toast.success(response.message);
+        toast.success(
+          response.message,
+        );
       } else {
-        toast.warning(response.message);
+        toast.warning(
+          response.message,
+        );
       }
 
       await loadIntegration();
@@ -138,7 +144,9 @@ export default function IntegrationDetailPage() {
   };
 
   const catalog =
-    getIntegrationCatalogItem(provider);
+    getIntegrationCatalogItem(
+      provider,
+    );
 
   if (isLoading) {
     return (
@@ -165,6 +173,7 @@ export default function IntegrationDetailPage() {
         <section className="luxia-panel mt-5 rounded-3xl p-6">
           <div className="flex items-start gap-3 rounded-2xl border border-red-500/15 bg-red-950/15 p-5">
             <TriangleAlert className="mt-0.5 shrink-0 text-red-400" />
+
             <p className="text-sm leading-6 text-red-300">
               {errorMessage}
             </p>
@@ -187,7 +196,9 @@ export default function IntegrationDetailPage() {
 
         <div className="flex flex-wrap items-center gap-3">
           <IntegrationStatusBadge
-            status={integration.status}
+            status={
+              integration.status
+            }
             health={
               integration.last_health_status
             }
@@ -223,6 +234,7 @@ export default function IntegrationDetailPage() {
             ) : (
               <Gauge size={16} />
             )}
+
             Comprobar salud
           </button>
         </div>
@@ -244,10 +256,17 @@ export default function IntegrationDetailPage() {
       </section>
 
       <div className="mt-5">
-        <IntegrationEditor
-          integration={integration}
-          onSaved={setIntegration}
-        />
+        {provider === "stripe" ? (
+          <StripeIntegrationEditor
+            integration={integration}
+            onSaved={setIntegration}
+          />
+        ) : (
+          <IntegrationEditor
+            integration={integration}
+            onSaved={setIntegration}
+          />
+        )}
       </div>
     </div>
   );

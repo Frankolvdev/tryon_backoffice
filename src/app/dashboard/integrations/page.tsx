@@ -41,6 +41,7 @@ const editableProviders:
     "comfyui",
     "runpod",
     "s3",
+    "stripe",
   ];
 
 export default function IntegrationsPage() {
@@ -65,7 +66,9 @@ export default function IntegrationsPage() {
         const response =
           await browserApiRequest<
             IntegrationConfigResponse[]
-          >("/api/admin/integrations");
+          >(
+            "/api/admin/integrations",
+          );
 
         setIntegrations(response);
       } catch (error) {
@@ -88,7 +91,8 @@ export default function IntegrationsPage() {
   const metrics = useMemo(() => {
     const enabled =
       integrations.filter(
-        (item) => item.is_enabled,
+        (item) =>
+          item.is_enabled,
       ).length;
 
     const healthy =
@@ -160,7 +164,10 @@ export default function IntegrationsPage() {
           },
         );
 
-      if (response.status === "healthy") {
+      if (
+        response.status ===
+        "healthy"
+      ) {
         toast.success(
           `${integration.name}: ${response.message}`,
         );
@@ -189,7 +196,9 @@ export default function IntegrationsPage() {
           <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
             <div className="flex items-start gap-4">
               <div className="luxia-red-glow flex size-14 shrink-0 items-center justify-center rounded-2xl border border-red-500/20 bg-red-950/25 text-red-400">
-                <Settings2 size={24} />
+                <Settings2
+                  size={24}
+                />
               </div>
 
               <div>
@@ -202,7 +211,9 @@ export default function IntegrationsPage() {
                 </h1>
 
                 <p className="mt-3 max-w-3xl text-sm leading-7 text-zinc-600">
-                  Configuración centralizada y estado de los proveedores externos registrados por el backend.
+                  Configuración centralizada y estado de
+                  los proveedores externos registrados
+                  por el backend.
                 </p>
               </div>
             </div>
@@ -222,8 +233,11 @@ export default function IntegrationsPage() {
                     className="animate-spin"
                   />
                 ) : (
-                  <Sparkles size={16} />
+                  <Sparkles
+                    size={16}
+                  />
                 )}
+
                 Crear defaults
               </button>
 
@@ -243,6 +257,7 @@ export default function IntegrationsPage() {
                       : undefined
                   }
                 />
+
                 Actualizar
               </button>
             </div>
@@ -273,7 +288,8 @@ export default function IntegrationsPage() {
             icon: TriangleAlert,
           },
         ].map((metric) => {
-          const Icon = metric.icon;
+          const Icon =
+            metric.icon;
 
           return (
             <article
@@ -333,14 +349,16 @@ export default function IntegrationsPage() {
             </h2>
 
             <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-zinc-600">
-              Ejecuta “Crear defaults” para registrar las integraciones soportadas por el backend.
+              Ejecuta “Crear defaults” para registrar las
+              integraciones soportadas por el backend.
             </p>
           </section>
         )}
 
       {!isLoading &&
         !errorMessage &&
-        integrations.length > 0 && (
+        integrations.length >
+          0 && (
           <section className="mt-5 grid gap-5 lg:grid-cols-2 2xl:grid-cols-3">
             {integrations.map(
               (integration) => {
@@ -349,7 +367,8 @@ export default function IntegrationsPage() {
                     integration.provider,
                   );
 
-                const Icon = catalog.icon;
+                const Icon =
+                  catalog.icon;
 
                 const editable =
                   editableProviders.includes(
@@ -364,16 +383,22 @@ export default function IntegrationsPage() {
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex min-w-0 items-start gap-4">
                         <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-red-500/15 bg-red-950/20 text-red-400">
-                          <Icon size={19} />
+                          <Icon
+                            size={19}
+                          />
                         </div>
 
                         <div className="min-w-0">
                           <p className="font-semibold text-white">
-                            {integration.name}
+                            {
+                              integration.name
+                            }
                           </p>
 
                           <p className="mt-1 font-mono text-[10px] text-zinc-700">
-                            {integration.provider}
+                            {
+                              integration.provider
+                            }
                           </p>
                         </div>
                       </div>
@@ -389,7 +414,9 @@ export default function IntegrationsPage() {
                     </div>
 
                     <p className="mt-5 text-sm leading-6 text-zinc-600">
-                      {catalog.description}
+                      {
+                        catalog.description
+                      }
                     </p>
 
                     <dl className="mt-5 space-y-3 text-xs">
@@ -397,6 +424,7 @@ export default function IntegrationsPage() {
                         <dt className="text-zinc-700">
                           Habilitada
                         </dt>
+
                         <dd className="text-zinc-400">
                           {integration.is_enabled
                             ? "Sí"
@@ -408,6 +436,7 @@ export default function IntegrationsPage() {
                         <dt className="text-zinc-700">
                           URL base
                         </dt>
+
                         <dd className="max-w-[65%] truncate text-right text-zinc-400">
                           {integration.base_url ??
                             "No configurada"}
@@ -418,6 +447,7 @@ export default function IntegrationsPage() {
                         <dt className="text-zinc-700">
                           Última comprobación
                         </dt>
+
                         <dd className="text-right text-zinc-400">
                           {integration.last_checked_at
                             ? new Date(
@@ -451,7 +481,9 @@ export default function IntegrationsPage() {
                             className="animate-spin"
                           />
                         ) : (
-                          <Gauge size={15} />
+                          <Gauge
+                            size={15}
+                          />
                         )}
 
                         Salud
@@ -462,7 +494,9 @@ export default function IntegrationsPage() {
                           href={`/dashboard/integrations/${integration.provider}`}
                           className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-red-500/15 bg-red-950/15 text-sm text-red-300"
                         >
-                          <Pencil size={15} />
+                          <Pencil
+                            size={15}
+                          />
                           Configurar
                         </Link>
                       ) : (
