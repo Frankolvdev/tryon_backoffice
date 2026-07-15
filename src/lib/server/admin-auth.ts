@@ -14,21 +14,30 @@ import type {
   User,
 } from "@/types/auth";
 
-export function isAdministrativeUser(user: User): boolean {
-  return user.role === "admin" || user.role === "superadmin";
+export function isAdministrativeUser(
+  user: User,
+): boolean {
+  return (
+    user.role === "admin" ||
+    user.role === "superadmin"
+  );
 }
 
 async function fetchCurrentUser(
   accessToken: string,
 ): Promise<User> {
-  return backendRequest<User>("/api/v1/users/me", {
-    method: "GET",
-    accessToken,
-  });
+  return backendRequest<User>(
+    "/api/v1/users/me",
+    {
+      method: "GET",
+      accessToken,
+    },
+  );
 }
 
 async function refreshAuthentication(): Promise<TokenResponse> {
-  const refreshToken = await getRefreshToken();
+  const refreshToken =
+    await getRefreshToken();
 
   if (!refreshToken) {
     throw new BackendApiError(
@@ -38,51 +47,85 @@ async function refreshAuthentication(): Promise<TokenResponse> {
     );
   }
 
-  const tokens = await backendRequest<TokenResponse>(
-    "/api/v1/auth/refresh",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        refresh_token: refreshToken,
-      }),
-    },
-  );
+  const tokens =
+    await backendRequest<TokenResponse>(
+      "/api/v1/auth/refresh",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          refresh_token: refreshToken,
+        }),
+      },
+    );
 
   await setAuthenticationCookies(tokens);
 
   return tokens;
 }
 
+async function refreshOrClearAuthentication(): Promise<TokenResponse> {
+  try {
+    return await refreshAuthentication();
+  } catch (error) {
+    if (
+      error instanceof BackendApiError &&
+      (
+        error.status === 400 ||
+        error.status === 401 ||
+        error.status === 403
+      )
+    ) {
+      await clearAuthenticationCookies();
+
+      throw new BackendApiError(
+        "La sesión ha expirado. Inicia sesión nuevamente.",
+        401,
+        error.payload,
+      );
+    }
+
+    throw error;
+  }
+}
+
 export async function getAuthenticatedAdmin(): Promise<User> {
-  const accessToken = await getAccessToken();
+  let accessToken =
+    await getAccessToken();
 
   if (!accessToken) {
-    await clearAuthenticationCookies();
+    const tokens =
+      await refreshOrClearAuthentication();
 
-    throw new BackendApiError(
-      "La sesión ha expirado.",
-      401,
-      null,
-    );
+    accessToken = tokens.access_token;
   }
 
   let user: User;
 
   try {
-    user = await fetchCurrentUser(accessToken);
+    user = await fetchCurrentUser(
+      accessToken,
+    );
   } catch (error) {
     if (
-      !(error instanceof BackendApiError) ||
+      !(
+        error instanceof BackendApiError
+      ) ||
       error.status !== 401
     ) {
       throw error;
     }
 
-    const tokens = await refreshAuthentication();
-    user = await fetchCurrentUser(tokens.access_token);
+    const tokens =
+      await refreshOrClearAuthentication();
+
+    user = await fetchCurrentUser(
+      tokens.access_token,
+    );
   }
 
-  if (!isAdministrativeUser(user)) {
+  if (
+    !isAdministrativeUser(user)
+  ) {
     await clearAuthenticationCookies();
 
     throw new BackendApiError(
@@ -92,7 +135,10 @@ export async function getAuthenticatedAdmin(): Promise<User> {
     );
   }
 
-  if (!user.is_active || user.status !== "active") {
+  if (
+    !user.is_active ||
+    user.status !== "active"
+  ) {
     await clearAuthenticationCookies();
 
     throw new BackendApiError(
