@@ -12,6 +12,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 
+import { TryOnRunPodActions } from "@/components/backoffice/tryon/tryon-runpod-actions";
 import { browserApiRequest } from "@/lib/api/browser-api";
 
 import type {
@@ -23,6 +24,7 @@ import type {
 interface TryOnJobActionsPanelProps {
   job: TryOnJobSummary;
   onUpdated: (job: TryOnJobSummary) => void;
+  onRefresh?: () => Promise<void> | void;
 }
 
 const KNOWN_STATUSES: TryOnJobStatus[] = [
@@ -58,6 +60,7 @@ function parseNullableInteger(
 export function TryOnJobActionsPanel({
   job,
   onUpdated,
+  onRefresh,
 }: TryOnJobActionsPanelProps) {
   const [status, setStatus] =
     useState<TryOnJobStatus>(job.status);
@@ -222,9 +225,8 @@ export function TryOnJobActionsPanel({
           </h2>
 
           <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-600">
-            Este formulario usa exclusivamente los
-            campos admitidos por
-            TryOnJobAdminUpdate en el backend.
+            Edición administrativa del job y acciones
+            reales sobre su ejecución RunPod vinculada.
           </p>
         </div>
       </div>
@@ -381,6 +383,13 @@ export function TryOnJobActionsPanel({
           </button>
         </div>
       </form>
+
+      <TryOnRunPodActions
+        job={job}
+        onTryOnJobRefresh={
+          onRefresh ?? (() => undefined)
+        }
+      />
     </section>
   );
 }
