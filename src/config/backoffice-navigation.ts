@@ -84,7 +84,7 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
       },
       {
         label: "RunPod",
-        href: "/dashboard/tryon/integrations",
+        href: "/dashboard/tryon/integrations/runpod",
         icon: Cpu,
       },
       {
