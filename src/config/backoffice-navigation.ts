@@ -164,8 +164,8 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
     items: [
       {
         label: "Monitoreo",
+        href: "/dashboard/tryon/integrations/monitoring",
         icon: Gauge,
-        disabled: true,
       },
       {
         label: "Almacenamiento",
