@@ -3,6 +3,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Activity,
   BadgeDollarSign,
+  BadgePercent,
   Bell,
   Boxes,
   ChartNoAxesCombined,
@@ -132,6 +133,11 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         label: "Tokens",
         href: "/dashboard/billing/tokens",
         icon: PackageOpen,
+      },
+      {
+        label: "Pricing y cupones",
+        href: "/dashboard/billing/pricing-coupons",
+        icon: BadgePercent,
       },
       {
         label: "Cupones",
