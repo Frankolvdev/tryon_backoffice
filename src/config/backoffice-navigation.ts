@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 
 import {
   Activity,
+  BadgeDollarSign,
   Bell,
   Boxes,
   ChartNoAxesCombined,
@@ -102,6 +103,11 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
   {
     label: "Comercial",
     items: [
+      {
+        label: "Dashboard comercial",
+        href: "/dashboard/billing",
+        icon: BadgeDollarSign,
+      },
       {
         label: "Pagos",
         icon: CreditCard,
