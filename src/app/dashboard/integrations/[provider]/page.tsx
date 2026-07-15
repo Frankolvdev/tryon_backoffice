@@ -21,6 +21,7 @@ import { toast } from "sonner";
 
 import { IntegrationEditor } from "@/components/backoffice/integrations/integration-editor";
 import { IntegrationStatusBadge } from "@/components/backoffice/integrations/integration-status-badge";
+import { SmtpIntegrationEditor } from "@/components/backoffice/integrations/smtp-integration-editor";
 import { StripeIntegrationEditor } from "@/components/backoffice/integrations/stripe-integration-editor";
 import { browserApiRequest } from "@/lib/api/browser-api";
 import {
@@ -39,6 +40,7 @@ const editableProviders:
     "runpod",
     "s3",
     "stripe",
+    "smtp",
   ];
 
 export default function IntegrationDetailPage() {
@@ -258,6 +260,11 @@ export default function IntegrationDetailPage() {
       <div className="mt-5">
         {provider === "stripe" ? (
           <StripeIntegrationEditor
+            integration={integration}
+            onSaved={setIntegration}
+          />
+        ) : provider === "smtp" ? (
+          <SmtpIntegrationEditor
             integration={integration}
             onSaved={setIntegration}
           />

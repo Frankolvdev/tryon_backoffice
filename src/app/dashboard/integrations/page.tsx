@@ -42,6 +42,7 @@ const editableProviders:
     "runpod",
     "s3",
     "stripe",
+    "smtp",
   ];
 
 export default function IntegrationsPage() {
