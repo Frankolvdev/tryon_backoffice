@@ -179,8 +179,8 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
       },
       {
         label: "Integraciones",
+        href: "/dashboard/integrations",
         icon: Globe2,
-        disabled: true,
       },
       {
         label: "Feature flags",
