@@ -69,13 +69,13 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
       },
       {
         label: "Try-On",
+        href: "/dashboard/tryon",
         icon: Sparkles,
-        disabled: true,
       },
       {
         label: "Trabajos de IA",
+        href: "/dashboard/tryon/jobs",
         icon: Workflow,
-        disabled: true,
       },
       {
         label: "Colas y procesos",
@@ -84,18 +84,18 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
       },
       {
         label: "RunPod",
+        href: "/dashboard/tryon/integrations",
         icon: Cpu,
-        disabled: true,
       },
       {
         label: "ComfyUI",
+        href: "/dashboard/tryon/integrations",
         icon: Boxes,
-        disabled: true,
       },
       {
         label: "Workflows",
+        href: "/dashboard/tryon/workflows",
         icon: ClipboardList,
-        disabled: true,
       },
     ],
   },
