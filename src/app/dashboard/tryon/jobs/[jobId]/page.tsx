@@ -24,6 +24,7 @@ import {
 import { TryOnCopyButton } from "@/components/backoffice/tryon/tryon-copy-button";
 import { TryOnEmptyState } from "@/components/backoffice/tryon/tryon-empty-state";
 import { TryOnJobCoreCard } from "@/components/backoffice/tryon/tryon-job-core-card";
+import { TryOnJobMetricsPanel } from "@/components/backoffice/tryon/tryon-job-metrics-panel";
 import { TryOnJobStatusBadge } from "@/components/backoffice/tryon/tryon-job-status-badge";
 import { TryOnModuleHeader } from "@/components/backoffice/tryon/tryon-module-header";
 import { browserApiRequest } from "@/lib/api/browser-api";
@@ -146,7 +147,7 @@ export default function TryOnJobDetailPage() {
     <div>
       <TryOnModuleHeader
         title={`Job #${job.id}`}
-        description="Información central del trabajo: usuario, estado, artículo, calidad, workflow, RunPod, prompt y error."
+        description="Información central, consumo GPU y tiempos registrados del trabajo Try-On."
       />
 
       <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -233,6 +234,8 @@ export default function TryOnJobDetailPage() {
           />
         </div>
       </section>
+
+      <TryOnJobMetricsPanel job={job} />
 
       <section className="mt-5 grid gap-5 xl:grid-cols-2">
         <article className="luxia-panel rounded-3xl p-6">
