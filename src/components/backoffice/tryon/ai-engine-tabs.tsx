@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   Cpu,
   Database,
+  Gauge,
   Server,
 } from "lucide-react";
 
@@ -26,6 +27,11 @@ const tabs = [
     label: "Storage",
     href: "/dashboard/tryon/integrations/storage",
     icon: Database,
+  },
+  {
+    label: "Monitoreo",
+    href: "/dashboard/tryon/integrations/monitoring",
+    icon: Gauge,
   },
 ];
 
