@@ -115,8 +115,8 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
       },
       {
         label: "Facturas",
+        href: "/dashboard/billing/invoices",
         icon: ReceiptText,
-        disabled: true,
       },
       {
         label: "Planes",
