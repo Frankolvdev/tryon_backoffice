@@ -52,3 +52,14 @@ export interface WorkflowDefinitionUpdate {
   is_active?: boolean | null;
   is_default?: boolean | null;
 }
+
+export interface WorkflowVersionCreate {
+  name: string | null;
+  description: string | null;
+  workflow: Record<string, unknown>;
+  parameter_schema: Record<string, unknown>;
+  execution_modes: WorkflowExecutionMode[];
+  metadata: Record<string, unknown>;
+  activate_new_version: boolean;
+  make_default: boolean;
+}

@@ -8,6 +8,7 @@ import {
   UserRound,
 } from "lucide-react";
 
+import { WorkflowManagementPanel } from "@/components/backoffice/tryon/workflow-management-panel";
 import { WorkflowStatusBadges } from "@/components/backoffice/tryon/workflow-status-badges";
 import {
   formatTryOnDate,
@@ -207,6 +208,10 @@ export function WorkflowDetailOverview({
           </dl>
         </article>
       </section>
+
+      <WorkflowManagementPanel
+        workflow={workflow}
+      />
     </>
   );
 }
