@@ -49,6 +49,16 @@ export interface TryOnJobSummary {
   completed_at: string | null;
 }
 
+export interface TryOnJobListResponse {
+  items?: TryOnJobSummary[];
+  jobs?: TryOnJobSummary[];
+  results?: TryOnJobSummary[];
+  total?: number;
+  skip?: number;
+  limit?: number;
+  [key: string]: unknown;
+}
+
 export interface TryOnJobAdminUpdate {
   status?: TryOnJobStatus | null;
   error_message?: string | null;

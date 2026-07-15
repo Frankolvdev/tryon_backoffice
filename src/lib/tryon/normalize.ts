@@ -4,7 +4,9 @@ import type {
   TryOnOverviewMetrics,
 } from "@/types/admin-tryon";
 
-function asRecord(value: unknown): Record<string, unknown> | null {
+function asRecord(
+  value: unknown,
+): Record<string, unknown> | null {
   if (
     typeof value !== "object" ||
     value === null ||
@@ -22,7 +24,8 @@ export function extractTryOnJobs(
   if (Array.isArray(payload)) {
     return payload.filter(
       (item): item is TryOnJobSummary =>
-        typeof item === "object" && item !== null,
+        typeof item === "object" &&
+        item !== null,
     );
   }
 
@@ -43,7 +46,8 @@ export function extractTryOnJobs(
     if (Array.isArray(candidate)) {
       return candidate.filter(
         (item): item is TryOnJobSummary =>
-          typeof item === "object" && item !== null,
+          typeof item === "object" &&
+          item !== null,
       );
     }
 
@@ -51,12 +55,15 @@ export function extractTryOnJobs(
 
     if (nested) {
       const nestedItems =
-        nested.items ?? nested.jobs ?? nested.results;
+        nested.items ??
+        nested.jobs ??
+        nested.results;
 
       if (Array.isArray(nestedItems)) {
         return nestedItems.filter(
           (item): item is TryOnJobSummary =>
-            typeof item === "object" && item !== null,
+            typeof item === "object" &&
+            item !== null,
         );
       }
     }
@@ -65,14 +72,21 @@ export function extractTryOnJobs(
   return [];
 }
 
-function normalizeStatus(value: unknown): string {
-  return String(value ?? "").trim().toLowerCase();
+function normalizeStatus(
+  value: unknown,
+): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase();
 }
 
 function readNumber(
   value: unknown,
 ): number {
-  if (typeof value === "number" && Number.isFinite(value)) {
+  if (
+    typeof value === "number" &&
+    Number.isFinite(value)
+  ) {
     return value;
   }
 
@@ -103,7 +117,9 @@ export function calculateTryOnOverview(
   };
 
   for (const job of jobs) {
-    const status = normalizeStatus(job.status);
+    const status = normalizeStatus(
+      job.status,
+    );
 
     if (
       status === "queued" ||
@@ -128,16 +144,18 @@ export function calculateTryOnOverview(
     }
 
     metrics.tokensConsumed += readNumber(
-      job.tokens_consumed,
+      job.tokens_cost,
     );
 
-    metrics.estimatedGpuCostCents += readNumber(
-      job.estimated_gpu_cost_cents,
-    );
+    metrics.estimatedGpuCostCents +=
+      readNumber(
+        job.estimated_gpu_cost_cents,
+      );
 
-    metrics.actualGpuCostCents += readNumber(
-      job.actual_gpu_cost_cents,
-    );
+    metrics.actualGpuCostCents +=
+      readNumber(
+        job.actual_gpu_cost_cents,
+      );
   }
 
   return metrics;
