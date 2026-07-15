@@ -169,8 +169,8 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
       },
       {
         label: "Almacenamiento",
+        href: "/dashboard/tryon/integrations/storage",
         icon: Database,
-        disabled: true,
       },
       {
         label: "Internacionalización",

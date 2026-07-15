@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 import {
   Cpu,
+  Database,
   Server,
 } from "lucide-react";
 
@@ -21,6 +22,11 @@ const tabs = [
     href: "/dashboard/tryon/integrations/runpod",
     icon: Server,
   },
+  {
+    label: "Storage",
+    href: "/dashboard/tryon/integrations/storage",
+    icon: Database,
+  },
 ];
 
 export function AiEngineTabs() {
@@ -30,7 +36,6 @@ export function AiEngineTabs() {
     <nav className="mt-6 flex flex-wrap gap-2">
       {tabs.map((tab) => {
         const Icon = tab.icon;
-
         const active =
           pathname === tab.href;
 
