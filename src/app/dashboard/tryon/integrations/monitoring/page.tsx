@@ -148,26 +148,19 @@ export default function TryOnMonitoringPage() {
           storageFiles,
           workflowDefinitions,
         ] = await Promise.all([
-          browserApiRequest<
-            TryOnJobSummary[]
-          >(
-            "/api/admin/tryon-jobs?skip=0&limit=200",
+          browserApiRequest<TryOnJobSummary[]>(
+            "/api/admin/tryon-jobs?skip=0&limit=100",
           ),
-          browserApiRequest<
-            ExternalAiJobResponse[]
-          >(
-            "/api/admin/external-ai-jobs?skip=0&limit=200",
+          browserApiRequest<ExternalAiJobResponse[]>(
+            "/api/admin/external-ai-jobs?skip=0&limit=100",
           ),
-          browserApiRequest<
-            AdminStorageFile[]
-          >(
-            "/api/admin/storage/files?skip=0&limit=200",
+          browserApiRequest<AdminStorageFile[]>(
+            "/api/admin/storage/files?skip=0&limit=100",
           ),
           browserApiRequest<WorkflowDefinitionListResponse>(
-            "/api/admin/workflow-definitions?skip=0&limit=200",
+            "/api/admin/workflow-definitions?skip=0&limit=100",
           ),
         ]);
-
         setSnapshot({
           tryOnJobs,
           externalAiJobs,
@@ -195,8 +188,8 @@ export default function TryOnMonitoringPage() {
     () =>
       snapshot
         ? calculateTryOnMonitoringMetrics(
-            snapshot,
-          )
+          snapshot,
+        )
         : null,
     [snapshot],
   );
