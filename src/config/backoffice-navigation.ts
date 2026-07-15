@@ -110,8 +110,8 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
       },
       {
         label: "Pagos",
+        href: "/dashboard/billing/payments",
         icon: CreditCard,
-        disabled: true,
       },
       {
         label: "Facturas",
