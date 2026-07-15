@@ -1,53 +1,199 @@
+"use client";
+
 import Link from "next/link";
+import { useParams } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
+
 import {
   ArrowLeft,
-  Construction,
+  LoaderCircle,
+  RefreshCcw,
 } from "lucide-react";
 
+import { TryOnEmptyState } from "@/components/backoffice/tryon/tryon-empty-state";
 import { TryOnModuleHeader } from "@/components/backoffice/tryon/tryon-module-header";
+import { WorkflowDetailOverview } from "@/components/backoffice/tryon/workflow-detail-overview";
+import { WorkflowJsonPanel } from "@/components/backoffice/tryon/workflow-json-panel";
+import { browserApiRequest } from "@/lib/api/browser-api";
 
-interface WorkflowDetailPlaceholderProps {
-  params: Promise<{
+import type {
+  WorkflowDefinitionResponse,
+} from "@/types/admin-workflows";
+
+export default function WorkflowDetailPage() {
+  const params = useParams<{
     workflowId: string;
-  }>;
-}
+  }>();
 
-export default async function WorkflowDetailPlaceholder({
-  params,
-}: Readonly<WorkflowDetailPlaceholderProps>) {
-  const { workflowId } = await params;
+  const workflowId = Number(
+    params.workflowId,
+  );
 
-  return (
-    <div>
-      <TryOnModuleHeader
-        title={`Workflow #${workflowId}`}
-        description="La ruta de detalle está preparada para el siguiente paquete."
-      />
+  const [workflow, setWorkflow] =
+    useState<WorkflowDefinitionResponse | null>(
+      null,
+    );
 
-      <section className="luxia-panel mt-7 rounded-3xl p-8 text-center">
-        <Construction
-          size={38}
-          className="mx-auto text-red-500"
+  const [isLoading, setIsLoading] =
+    useState(true);
+
+  const [errorMessage, setErrorMessage] =
+    useState<string | null>(null);
+
+  const loadWorkflow =
+    useCallback(async () => {
+      if (
+        !Number.isInteger(workflowId) ||
+        workflowId <= 0
+      ) {
+        setWorkflow(null);
+        setErrorMessage(
+          "El identificador del workflow no es válido.",
+        );
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      setErrorMessage(null);
+
+      try {
+        const response =
+          await browserApiRequest<WorkflowDefinitionResponse>(
+            `/api/admin/workflow-definitions/${workflowId}`,
+          );
+
+        setWorkflow(response);
+      } catch (error) {
+        setWorkflow(null);
+
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "No fue posible cargar el workflow.",
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    }, [workflowId]);
+
+  useEffect(() => {
+    void loadWorkflow();
+  }, [loadWorkflow]);
+
+  if (isLoading) {
+    return (
+      <div>
+        <TryOnModuleHeader
+          title={`Workflow #${params.workflowId}`}
+          description="Consultando la definición administrativa del workflow."
         />
 
-        <h2 className="mt-5 text-xl font-semibold text-white">
-          Detalle preparado
-        </h2>
+        <section className="luxia-panel mt-7 flex min-h-96 items-center justify-center rounded-3xl">
+          <div className="text-center">
+            <LoaderCircle className="mx-auto animate-spin text-red-500" />
 
-        <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-zinc-600">
-          El siguiente ZIP conectará el endpoint
-          individual, mostrará JSON, parámetros,
-          metadata y acciones del workflow.
-        </p>
+            <p className="mt-4 text-sm text-zinc-500">
+              Cargando workflow...
+            </p>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  if (
+    !workflow ||
+    errorMessage
+  ) {
+    return (
+      <div>
+        <TryOnModuleHeader
+          title={`Workflow #${params.workflowId}`}
+          description="Detalle administrativo del workflow."
+        />
+
+        <div className="mt-7">
+          <TryOnEmptyState
+            error
+            title="No se pudo cargar el workflow"
+            description={
+              errorMessage ??
+              "El workflow solicitado no está disponible."
+            }
+          />
+        </div>
 
         <Link
           href="/dashboard/tryon/workflows"
-          className="mt-6 inline-flex h-11 items-center gap-2 rounded-xl bg-red-700 px-5 text-sm font-semibold text-white"
+          className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl border border-white/8 bg-white/[0.025] px-4 text-sm text-zinc-400 transition hover:text-white"
         >
           <ArrowLeft size={16} />
           Volver a workflows
         </Link>
-      </section>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <TryOnModuleHeader
+        title={workflow.name}
+        description="Detalle completo de la definición, esquema de parámetros, metadata y JSON de ejecución."
+      />
+
+      <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Link
+          href="/dashboard/tryon/workflows"
+          className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/8 bg-white/[0.025] px-4 text-sm text-zinc-400 transition hover:text-white"
+        >
+          <ArrowLeft size={16} />
+          Volver a workflows
+        </Link>
+
+        <button
+          type="button"
+          onClick={() =>
+            void loadWorkflow()
+          }
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/8 bg-white/[0.025] px-4 text-sm text-zinc-400 transition hover:text-white"
+        >
+          <RefreshCcw size={16} />
+          Actualizar
+        </button>
+      </div>
+
+      <WorkflowDetailOverview
+        workflow={workflow}
+      />
+
+      <div className="mt-5 grid gap-5 xl:grid-cols-2">
+        <WorkflowJsonPanel
+          title="Workflow ComfyUI"
+          filename={`${workflow.key}-v${workflow.version}.json`}
+          value={workflow.workflow}
+        />
+
+        <WorkflowJsonPanel
+          title="Esquema de parámetros"
+          filename={`${workflow.key}-parameter-schema.json`}
+          value={
+            workflow.parameter_schema
+          }
+        />
+      </div>
+
+      <div className="mt-5">
+        <WorkflowJsonPanel
+          title="Metadata"
+          filename={`${workflow.key}-metadata.json`}
+          value={workflow.metadata}
+        />
+      </div>
     </div>
   );
 }
