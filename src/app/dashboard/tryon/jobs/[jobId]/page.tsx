@@ -13,7 +13,6 @@ import {
   ArrowLeft,
   Boxes,
   Clock3,
-  ImageIcon,
   LoaderCircle,
   RefreshCcw,
   Server,
@@ -24,6 +23,7 @@ import {
 import { TryOnCopyButton } from "@/components/backoffice/tryon/tryon-copy-button";
 import { TryOnEmptyState } from "@/components/backoffice/tryon/tryon-empty-state";
 import { TryOnJobCoreCard } from "@/components/backoffice/tryon/tryon-job-core-card";
+import { TryOnJobFilesPanel } from "@/components/backoffice/tryon/tryon-job-files-panel";
 import { TryOnJobMetricsPanel } from "@/components/backoffice/tryon/tryon-job-metrics-panel";
 import { TryOnJobStatusBadge } from "@/components/backoffice/tryon/tryon-job-status-badge";
 import { TryOnModuleHeader } from "@/components/backoffice/tryon/tryon-module-header";
@@ -147,7 +147,7 @@ export default function TryOnJobDetailPage() {
     <div>
       <TryOnModuleHeader
         title={`Job #${job.id}`}
-        description="Información central, consumo GPU y tiempos registrados del trabajo Try-On."
+        description="Información central, consumo GPU, archivos y tiempos registrados del trabajo Try-On."
       />
 
       <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -237,6 +237,8 @@ export default function TryOnJobDetailPage() {
 
       <TryOnJobMetricsPanel job={job} />
 
+      <TryOnJobFilesPanel job={job} />
+
       <section className="mt-5 grid gap-5 xl:grid-cols-2">
         <article className="luxia-panel rounded-3xl p-6">
           <div className="flex items-center gap-3">
@@ -301,69 +303,7 @@ export default function TryOnJobDetailPage() {
         </article>
       </section>
 
-      <section className="mt-5 grid gap-5 lg:grid-cols-2">
-        <article className="luxia-panel rounded-3xl p-6">
-          <div className="flex items-center gap-3">
-            <ImageIcon className="text-red-400" />
-
-            <h2 className="font-semibold text-white">
-              Archivos asociados
-            </h2>
-          </div>
-
-          <dl className="mt-5 space-y-4 text-sm">
-            <div className="flex items-center justify-between gap-4 border-b border-white/5 pb-4">
-              <dt className="text-zinc-600">
-                Imagen de persona
-              </dt>
-
-              <dd className="flex items-center gap-2 text-zinc-300">
-                #{job.person_image_file_id}
-                <TryOnCopyButton
-                  value={String(
-                    job.person_image_file_id,
-                  )}
-                />
-              </dd>
-            </div>
-
-            <div className="flex items-center justify-between gap-4 border-b border-white/5 pb-4">
-              <dt className="text-zinc-600">
-                Imagen de artículo
-              </dt>
-
-              <dd className="flex items-center gap-2 text-zinc-300">
-                #{job.item_image_file_id}
-                <TryOnCopyButton
-                  value={String(
-                    job.item_image_file_id,
-                  )}
-                />
-              </dd>
-            </div>
-
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-zinc-600">
-                Resultado
-              </dt>
-
-              <dd className="flex items-center gap-2 text-zinc-300">
-                {job.result_file_id === null
-                  ? "Pendiente"
-                  : `#${job.result_file_id}`}
-
-                {job.result_file_id !== null && (
-                  <TryOnCopyButton
-                    value={String(
-                      job.result_file_id,
-                    )}
-                  />
-                )}
-              </dd>
-            </div>
-          </dl>
-        </article>
-
+      <section className="mt-5">
         <article className="luxia-panel rounded-3xl p-6">
           <div className="flex items-center gap-3">
             <Clock3 className="text-red-400" />
@@ -373,37 +313,37 @@ export default function TryOnJobDetailPage() {
             </h2>
           </div>
 
-          <dl className="mt-5 space-y-4 text-sm">
-            <div className="flex justify-between gap-4 border-b border-white/5 pb-4">
-              <dt className="text-zinc-600">
+          <dl className="mt-5 grid gap-4 text-sm md:grid-cols-3">
+            <div className="rounded-2xl border border-white/6 bg-black/20 p-4">
+              <dt className="text-xs text-zinc-600">
                 Creado
               </dt>
 
-              <dd className="text-right text-zinc-300">
+              <dd className="mt-2 text-zinc-300">
                 {formatTryOnDate(
                   job.created_at,
                 )}
               </dd>
             </div>
 
-            <div className="flex justify-between gap-4 border-b border-white/5 pb-4">
-              <dt className="text-zinc-600">
+            <div className="rounded-2xl border border-white/6 bg-black/20 p-4">
+              <dt className="text-xs text-zinc-600">
                 Actualizado
               </dt>
 
-              <dd className="text-right text-zinc-300">
+              <dd className="mt-2 text-zinc-300">
                 {formatTryOnDate(
                   job.updated_at,
                 )}
               </dd>
             </div>
 
-            <div className="flex justify-between gap-4">
-              <dt className="text-zinc-600">
+            <div className="rounded-2xl border border-white/6 bg-black/20 p-4">
+              <dt className="text-xs text-zinc-600">
                 Completado
               </dt>
 
-              <dd className="text-right text-zinc-300">
+              <dd className="mt-2 text-zinc-300">
                 {formatTryOnDate(
                   job.completed_at,
                 )}
