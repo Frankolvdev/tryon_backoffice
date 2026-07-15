@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   useCallback,
   useEffect,
@@ -13,6 +14,7 @@ import {
   CircleOff,
   Gauge,
   LoaderCircle,
+  Pencil,
   RefreshCcw,
   Settings2,
   ShieldCheck,
@@ -30,8 +32,16 @@ import {
 import type {
   IntegrationConfigResponse,
   IntegrationHealthResponse,
+  IntegrationProvider,
   IntegrationSeedResponse,
 } from "@/types/admin-integrations";
+
+const editableProviders:
+  IntegrationProvider[] = [
+    "comfyui",
+    "runpod",
+    "s3",
+  ];
 
 export default function IntegrationsPage() {
   const [integrations, setIntegrations] =
@@ -192,9 +202,7 @@ export default function IntegrationsPage() {
                 </h1>
 
                 <p className="mt-3 max-w-3xl text-sm leading-7 text-zinc-600">
-                  Configuración centralizada y estado de
-                  los proveedores externos registrados
-                  por el backend.
+                  Configuración centralizada y estado de los proveedores externos registrados por el backend.
                 </p>
               </div>
             </div>
@@ -304,15 +312,9 @@ export default function IntegrationsPage() {
                 className="mt-0.5 shrink-0 text-red-400"
               />
 
-              <div>
-                <p className="font-medium text-red-300">
-                  No se pudieron cargar las integraciones
-                </p>
-
-                <p className="mt-2 text-sm leading-6 text-red-400/80">
-                  {errorMessage}
-                </p>
-              </div>
+              <p className="text-sm leading-6 text-red-300">
+                {errorMessage}
+              </p>
             </div>
           </section>
         )}
@@ -331,8 +333,7 @@ export default function IntegrationsPage() {
             </h2>
 
             <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-zinc-600">
-              Ejecuta “Crear defaults” para registrar las
-              integraciones soportadas por el backend.
+              Ejecuta “Crear defaults” para registrar las integraciones soportadas por el backend.
             </p>
           </section>
         )}
@@ -349,6 +350,11 @@ export default function IntegrationsPage() {
                   );
 
                 const Icon = catalog.icon;
+
+                const editable =
+                  editableProviders.includes(
+                    integration.provider,
+                  );
 
                 return (
                   <article
@@ -424,39 +430,47 @@ export default function IntegrationsPage() {
                       </div>
                     </dl>
 
-                    {integration.last_health_message && (
-                      <p className="mt-4 rounded-xl border border-white/6 bg-black/20 p-3 text-xs leading-5 text-zinc-600">
-                        {
-                          integration.last_health_message
+                    <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void checkHealth(
+                            integration,
+                          )
                         }
-                      </p>
-                    )}
+                        disabled={
+                          Boolean(action) ||
+                          !integration.is_enabled
+                        }
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/8 bg-white/[0.025] text-sm text-zinc-400 disabled:opacity-40"
+                      >
+                        {action ===
+                        `health-${integration.provider}` ? (
+                          <LoaderCircle
+                            size={15}
+                            className="animate-spin"
+                          />
+                        ) : (
+                          <Gauge size={15} />
+                        )}
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void checkHealth(
-                          integration,
-                        )
-                      }
-                      disabled={
-                        Boolean(action) ||
-                        !integration.is_enabled
-                      }
-                      className="mt-5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/8 bg-white/[0.025] text-sm text-zinc-400 transition hover:text-white disabled:opacity-40"
-                    >
-                      {action ===
-                      `health-${integration.provider}` ? (
-                        <LoaderCircle
-                          size={15}
-                          className="animate-spin"
-                        />
+                        Salud
+                      </button>
+
+                      {editable ? (
+                        <Link
+                          href={`/dashboard/integrations/${integration.provider}`}
+                          className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-red-500/15 bg-red-950/15 text-sm text-red-300"
+                        >
+                          <Pencil size={15} />
+                          Configurar
+                        </Link>
                       ) : (
-                        <Gauge size={15} />
+                        <span className="inline-flex h-10 items-center justify-center rounded-xl border border-white/6 bg-black/20 text-xs text-zinc-700">
+                          Próximo paquete
+                        </span>
                       )}
-
-                      Comprobar salud
-                    </button>
+                    </div>
                   </article>
                 );
               },

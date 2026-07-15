@@ -1,12 +1,12 @@
 import {
   Apple,
+  BadgeInfo,
   Boxes,
   Cloud,
   HardDrive,
   Mail,
   Server,
   WalletCards,
-  BadgeInfo,
 } from "lucide-react";
 
 import type {
@@ -17,7 +17,12 @@ export interface IntegrationCatalogItem {
   provider: IntegrationProvider;
   label: string;
   description: string;
-  category: "ai" | "storage" | "payments" | "communications" | "authentication";
+  category:
+    | "ai"
+    | "storage"
+    | "payments"
+    | "communications"
+    | "authentication";
   icon: typeof Server;
 }
 
