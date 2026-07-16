@@ -27,7 +27,6 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
-  Tickets,
   Users,
   Workflow,
 } from "lucide-react";
@@ -80,9 +79,9 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         icon: Workflow,
       },
       {
-        label: "Colas y procesos",
+        label: "Procesos en segundo plano",
+        href: "/dashboard/background-processes",
         icon: ListRestart,
-        disabled: true,
       },
       {
         label: "RunPod",
@@ -213,11 +212,6 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         label: "Configuración",
         href: "/dashboard/settings",
         icon: Settings,
-      },
-      {
-        label: "Tickets",
-        href: "/dashboard/support",
-        icon: Tickets,
       },
     ],
   },
