@@ -56,3 +56,12 @@ export interface OperationalEventSummary {
   by_source: Record<string, number>;
   generated_at: string;
 }
+export interface OperationalEventResolveRequest {
+  resolution_note: string;
+}
+
+export interface OperationalEventResolveResponse {
+  event: OperationalEvent;
+  resolved: boolean;
+  message: string;
+}

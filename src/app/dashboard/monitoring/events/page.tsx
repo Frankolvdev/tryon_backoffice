@@ -19,6 +19,7 @@ import {
   useState,
 } from "react";
 
+import { OperationalEventResolution } from "@/components/backoffice/monitoring/operational-event-resolution";
 import { browserApiRequest } from "@/lib/api/browser-api";
 import type {
   OperationalEvent,
@@ -519,19 +520,31 @@ export default function OperationalEventsPage() {
                   )}
                 </pre>
 
-                {selected.is_resolved &&
-                  selected.resolution_note && (
-                    <div className="mt-5 rounded-2xl border border-emerald-500/15 bg-emerald-950/10 p-4">
-                      <p className="text-xs font-semibold text-emerald-300">
-                        Resolución
-                      </p>
-                      <p className="mt-2 text-xs leading-6 text-zinc-500">
-                        {
-                          selected.resolution_note
-                        }
-                      </p>
-                    </div>
-                  )}
+                <OperationalEventResolution
+                  event={selected}
+                  onResolved={(updated) => {
+                    setSelected(updated);
+                    setEvents((current) =>
+                      current.map((item) =>
+                        item.id === updated.id
+                          ? updated
+                          : item,
+                      ),
+                    );
+
+                    setSummary((current) =>
+                      current
+                        ? {
+                            ...current,
+                            unresolved: Math.max(
+                              0,
+                              current.unresolved - 1,
+                            ),
+                          }
+                        : current,
+                    );
+                  }}
+                />
               </>
             )}
           </aside>
