@@ -1,5 +1,4 @@
 import type { LucideIcon } from "lucide-react";
-
 import {
   BadgeDollarSign,
   BadgePercent,
@@ -194,8 +193,8 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
       },
       {
         label: "Feature flags",
+        href: "/dashboard/feature-flags",
         icon: SlidersHorizontal,
-        disabled: true,
       },
       {
         label: "MFA",
