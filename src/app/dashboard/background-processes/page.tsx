@@ -13,6 +13,7 @@ import {
   Search,
   Skull,
   XCircle,
+  Plus,
 } from "lucide-react";
 import {
   useCallback,
@@ -22,6 +23,8 @@ import {
 } from "react";
 
 import { BackgroundJobActions } from "@/components/backoffice/background-processes/background-job-actions";
+import { BackgroundJobAdvancedDetail } from "@/components/backoffice/background-processes/background-job-advanced-detail";
+import { BackgroundJobCreateDialog } from "@/components/backoffice/background-processes/background-job-create-dialog";
 import { BackgroundJobMaintenance } from "@/components/backoffice/background-processes/background-job-maintenance";
 import { browserApiRequest } from "@/lib/api/browser-api";
 import type {
@@ -98,6 +101,8 @@ export default function BackgroundProcessesPage() {
     useState(false);
   const [errorMessage, setErrorMessage] =
     useState<string | null>(null);
+  const [showCreate, setShowCreate] =
+    useState(false);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -287,6 +292,16 @@ export default function BackgroundProcessesPage() {
             </p>
           </div>
 
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => setShowCreate(true)}
+              className="luxia-red-glow inline-flex h-11 items-center gap-2 rounded-xl bg-red-700 px-4 text-sm font-semibold text-white"
+            >
+              <Plus size={16} />
+              Crear proceso
+            </button>
+
           <button
             type="button"
             onClick={() => void load()}
@@ -303,6 +318,7 @@ export default function BackgroundProcessesPage() {
             />
             Actualizar
           </button>
+          </div>
         </div>
       </section>
 
@@ -723,11 +739,25 @@ export default function BackgroundProcessesPage() {
                       await refreshSelected();
                     }}
                   />
+
+                  <BackgroundJobAdvancedDetail
+                    detail={selected}
+                  />
                 </>
               )}
             </aside>
           </section>
         )}
+      {showCreate && (
+        <BackgroundJobCreateDialog
+          onClose={() => setShowCreate(false)}
+          onCreated={async (job) => {
+            setShowCreate(false);
+            await load();
+            await openDetail(job);
+          }}
+        />
+      )}
     </div>
   );
 }

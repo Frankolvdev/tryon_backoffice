@@ -153,3 +153,50 @@ export interface BackgroundJobMaintenanceResponse {
   started_at: string;
   completed_at: string;
 }
+export interface BackgroundJobHandler {
+  job_type: string;
+  execution_mode: string;
+  registered: boolean;
+}
+
+export interface BackgroundJobHandlerListResponse {
+  items: BackgroundJobHandler[];
+  total: number;
+}
+
+export interface BackgroundJobDependencyCreate {
+  depends_on_job_id: number;
+  dependency_type: "success" | "completion";
+}
+
+export interface BackgroundJobCreate {
+  job_type: string;
+  queue_name:
+    | "default"
+    | "ai"
+    | "billing"
+    | "security"
+    | "notifications"
+    | "maintenance"
+    | "webhooks";
+  execution_mode:
+    | "internal"
+    | "comfyui_local"
+    | "runpod_serverless"
+    | "external_api";
+  priority: 0 | 25 | 50 | 75 | 100;
+  user_id?: number | null;
+  tryon_job_id?: number | null;
+  external_ai_job_id?: number | null;
+  idempotency_key?: string | null;
+  payload: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  dependencies: BackgroundJobDependencyCreate[];
+  max_attempts: number;
+  retry_backoff_seconds: number;
+  retry_backoff_multiplier: number;
+  timeout_seconds: number;
+  scheduled_at?: string | null;
+  is_cancelable: boolean;
+  retain_until?: string | null;
+}
