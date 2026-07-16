@@ -55,8 +55,8 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
       },
       {
         label: "Analítica",
+        href: "/dashboard/analytics",
         icon: ChartNoAxesCombined,
-        disabled: true,
       },
     ],
   },
