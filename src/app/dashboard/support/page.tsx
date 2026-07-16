@@ -19,6 +19,7 @@ import {
   Tickets,
 } from "lucide-react";
 
+import { SupportTicketEditor } from "@/components/backoffice/support/support-ticket-editor";
 import { browserApiRequest } from "@/lib/api/browser-api";
 import type {
   SupportTicket,
@@ -596,12 +597,19 @@ export default function SupportDashboardPage() {
                     </section>
                   )}
 
-                  <p className="mt-5 text-xs leading-6 text-zinc-700">
-                    La edición de estado,
-                    prioridad, asignación y notas
-                    internas se agregará en el
-                    siguiente ZIP.
-                  </p>
+                  <SupportTicketEditor
+                    ticket={selected}
+                    onUpdated={(updated) => {
+                      setSelected(updated);
+                      setTickets((current) =>
+                        current.map((ticket) =>
+                          ticket.id === updated.id
+                            ? updated
+                            : ticket,
+                        ),
+                      );
+                    }}
+                  />
                 </>
               )}
             </aside>

@@ -24,3 +24,10 @@ export interface SupportTicket {
   created_at: string;
   updated_at: string;
 }
+
+export interface SupportTicketUpdate {
+  status?: SupportTicketStatus;
+  priority?: SupportTicketPriority;
+  admin_notes?: string | null;
+  assigned_admin_user_id?: number | null;
+}
