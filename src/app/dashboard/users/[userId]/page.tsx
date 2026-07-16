@@ -13,11 +13,13 @@ import {
   LoaderCircle,
   MonitorSmartphone,
   RefreshCcw,
+  Settings,
   ShieldCheck,
   ShoppingCart,
   UserRound,
 } from "lucide-react";
 
+import { UserAccountManagementPanel } from "@/components/backoffice/user-account-management-panel";
 import { UserRbacPanel } from "@/components/backoffice/user-rbac-panel";
 import { UserSessionsPanel } from "@/components/backoffice/user-sessions-panel";
 import { UserSubscriptionPanel } from "@/components/backoffice/user-subscription-panel";
@@ -34,6 +36,7 @@ import type {
 
 type DetailTab =
   | "summary"
+  | "account"
   | "rbac"
   | "sessions"
   | "tokens"
@@ -51,8 +54,13 @@ interface UserDetailData {
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return "No disponible";
+
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Fecha inválida";
+
+  if (Number.isNaN(date.getTime())) {
+    return "Fecha inválida";
+  }
+
   return new Intl.DateTimeFormat("es-MX", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -145,6 +153,7 @@ export default function UserDetailPage() {
     count?: number;
   }> = [
     { key: "summary", label: "Resumen", icon: UserRound },
+    { key: "account", label: "Cuenta y contraseña", icon: Settings },
     { key: "rbac", label: "Roles y permisos", icon: ShieldCheck },
     { key: "sessions", label: "Sesiones", icon: MonitorSmartphone },
     {
@@ -174,28 +183,19 @@ export default function UserDetailPage() {
       <header>
         <Link
           href="/dashboard/users"
-          className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-white"
+          className="inline-flex items-center gap-2 text-sm text-zinc-600 hover:text-white"
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft size={15} />
           Volver a usuarios
         </Link>
 
-        <div className="mt-6 flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-          <div className="flex items-start gap-4">
-            <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-red-500/15 bg-red-950/20 text-red-400">
-              <UserRound size={25} />
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold tracking-[0.22em] text-red-500 uppercase">
-                Usuario #{user.id}
-              </p>
-              <h1 className="mt-2 text-3xl font-semibold text-white">
-                {user.full_name || "Sin nombre"}
-              </h1>
-              <p className="mt-2 break-all text-sm text-zinc-500">
-                {user.email}
-              </p>
-            </div>
+        <div className="mt-5 flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+          <div>
+            <p className="text-xs text-red-500">Usuario #{user.id}</p>
+            <h1 className="mt-2 text-3xl font-semibold text-white">
+              {user.full_name || "Sin nombre"}
+            </h1>
+            <p className="mt-2 text-sm text-zinc-600">{user.email}</p>
           </div>
 
           <button
@@ -209,221 +209,181 @@ export default function UserDetailPage() {
         </div>
       </header>
 
-      <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <article className="luxia-panel rounded-2xl p-5">
-          <ShieldCheck className="text-red-400" />
-          <p className="mt-5 text-xs text-zinc-600">Rol</p>
-          <p className="mt-2 text-xl font-semibold text-white">{user.role}</p>
-        </article>
-        <article className="luxia-panel rounded-2xl p-5">
-          <Activity className="text-red-400" />
-          <p className="mt-5 text-xs text-zinc-600">Estado</p>
-          <p className="mt-2 text-xl font-semibold text-white">{user.status}</p>
-        </article>
-        <article className="luxia-panel rounded-2xl p-5">
-          <Coins className="text-red-400" />
-          <p className="mt-5 text-xs text-zinc-600">Balance</p>
-          <p className="mt-2 text-xl font-semibold text-white">
-            {user.token_balance.toLocaleString("es-MX")}
-          </p>
-        </article>
-        <article className="luxia-panel rounded-2xl p-5">
-          <UserRound className="text-red-400" />
-          <p className="mt-5 text-xs text-zinc-600">Verificado</p>
-          <p className="mt-2 text-xl font-semibold text-white">
-            {user.is_verified ? "Sí" : "No"}
-          </p>
-        </article>
+      <section className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          ["Rol", user.role],
+          ["Estado", user.status],
+          ["Balance", user.token_balance.toLocaleString("es-MX")],
+          ["Verificado", user.is_verified ? "Sí" : "No"],
+        ].map(([label, value]) => (
+          <article key={label} className="luxia-panel rounded-2xl p-5">
+            <p className="text-xs text-zinc-600">{label}</p>
+            <p className="mt-2 text-lg font-semibold text-white">{value}</p>
+          </article>
+        ))}
       </section>
 
-      <section className="luxia-panel mt-6 overflow-hidden rounded-3xl">
-        <div className="overflow-x-auto border-b border-white/6">
-          <div className="flex min-w-max gap-1 p-2">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setActiveTab(tab.key)}
-                  className={cn(
-                    "flex h-10 items-center gap-2 rounded-xl px-4 text-sm transition",
-                    activeTab === tab.key
-                      ? "bg-red-950/35 text-red-300"
-                      : "text-zinc-600 hover:bg-white/[0.03] hover:text-zinc-300",
-                  )}
-                >
-                  <Icon size={15} />
-                  {tab.label}
-                  {tab.count !== undefined && (
-                    <span className="rounded-full bg-black/30 px-2 py-0.5 text-[10px]">
-                      {tab.count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+      <nav className="luxia-panel mt-5 flex flex-wrap gap-2 rounded-3xl p-3">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
 
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={cn(
+                "flex h-10 items-center gap-2 rounded-xl px-4 text-sm transition",
+                activeTab === tab.key
+                  ? "bg-red-950/35 text-red-300"
+                  : "text-zinc-600 hover:bg-white/[0.03] hover:text-zinc-300",
+              )}
+            >
+              <Icon size={15} />
+              {tab.label}
+              {tab.count !== undefined && (
+                <span className="rounded-full bg-black/30 px-2 py-0.5 text-[10px]">
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="mt-5">
         {activeTab === "summary" && (
-          <div className="grid gap-5 p-6 lg:grid-cols-2">
-            <article className="rounded-2xl border border-white/7 bg-black/20 p-5">
+          <div className="grid gap-5 xl:grid-cols-2">
+            <section className="luxia-panel rounded-3xl p-6">
               <h2 className="font-semibold text-white">Cuenta</h2>
               <dl className="mt-5 space-y-4 text-sm">
-                <div className="flex justify-between gap-4 border-b border-white/5 pb-4">
-                  <dt className="text-zinc-600">Correo</dt>
-                  <dd className="break-all text-right text-zinc-300">
-                    {user.email}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-4 border-b border-white/5 pb-4">
-                  <dt className="text-zinc-600">Nombre</dt>
-                  <dd className="text-right text-zinc-300">
-                    {user.full_name ?? "Sin nombre"}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-4 border-b border-white/5 pb-4">
-                  <dt className="text-zinc-600">Proveedor</dt>
-                  <dd className="text-zinc-300">{user.auth_provider}</dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-zinc-600">Activo</dt>
-                  <dd className="text-zinc-300">
-                    {user.is_active ? "Sí" : "No"}
-                  </dd>
-                </div>
+                {[
+                  ["Correo", user.email],
+                  ["Nombre", user.full_name ?? "Sin nombre"],
+                  ["Proveedor", user.auth_provider],
+                  ["Activo", user.is_active ? "Sí" : "No"],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex justify-between gap-4 border-b border-white/5 pb-3">
+                    <dt className="text-zinc-600">{label}</dt>
+                    <dd className="text-right text-zinc-300">{value}</dd>
+                  </div>
+                ))}
               </dl>
-            </article>
+            </section>
 
-            <article className="rounded-2xl border border-white/7 bg-black/20 p-5">
+            <section className="luxia-panel rounded-3xl p-6">
               <h2 className="font-semibold text-white">Fechas</h2>
               <dl className="mt-5 space-y-4 text-sm">
-                <div className="flex justify-between gap-4 border-b border-white/5 pb-4">
-                  <dt className="text-zinc-600">Creado</dt>
-                  <dd className="text-right text-zinc-300">
-                    {formatDate(user.created_at)}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-4 border-b border-white/5 pb-4">
-                  <dt className="text-zinc-600">Actualizado</dt>
-                  <dd className="text-right text-zinc-300">
-                    {formatDate(user.updated_at)}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-zinc-600">Eliminado</dt>
-                  <dd className="text-right text-zinc-300">
-                    {formatDate(user.deleted_at)}
-                  </dd>
-                </div>
+                {[
+                  ["Creado", formatDate(user.created_at)],
+                  ["Actualizado", formatDate(user.updated_at)],
+                  ["Eliminado", formatDate(user.deleted_at)],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex justify-between gap-4 border-b border-white/5 pb-3">
+                    <dt className="text-zinc-600">{label}</dt>
+                    <dd className="text-right text-zinc-300">{value}</dd>
+                  </div>
+                ))}
               </dl>
-            </article>
+            </section>
           </div>
         )}
 
-        {activeTab === "rbac" && <UserRbacPanel userId={userId} />}
-        {activeTab === "sessions" && <UserSessionsPanel userId={userId} />}
-        {activeTab === "subscription" && (
-          <UserSubscriptionPanel userId={userId} />
+        {activeTab === "account" && (
+          <UserAccountManagementPanel
+            user={user}
+            onUpdated={(updated) =>
+              setData((current) =>
+                current
+                  ? { ...current, user: updated }
+                  : current,
+              )
+            }
+          />
         )}
-        {activeTab === "purchases" && (
-          <UserTokenPurchasesPanel userId={userId} />
-        )}
+
+        {activeTab === "rbac" && <UserRbacPanel user={user} />}
+        {activeTab === "sessions" && <UserSessionsPanel userId={user.id} />}
+        {activeTab === "subscription" && <UserSubscriptionPanel user={user} />}
+        {activeTab === "purchases" && <UserTokenPurchasesPanel user={user} />}
 
         {activeTab === "tokens" && (
-          <div className="divide-y divide-white/6">
-            {data.transactions.length === 0 ? (
-              <p className="p-8 text-center text-sm text-zinc-600">
-                No existen movimientos de tokens.
-              </p>
-            ) : (
-              data.transactions.map((transaction) => (
-                <article
-                  key={transaction.id}
-                  className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-zinc-300">
-                      {transaction.description ||
-                        transaction.source ||
-                        transaction.transaction_type}
-                    </p>
-                    <p className="mt-2 text-xs text-zinc-600">
-                      {formatDate(transaction.created_at)} · Balance posterior:{" "}
-                      {transaction.balance_after}
-                    </p>
-                  </div>
-                  <p
-                    className={cn(
-                      "text-lg font-semibold",
-                      transaction.amount >= 0
-                        ? "text-emerald-400"
-                        : "text-red-400",
-                    )}
+          <section className="luxia-panel rounded-3xl p-6">
+            <h2 className="font-semibold text-white">Movimientos de tokens</h2>
+            <div className="mt-5 space-y-3">
+              {data.transactions.length === 0 ? (
+                <p className="text-sm text-zinc-600">No existen movimientos de tokens.</p>
+              ) : (
+                data.transactions.map((transaction) => (
+                  <article
+                    key={transaction.id}
+                    className="flex items-center justify-between gap-4 rounded-2xl border border-white/7 bg-black/20 p-4"
                   >
-                    {transaction.amount >= 0 ? "+" : ""}
-                    {transaction.amount}
-                  </p>
-                </article>
-              ))
-            )}
-          </div>
+                    <div>
+                      <p className="text-sm text-white">
+                        {transaction.description ||
+                          transaction.source ||
+                          transaction.transaction_type}
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-600">
+                        {formatDate(transaction.created_at)} · Balance posterior: {transaction.balance_after}
+                      </p>
+                    </div>
+                    <p className={transaction.amount >= 0 ? "text-emerald-400" : "text-red-400"}>
+                      {transaction.amount >= 0 ? "+" : ""}
+                      {transaction.amount}
+                    </p>
+                  </article>
+                ))
+              )}
+            </div>
+          </section>
         )}
 
         {activeTab === "api-keys" && (
-          <div className="divide-y divide-white/6">
-            {data.apiKeys.length === 0 ? (
-              <p className="p-8 text-center text-sm text-zinc-600">
-                El usuario no tiene API keys.
-              </p>
-            ) : (
-              data.apiKeys.map((apiKey) => (
-                <article key={apiKey.id} className="p-5">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-zinc-300">
-                        {apiKey.name}
-                      </p>
-                      <p className="mt-2 font-mono text-xs text-zinc-600">
-                        {apiKey.key_prefix}••••••••
-                      </p>
-                    </div>
-                    <span className="rounded-full border border-white/7 px-3 py-1 text-xs text-zinc-500">
-                      {apiKey.status}
-                    </span>
-                  </div>
-                </article>
-              ))
-            )}
-          </div>
+          <section className="luxia-panel rounded-3xl p-6">
+            <h2 className="font-semibold text-white">API Keys</h2>
+            <div className="mt-5 space-y-3">
+              {data.apiKeys.length === 0 ? (
+                <p className="text-sm text-zinc-600">El usuario no tiene API keys.</p>
+              ) : (
+                data.apiKeys.map((apiKey) => (
+                  <article key={apiKey.id} className="rounded-2xl border border-white/7 bg-black/20 p-4">
+                    <p className="text-sm text-white">{apiKey.name}</p>
+                    <p className="mt-1 font-mono text-xs text-zinc-600">
+                      {apiKey.key_prefix}••••••••
+                    </p>
+                    <p className="mt-2 text-xs text-zinc-500">{apiKey.status}</p>
+                  </article>
+                ))
+              )}
+            </div>
+          </section>
         )}
 
         {activeTab === "activity" && (
-          <div className="divide-y divide-white/6">
-            {data.activity.length === 0 ? (
-              <p className="p-8 text-center text-sm text-zinc-600">
-                No existe actividad registrada.
-              </p>
-            ) : (
-              data.activity.map((entry) => (
-                <article key={entry.id} className="p-5">
-                  <p className="text-sm font-medium text-zinc-300">
-                    {entry.action}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-zinc-600">
-                    {entry.description || "Sin descripción"}
-                  </p>
-                  <p className="mt-3 text-xs text-zinc-700">
-                    {formatDate(entry.created_at)} · IP:{" "}
-                    {entry.ip_address || "No disponible"}
-                  </p>
-                </article>
-              ))
-            )}
-          </div>
+          <section className="luxia-panel rounded-3xl p-6">
+            <h2 className="font-semibold text-white">Actividad</h2>
+            <div className="mt-5 space-y-3">
+              {data.activity.length === 0 ? (
+                <p className="text-sm text-zinc-600">No existe actividad registrada.</p>
+              ) : (
+                data.activity.map((entry) => (
+                  <article key={entry.id} className="rounded-2xl border border-white/7 bg-black/20 p-4">
+                    <p className="text-sm text-white">{entry.action}</p>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      {entry.description || "Sin descripción"}
+                    </p>
+                    <p className="mt-2 text-xs text-zinc-700">
+                      {formatDate(entry.created_at)} · IP: {entry.ip_address || "No disponible"}
+                    </p>
+                  </article>
+                ))
+              )}
+            </div>
+          </section>
         )}
-      </section>
+      </div>
     </div>
   );
 }
