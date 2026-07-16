@@ -5,6 +5,8 @@ import {
   EyeOff,
   Flag,
   LoaderCircle,
+  Pencil,
+  Plus,
   RefreshCcw,
   Search,
   ShieldCheck,
@@ -18,10 +20,13 @@ import {
   useMemo,
   useState,
 } from "react";
+import { toast } from "sonner";
 
+import { FeatureFlagEditorDialog } from "@/components/backoffice/feature-flags/feature-flag-editor-dialog";
 import { browserApiRequest } from "@/lib/api/browser-api";
 import type {
   AdminFeatureFlag,
+  AdminFeatureFlagUpdate,
   FeatureFlagStatusFilter,
   FeatureFlagVisibilityFilter,
 } from "@/types/admin-feature-flags";
@@ -41,6 +46,9 @@ function formatDate(value: string): string {
 
 export default function FeatureFlagsPage() {
   const [flags, setFlags] = useState<AdminFeatureFlag[]>([]);
+  const [editor, setEditor] =
+    useState<AdminFeatureFlag | null | undefined>(undefined);
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -73,6 +81,47 @@ export default function FeatureFlagsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const saveInState = (saved: AdminFeatureFlag) => {
+    setFlags((current) => {
+      const exists = current.some((item) => item.id === saved.id);
+
+      return exists
+        ? current.map((item) => (item.id === saved.id ? saved : item))
+        : [saved, ...current];
+    });
+
+    setEditor(undefined);
+  };
+
+  const quickUpdate = async (
+    flag: AdminFeatureFlag,
+    data: AdminFeatureFlagUpdate,
+    successMessage: string,
+  ) => {
+    setUpdatingId(flag.id);
+
+    try {
+      const saved = await browserApiRequest<AdminFeatureFlag>(
+        `/api/admin/feature-flags/${flag.id}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        },
+      );
+
+      saveInState(saved);
+      toast.success(successMessage);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No fue posible actualizar el feature flag.",
+      );
+    } finally {
+      setUpdatingId(null);
+    }
+  };
 
   const filteredFlags = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -123,54 +172,46 @@ export default function FeatureFlagsPage() {
               </h1>
 
               <p className="mt-3 max-w-3xl text-sm leading-7 text-zinc-600">
-                Supervisa las funcionalidades controladas por el backend,
+                Administra las funcionalidades controladas por el backend,
                 su disponibilidad actual y su exposición pública.
               </p>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => void load()}
-            disabled={isLoading}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/8 px-4 text-sm text-zinc-400 transition hover:border-white/15 hover:text-white disabled:opacity-50"
-          >
-            <RefreshCcw
-              size={16}
-              className={isLoading ? "animate-spin" : undefined}
-            />
-            Actualizar
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => setEditor(null)}
+              className="luxia-red-glow inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-red-700 px-4 text-sm font-semibold text-white transition hover:bg-red-600"
+            >
+              <Plus size={16} />
+              Nuevo flag
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void load()}
+              disabled={isLoading}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/8 px-4 text-sm text-zinc-400 transition hover:border-white/15 hover:text-white disabled:opacity-50"
+            >
+              <RefreshCcw
+                size={16}
+                className={isLoading ? "animate-spin" : undefined}
+              />
+              Actualizar
+            </button>
+          </div>
         </div>
       </section>
 
       <section className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {[
-          {
-            label: "Flags totales",
-            value: flags.length,
-            icon: Flag,
-          },
-          {
-            label: "Habilitados",
-            value: enabledCount,
-            icon: ToggleRight,
-          },
-          {
-            label: "Públicos",
-            value: publicCount,
-            icon: Eye,
-          },
-          {
-            label: "Privados",
-            value: privateCount,
-            icon: ShieldCheck,
-          },
+          { label: "Flags totales", value: flags.length, icon: Flag },
+          { label: "Habilitados", value: enabledCount, icon: ToggleRight },
+          { label: "Públicos", value: publicCount, icon: Eye },
+          { label: "Privados", value: privateCount, icon: ShieldCheck },
         ].map(({ label, value, icon: Icon }) => (
-          <article
-            key={label}
-            className="luxia-panel rounded-3xl p-5"
-          >
+          <article key={label} className="luxia-panel rounded-3xl p-5">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-xs text-zinc-600">{label}</p>
@@ -209,7 +250,7 @@ export default function FeatureFlagsPage() {
                 event.target.value as FeatureFlagStatusFilter,
               )
             }
-            className="h-11 rounded-xl border border-white/8 bg-black/20 px-4 text-sm text-zinc-300 outline-none focus:border-red-500/30"
+            className="h-11 rounded-xl border border-white/8 bg-[#09090a] px-4 text-sm text-zinc-300 outline-none focus:border-red-500/30"
           >
             <option value="all">Todos los estados</option>
             <option value="enabled">Habilitados</option>
@@ -223,7 +264,7 @@ export default function FeatureFlagsPage() {
                 event.target.value as FeatureFlagVisibilityFilter,
               )
             }
-            className="h-11 rounded-xl border border-white/8 bg-black/20 px-4 text-sm text-zinc-300 outline-none focus:border-red-500/30"
+            className="h-11 rounded-xl border border-white/8 bg-[#09090a] px-4 text-sm text-zinc-300 outline-none focus:border-red-500/30"
           >
             <option value="all">Toda visibilidad</option>
             <option value="public">Públicos</option>
@@ -246,81 +287,123 @@ export default function FeatureFlagsPage() {
 
       {!isLoading && !errorMessage && (
         <section className="mt-5 grid gap-5 xl:grid-cols-2 2xl:grid-cols-3">
-          {filteredFlags.map((flag) => (
-            <article
-              key={flag.id}
-              className="luxia-panel rounded-3xl p-6"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="truncate font-mono text-xs text-red-400">
-                    {flag.key}
-                  </p>
+          {filteredFlags.map((flag) => {
+            const isUpdating = updatingId === flag.id;
 
-                  <h2 className="mt-2 text-lg font-semibold text-white">
-                    {flag.name}
-                  </h2>
+            return (
+              <article
+                key={flag.id}
+                className="luxia-panel rounded-3xl p-6"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="truncate font-mono text-xs text-red-400">
+                      {flag.key}
+                    </p>
+
+                    <h2 className="mt-2 text-lg font-semibold text-white">
+                      {flag.name}
+                    </h2>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={isUpdating}
+                    onClick={() =>
+                      void quickUpdate(
+                        flag,
+                        { is_enabled: !flag.is_enabled },
+                        flag.is_enabled
+                          ? "Feature flag deshabilitado."
+                          : "Feature flag habilitado.",
+                      )
+                    }
+                    className={
+                      flag.is_enabled
+                        ? "flex size-11 shrink-0 items-center justify-center rounded-2xl border border-emerald-500/15 bg-emerald-950/10 text-emerald-400 transition hover:border-emerald-500/30 disabled:opacity-50"
+                        : "flex size-11 shrink-0 items-center justify-center rounded-2xl border border-white/8 bg-black/20 text-zinc-700 transition hover:border-white/15 hover:text-zinc-400 disabled:opacity-50"
+                    }
+                    aria-label={
+                      flag.is_enabled
+                        ? "Deshabilitar feature flag"
+                        : "Habilitar feature flag"
+                    }
+                  >
+                    {isUpdating ? (
+                      <LoaderCircle size={20} className="animate-spin" />
+                    ) : flag.is_enabled ? (
+                      <ToggleRight size={24} />
+                    ) : (
+                      <ToggleLeft size={24} />
+                    )}
+                  </button>
                 </div>
 
-                <div
-                  className={
-                    flag.is_enabled
-                      ? "flex size-11 shrink-0 items-center justify-center rounded-2xl border border-emerald-500/15 bg-emerald-950/10 text-emerald-400"
-                      : "flex size-11 shrink-0 items-center justify-center rounded-2xl border border-white/8 bg-black/20 text-zinc-700"
-                  }
+                <p className="mt-4 min-h-12 text-sm leading-6 text-zinc-600">
+                  {flag.description || "Sin descripción configurada."}
+                </p>
+
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <span
+                    className={
+                      flag.is_enabled
+                        ? "rounded-full border border-emerald-500/15 bg-emerald-950/10 px-2.5 py-1 text-[10px] text-emerald-400"
+                        : "rounded-full border border-white/8 px-2.5 py-1 text-[10px] text-zinc-600"
+                    }
+                  >
+                    {flag.is_enabled ? "habilitado" : "deshabilitado"}
+                  </span>
+
+                  <button
+                    type="button"
+                    disabled={isUpdating}
+                    onClick={() =>
+                      void quickUpdate(
+                        flag,
+                        { is_public: !flag.is_public },
+                        flag.is_public
+                          ? "Feature flag marcado como privado."
+                          : "Feature flag marcado como público.",
+                      )
+                    }
+                    className={
+                      flag.is_public
+                        ? "inline-flex items-center gap-1.5 rounded-full border border-sky-500/15 bg-sky-950/10 px-2.5 py-1 text-[10px] text-sky-400 disabled:opacity-50"
+                        : "inline-flex items-center gap-1.5 rounded-full border border-white/8 px-2.5 py-1 text-[10px] text-zinc-600 disabled:opacity-50"
+                    }
+                  >
+                    {flag.is_public ? <Eye size={11} /> : <EyeOff size={11} />}
+                    {flag.is_public ? "público" : "privado"}
+                  </button>
+                </div>
+
+                <dl className="mt-5 space-y-3 border-t border-white/5 pt-4 text-xs">
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-zinc-700">Creado</dt>
+                    <dd className="text-right text-zinc-400">
+                      {formatDate(flag.created_at)}
+                    </dd>
+                  </div>
+
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-zinc-700">Actualizado</dt>
+                    <dd className="text-right text-zinc-400">
+                      {formatDate(flag.updated_at)}
+                    </dd>
+                  </div>
+                </dl>
+
+                <button
+                  type="button"
+                  onClick={() => setEditor(flag)}
+                  className="mt-5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/8 text-sm text-zinc-400 transition hover:border-white/15 hover:text-white"
                 >
-                  {flag.is_enabled ? (
-                    <ToggleRight size={24} />
-                  ) : (
-                    <ToggleLeft size={24} />
-                  )}
-                </div>
-              </div>
-
-              <p className="mt-4 min-h-12 text-sm leading-6 text-zinc-600">
-                {flag.description || "Sin descripción configurada."}
-              </p>
-
-              <div className="mt-5 flex flex-wrap gap-2">
-                <span
-                  className={
-                    flag.is_enabled
-                      ? "rounded-full border border-emerald-500/15 bg-emerald-950/10 px-2.5 py-1 text-[10px] text-emerald-400"
-                      : "rounded-full border border-white/8 px-2.5 py-1 text-[10px] text-zinc-600"
-                  }
-                >
-                  {flag.is_enabled ? "habilitado" : "deshabilitado"}
-                </span>
-
-                <span
-                  className={
-                    flag.is_public
-                      ? "inline-flex items-center gap-1.5 rounded-full border border-sky-500/15 bg-sky-950/10 px-2.5 py-1 text-[10px] text-sky-400"
-                      : "inline-flex items-center gap-1.5 rounded-full border border-white/8 px-2.5 py-1 text-[10px] text-zinc-600"
-                  }
-                >
-                  {flag.is_public ? <Eye size={11} /> : <EyeOff size={11} />}
-                  {flag.is_public ? "público" : "privado"}
-                </span>
-              </div>
-
-              <dl className="mt-5 space-y-3 border-t border-white/5 pt-4 text-xs">
-                <div className="flex justify-between gap-4">
-                  <dt className="text-zinc-700">Creado</dt>
-                  <dd className="text-right text-zinc-400">
-                    {formatDate(flag.created_at)}
-                  </dd>
-                </div>
-
-                <div className="flex justify-between gap-4">
-                  <dt className="text-zinc-700">Actualizado</dt>
-                  <dd className="text-right text-zinc-400">
-                    {formatDate(flag.updated_at)}
-                  </dd>
-                </div>
-              </dl>
-            </article>
-          ))}
+                  <Pencil size={15} />
+                  Editar
+                </button>
+              </article>
+            );
+          })}
 
           {filteredFlags.length === 0 && (
             <div className="luxia-panel col-span-full rounded-3xl p-12 text-center">
@@ -331,6 +414,14 @@ export default function FeatureFlagsPage() {
             </div>
           )}
         </section>
+      )}
+
+      {editor !== undefined && (
+        <FeatureFlagEditorDialog
+          flag={editor}
+          onClose={() => setEditor(undefined)}
+          onSaved={saveInState}
+        />
       )}
     </div>
   );
