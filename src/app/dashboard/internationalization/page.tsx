@@ -14,7 +14,6 @@ import {
   useState,
 } from "react";
 import { toast } from "sonner";
-
 import { LocaleEditorDialog } from "@/components/backoffice/i18n/locale-editor-dialog";
 import { browserApiRequest } from "@/lib/api/browser-api";
 import type {
@@ -100,21 +99,29 @@ export default function InternationalizationPage() {
     saved: I18nLocale,
   ) => {
     setLocales((current) => {
-      const exists = current.some(
+      const normalized = saved.is_default
+        ? current.map((item) => ({
+            ...item,
+            is_default: item.code === saved.code,
+          }))
+        : current;
+
+      const exists = normalized.some(
         (item) =>
           item.code === saved.code,
       );
 
       return exists
-        ? current.map((item) =>
+        ? normalized.map((item) =>
             item.code === saved.code
               ? saved
               : item,
           )
-        : [saved, ...current];
+        : [saved, ...normalized];
     });
 
     setEditor(undefined);
+    void load();
   };
 
   return (
@@ -130,9 +137,11 @@ export default function InternationalizationPage() {
               <p className="text-[10px] font-semibold tracking-[0.2em] text-red-500 uppercase">
                 Sistema
               </p>
+
               <h1 className="mt-2 text-2xl font-semibold text-white">
                 Internacionalización
               </h1>
+
               <p className="mt-3 max-w-3xl text-sm leading-7 text-zinc-600">
                 Administra idiomas, formatos,
                 monedas, zonas horarias y
@@ -214,9 +223,11 @@ export default function InternationalizationPage() {
                   <p className="font-mono text-xs text-red-400">
                     {locale.code}
                   </p>
+
                   <h2 className="mt-2 text-lg font-semibold text-white">
                     {locale.native_name}
                   </h2>
+
                   <p className="mt-1 text-xs text-zinc-600">
                     {locale.name}
                   </p>
@@ -274,6 +285,7 @@ export default function InternationalizationPage() {
                     <dt className="text-zinc-700">
                       {String(label)}
                     </dt>
+
                     <dd className="text-right text-zinc-300">
                       {String(value)}
                     </dd>
