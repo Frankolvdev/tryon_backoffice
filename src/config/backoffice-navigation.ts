@@ -184,8 +184,8 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
       },
       {
         label: "Internacionalización",
+        href: "/dashboard/internationalization",
         icon: Languages,
-        disabled: true,
       },
       {
         label: "Integraciones",
