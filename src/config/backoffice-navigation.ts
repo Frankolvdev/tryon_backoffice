@@ -151,8 +151,8 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
     items: [
       {
         label: "Notificaciones",
+        href: "/dashboard/notifications",
         icon: Bell,
-        disabled: true,
       },
       {
         label: "Soporte",
