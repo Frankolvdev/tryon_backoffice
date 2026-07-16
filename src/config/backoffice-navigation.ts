@@ -1,7 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 
 import {
-  Activity,
   BadgeDollarSign,
   BadgePercent,
   Bell,
@@ -164,11 +163,6 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         icon: FileClock,
       },
       {
-        label: "Eventos operativos",
-        icon: Activity,
-        disabled: true,
-      },
-      {
         label: "Seguridad",
         href: "/dashboard/settings/security",
         icon: ShieldCheck,
@@ -180,7 +174,7 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
     items: [
       {
         label: "Monitoreo",
-        href: "/dashboard/tryon/integrations/monitoring",
+        href: "/dashboard/monitoring",
         icon: Gauge,
       },
       {

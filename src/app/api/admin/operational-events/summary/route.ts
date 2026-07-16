@@ -9,7 +9,8 @@ export async function GET(
   request: NextRequest,
 ): Promise<NextResponse> {
   return forwardAdminRequest({
-    backendPath: "/api/v1/admin/monitoring",
+    backendPath:
+      "/api/v1/admin/operational-events/summary",
     method: "GET",
     request,
   });
