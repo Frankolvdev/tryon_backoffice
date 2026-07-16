@@ -1,19 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ChevronDown,
+  KeyRound,
   LoaderCircle,
   LogOut,
-  Settings,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
 
 import { useAuth } from "@/components/providers/auth-provider";
 
-function getInitials(fullName: string | null, email: string): string {
+function getInitials(
+  fullName: string | null,
+  email: string,
+): string {
   if (fullName) {
     return fullName
       .split(/\s+/)
@@ -23,39 +30,68 @@ function getInitials(fullName: string | null, email: string): string {
       .join("")
       .toUpperCase();
   }
-  return email.slice(0, 2).toUpperCase();
+
+  return email
+    .slice(0, 2)
+    .toUpperCase();
 }
 
 export function AdminProfileMenu() {
-  const { user, logout } = useAuth();
-  const [isOpen, setIsOpen] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const {
+    user,
+    logout,
+  } = useAuth();
+
+  const [isOpen, setIsOpen] =
+    useState(false);
+
+  const [isLoggingOut, setIsLoggingOut] =
+    useState(false);
+
+  const containerRef =
+    useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const close = (event: PointerEvent) => {
+    const handlePointerDown = (
+      event: PointerEvent,
+    ) => {
       if (
         containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
+        !containerRef.current.contains(
+          event.target as Node,
+        )
       ) {
         setIsOpen(false);
       }
     };
 
-    document.addEventListener("pointerdown", close);
-    return () => document.removeEventListener("pointerdown", close);
+    document.addEventListener(
+      "pointerdown",
+      handlePointerDown,
+    );
+
+    return () => {
+      document.removeEventListener(
+        "pointerdown",
+        handlePointerDown,
+      );
+    };
   }, []);
 
   if (!user) {
     return (
       <div className="flex h-10 items-center gap-3 rounded-xl border border-white/7 bg-white/[0.025] px-3">
-        <LoaderCircle size={16} className="animate-spin text-zinc-600" />
+        <LoaderCircle
+          size={16}
+          className="animate-spin text-zinc-600"
+        />
       </div>
     );
   }
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
+
     try {
       await logout();
     } finally {
@@ -64,39 +100,66 @@ export function AdminProfileMenu() {
   };
 
   return (
-    <div ref={containerRef} className="relative">
+    <div
+      ref={containerRef}
+      className="relative"
+    >
       <button
         type="button"
-        onClick={() => setIsOpen((current) => !current)}
+        onClick={() =>
+          setIsOpen(
+            (current) => !current,
+          )
+        }
         className="flex h-11 items-center gap-3 rounded-xl border border-white/7 bg-white/[0.025] px-2.5 text-left transition hover:bg-white/[0.05]"
       >
         <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-red-500/20 bg-red-950/30 text-xs font-semibold text-red-300">
-          {getInitials(user.full_name, user.email)}
+          {getInitials(
+            user.full_name,
+            user.email,
+          )}
         </div>
+
         <div className="hidden min-w-0 sm:block">
           <p className="max-w-40 truncate text-xs font-medium text-zinc-200">
-            {user.full_name ?? user.email}
+            {user.full_name ??
+              user.email}
           </p>
+
           <p className="mt-0.5 text-[10px] tracking-wide text-zinc-600 uppercase">
             {user.role}
           </p>
         </div>
-        <ChevronDown size={14} className="hidden text-zinc-600 sm:block" />
+
+        <ChevronDown
+          size={14}
+          className="hidden text-zinc-600 sm:block"
+        />
       </button>
 
       {isOpen && (
         <div className="absolute top-[calc(100%+10px)] right-0 z-50 w-72 rounded-2xl border border-white/8 bg-[#101012] p-2 shadow-2xl">
           <div className="border-b border-white/6 px-3 py-3">
             <p className="truncate text-sm font-medium text-white">
-              {user.full_name ?? "Administrador"}
+              {user.full_name ??
+                "Administrador"}
             </p>
-            <p className="mt-1 truncate text-xs text-zinc-600">{user.email}</p>
+
+            <p className="mt-1 truncate text-xs text-zinc-600">
+              {user.email}
+            </p>
+
+            <p className="mt-2 text-[10px] text-zinc-700">
+              ID de usuario: {user.id}
+            </p>
           </div>
 
           <div className="py-2">
             <Link
               href="/dashboard/profile"
-              onClick={() => setIsOpen(false)}
+              onClick={() =>
+                setIsOpen(false)
+              }
               className="flex h-10 items-center gap-3 rounded-xl px-3 text-sm text-zinc-400 transition hover:bg-white/[0.04] hover:text-white"
             >
               <UserRound size={16} />
@@ -105,10 +168,12 @@ export function AdminProfileMenu() {
 
             <Link
               href="/dashboard/settings/security"
-              onClick={() => setIsOpen(false)}
+              onClick={() =>
+                setIsOpen(false)
+              }
               className="flex h-10 items-center gap-3 rounded-xl px-3 text-sm text-zinc-400 transition hover:bg-white/[0.04] hover:text-white"
             >
-              <Settings size={16} />
+              <KeyRound size={16} />
               Seguridad y MFA
             </Link>
 
@@ -121,14 +186,20 @@ export function AdminProfileMenu() {
           <button
             type="button"
             disabled={isLoggingOut}
-            onClick={() => void handleLogout()}
+            onClick={() =>
+              void handleLogout()
+            }
             className="flex h-10 w-full items-center gap-3 rounded-xl px-3 text-sm text-red-400 transition hover:bg-red-950/30 hover:text-red-300 disabled:opacity-50"
           >
             {isLoggingOut ? (
-              <LoaderCircle size={16} className="animate-spin" />
+              <LoaderCircle
+                size={16}
+                className="animate-spin"
+              />
             ) : (
               <LogOut size={16} />
             )}
+
             Cerrar sesión
           </button>
         </div>

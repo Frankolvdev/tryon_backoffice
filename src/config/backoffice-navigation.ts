@@ -171,8 +171,8 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
       },
       {
         label: "Seguridad",
+        href: "/dashboard/settings/security",
         icon: ShieldCheck,
-        disabled: true,
       },
     ],
   },
@@ -206,8 +206,8 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
       },
       {
         label: "MFA",
+        href: "/dashboard/settings/security",
         icon: KeyRound,
-        disabled: true,
       },
       {
         label: "Configuración",
