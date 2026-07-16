@@ -98,7 +98,12 @@ export default function FeatureFlagsPage() {
     flag: AdminFeatureFlag,
     data: AdminFeatureFlagUpdate,
     successMessage: string,
+    confirmationMessage: string,
   ) => {
+    if (!window.confirm(confirmationMessage)) {
+      return;
+    }
+
     setUpdatingId(flag.id);
 
     try {
@@ -280,8 +285,16 @@ export default function FeatureFlagsPage() {
       )}
 
       {!isLoading && errorMessage && (
-        <section className="luxia-panel mt-5 rounded-3xl p-6 text-sm text-red-300">
-          {errorMessage}
+        <section className="luxia-panel mt-5 rounded-3xl p-6">
+          <p className="text-sm text-red-300">{errorMessage}</p>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-red-500/20 px-4 text-sm text-red-300 transition hover:border-red-500/35 hover:text-red-200"
+          >
+            <RefreshCcw size={15} />
+            Reintentar
+          </button>
         </section>
       )}
 
@@ -316,6 +329,9 @@ export default function FeatureFlagsPage() {
                         flag.is_enabled
                           ? "Feature flag deshabilitado."
                           : "Feature flag habilitado.",
+                        flag.is_enabled
+                          ? `¿Deshabilitar "${flag.name}"? La funcionalidad dejará de estar disponible inmediatamente.`
+                          : `¿Habilitar "${flag.name}"? La funcionalidad quedará disponible inmediatamente.`,
                       )
                     }
                     className={
@@ -364,6 +380,9 @@ export default function FeatureFlagsPage() {
                         flag.is_public
                           ? "Feature flag marcado como privado."
                           : "Feature flag marcado como público.",
+                        flag.is_public
+                          ? `¿Marcar "${flag.name}" como privado? Su estado dejará de exponerse públicamente.`
+                          : `¿Marcar "${flag.name}" como público? Su estado podrá exponerse mediante la configuración pública.`,
                       )
                     }
                     className={
@@ -409,8 +428,24 @@ export default function FeatureFlagsPage() {
             <div className="luxia-panel col-span-full rounded-3xl p-12 text-center">
               <Flag className="mx-auto text-zinc-800" size={30} />
               <p className="mt-4 text-sm text-zinc-600">
-                No hay feature flags que coincidan con los filtros.
+                {flags.length === 0
+                  ? "No existen feature flags configurados."
+                  : "No hay feature flags que coincidan con los filtros."}
               </p>
+
+              {flags.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch("");
+                    setStatusFilter("all");
+                    setVisibilityFilter("all");
+                  }}
+                  className="mt-4 inline-flex h-10 items-center justify-center rounded-xl border border-white/8 px-4 text-sm text-zinc-500 transition hover:border-white/15 hover:text-white"
+                >
+                  Limpiar filtros
+                </button>
+              )}
             </div>
           )}
         </section>
