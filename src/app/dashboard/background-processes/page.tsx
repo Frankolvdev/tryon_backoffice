@@ -21,6 +21,8 @@ import {
   useState,
 } from "react";
 
+import { BackgroundJobActions } from "@/components/backoffice/background-processes/background-job-actions";
+import { BackgroundJobMaintenance } from "@/components/backoffice/background-processes/background-job-maintenance";
 import { browserApiRequest } from "@/lib/api/browser-api";
 import type {
   BackgroundJob,
@@ -212,6 +214,18 @@ export default function BackgroundProcessesPage() {
     search,
     status,
   ]);
+
+
+  const refreshSelected = async () => {
+    if (!selected) return;
+
+    const updated =
+      await browserApiRequest<BackgroundJobDetailResponse>(
+        `/api/admin/background-jobs/${selected.job.id}`,
+      );
+
+    setSelected(updated);
+  };
 
   const cards = metrics
     ? [
@@ -413,6 +427,14 @@ export default function BackgroundProcessesPage() {
           </select>
         </div>
       </section>
+
+
+      <BackgroundJobMaintenance
+        onCompleted={async () => {
+          await load();
+          await refreshSelected();
+        }}
+      />
 
       {isLoading && (
         <section className="luxia-panel mt-5 flex min-h-80 items-center justify-center rounded-3xl">
@@ -692,6 +714,15 @@ export default function BackgroundProcessesPage() {
                       dependientes
                     </p>
                   </section>
+
+                  <BackgroundJobActions
+                    detail={selected}
+                    onUpdated={setSelected}
+                    onRefresh={async () => {
+                      await load();
+                      await refreshSelected();
+                    }}
+                  />
                 </>
               )}
             </aside>

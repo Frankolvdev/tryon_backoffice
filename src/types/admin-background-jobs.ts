@@ -113,3 +113,43 @@ export interface BackgroundJobMetrics {
   period_end: string;
   generated_at: string;
 }
+export interface BackgroundJobCancelRequest {
+  reason?: string | null;
+}
+
+export interface BackgroundJobCancelResponse {
+  job: BackgroundJob;
+  cancellation_requested: boolean;
+  canceled_immediately: boolean;
+  message: string;
+}
+
+export interface BackgroundJobRetryRequest {
+  reset_attempt_count: boolean;
+  priority?: number | null;
+  scheduled_at?: string | null;
+  reason?: string | null;
+}
+
+export interface BackgroundJobRetryResponse {
+  job: BackgroundJob;
+  retried: boolean;
+  message: string;
+}
+
+export interface BackgroundJobMaintenanceRequest {
+  recover_expired_leases: boolean;
+  signal_ready_queues: boolean;
+  max_items: number;
+}
+
+export interface BackgroundJobMaintenanceResponse {
+  success: boolean;
+  expired_leases_inspected: number;
+  recovered_jobs: number;
+  dead_lettered_jobs: number;
+  signaled_queues: string[];
+  errors: Array<Record<string, unknown>>;
+  started_at: string;
+  completed_at: string;
+}
