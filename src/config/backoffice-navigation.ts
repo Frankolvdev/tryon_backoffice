@@ -156,8 +156,8 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
       },
       {
         label: "Soporte",
+        href: "/dashboard/support",
         icon: LifeBuoy,
-        disabled: true,
       },
       {
         label: "Auditoría",
@@ -216,8 +216,8 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
       },
       {
         label: "Tickets",
+        href: "/dashboard/support",
         icon: Tickets,
-        disabled: true,
       },
     ],
   },
