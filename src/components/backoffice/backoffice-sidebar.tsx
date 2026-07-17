@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
 import {
   ChevronLeft,
   ChevronRight,
@@ -14,8 +13,29 @@ import { useSidebar } from "@/components/backoffice/sidebar-provider";
 import { backofficeNavigation } from "@/config/backoffice-navigation";
 import { cn } from "@/lib/utils";
 
+function getActiveNavigationHref(
+  pathname: string,
+): string | undefined {
+  return backofficeNavigation
+    .flatMap((group) => group.items)
+    .filter(
+      (item) =>
+        item.href !== undefined &&
+        !item.disabled &&
+        (pathname === item.href ||
+          pathname.startsWith(`${item.href}/`)),
+    )
+    .sort(
+      (first, second) =>
+        (second.href?.length ?? 0) -
+        (first.href?.length ?? 0),
+    )[0]?.href;
+}
+
 function SidebarContent() {
   const pathname = usePathname();
+  const activeHref =
+    getActiveNavigationHref(pathname);
 
   const {
     isCollapsed,
@@ -40,13 +60,9 @@ function SidebarContent() {
               <div className="space-y-1">
                 {group.items.map((item) => {
                   const Icon = item.icon;
-
                   const isActive =
                     item.href !== undefined &&
-                    (pathname === item.href ||
-                      pathname.startsWith(
-                        `${item.href}/`,
-                      ));
+                    item.href === activeHref;
 
                   if (
                     item.disabled ||

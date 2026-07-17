@@ -13,7 +13,6 @@ import {
   FileClock,
   Gauge,
   Globe2,
-  KeyRound,
   Languages,
   LayoutDashboard,
   LifeBuoy,
@@ -195,11 +194,6 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         label: "Feature flags",
         href: "/dashboard/feature-flags",
         icon: SlidersHorizontal,
-      },
-      {
-        label: "MFA",
-        href: "/dashboard/settings/security",
-        icon: KeyRound,
       },
       {
         label: "Configuración",
