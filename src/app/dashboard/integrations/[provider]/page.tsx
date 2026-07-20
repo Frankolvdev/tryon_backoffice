@@ -22,12 +22,14 @@ import { toast } from "sonner";
 import { IntegrationEditor } from "@/components/backoffice/integrations/integration-editor";
 import { IntegrationStatusBadge } from "@/components/backoffice/integrations/integration-status-badge";
 import { GoogleOAuthForm } from "@/components/backoffice/integrations/oauth/google-form";
+import { OAuthProviderForm } from "@/components/backoffice/integrations/oauth/oauth-provider-form";
 import { SmtpIntegrationEditor } from "@/components/backoffice/integrations/smtp-integration-editor";
 import { StripeIntegrationEditor } from "@/components/backoffice/integrations/stripe-integration-editor";
 import { browserApiRequest } from "@/lib/api/browser-api";
 import {
   getIntegrationCatalogItem,
 } from "@/lib/integrations/catalog";
+import { isRemainingOAuthProvider } from "@/lib/integrations/oauth";
 
 import type {
   IntegrationConfigResponse,
@@ -275,6 +277,12 @@ export default function IntegrationDetailPage() {
           />
         ) : provider === "google_oauth" ? (
           <GoogleOAuthForm
+            integration={integration}
+            onSaved={setIntegration}
+          />
+        ) : isRemainingOAuthProvider(provider) ? (
+          <OAuthProviderForm
+            provider={provider}
             integration={integration}
             onSaved={setIntegration}
           />
