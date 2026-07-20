@@ -41,6 +41,10 @@ const editableProviders:
     "s3",
     "stripe",
     "smtp",
+    "google_oauth",
+    "github_oauth",
+    "facebook_oauth",
+    "apple_oauth",
   ];
 
 export default function IntegrationDetailPage() {

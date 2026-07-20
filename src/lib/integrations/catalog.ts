@@ -4,6 +4,7 @@ import {
   Boxes,
   Cloud,
   HardDrive,
+  Code2,
   Mail,
   Server,
   WalletCards,
@@ -74,6 +75,14 @@ export const integrationCatalog: IntegrationCatalogItem[] = [
       "Inicio de sesión mediante cuentas de Google.",
     category: "authentication",
     icon: Cloud,
+  },
+  {
+    provider: "github_oauth",
+    label: "GitHub OAuth",
+    description:
+      "Inicio de sesión mediante cuentas de GitHub.",
+    category: "authentication",
+    icon: Code2,
   },
   {
     provider: "apple_oauth",

@@ -5,6 +5,7 @@ export type IntegrationProvider =
   | "s3"
   | "smtp"
   | "google_oauth"
+  | "github_oauth"
   | "apple_oauth"
   | "facebook_oauth";
 

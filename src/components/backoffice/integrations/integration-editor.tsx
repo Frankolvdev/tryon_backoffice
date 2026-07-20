@@ -89,6 +89,34 @@ const providerFields: Partial<
       type: "number",
     },
   ],
+  google_oauth: [
+    {
+      key: "redirect_uri",
+      label: "URI de redirección autorizada",
+      placeholder: "http://127.0.0.1:8001/api/v1/oauth/google/callback",
+    },
+  ],
+  github_oauth: [
+    {
+      key: "redirect_uri",
+      label: "URI de redirección autorizada",
+      placeholder: "http://127.0.0.1:8001/api/v1/oauth/github/callback",
+    },
+  ],
+  facebook_oauth: [
+    {
+      key: "redirect_uri",
+      label: "URI de redirección autorizada",
+      placeholder: "http://127.0.0.1:8001/api/v1/oauth/facebook/callback",
+    },
+  ],
+  apple_oauth: [
+    {
+      key: "redirect_uri",
+      label: "URI de redirección autorizada",
+      placeholder: "http://127.0.0.1:8001/api/v1/oauth/apple/callback",
+    },
+  ],
   s3: [
     {
       key: "bucket",
@@ -139,6 +167,11 @@ export function IntegrationEditor({
   const catalog =
     getIntegrationCatalogItem(
       integration.provider,
+    );
+
+  const isOAuthProvider =
+    integration.provider.endsWith(
+      "_oauth",
     );
 
   const fields = useMemo(
@@ -410,22 +443,24 @@ export function IntegrationEditor({
           </select>
         </label>
 
-        <label>
-          <span className="mb-2 block text-sm text-zinc-500">
-            URL base
-          </span>
+        {!isOAuthProvider && (
+          <label>
+            <span className="mb-2 block text-sm text-zinc-500">
+              URL base
+            </span>
 
-          <input
-            value={baseUrl}
-            onChange={(event) =>
-              setBaseUrl(
-                event.target.value,
-              )
-            }
-            placeholder="https://..."
-            className="h-12 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white outline-none focus:border-red-500/50"
-          />
-        </label>
+            <input
+              value={baseUrl}
+              onChange={(event) =>
+                setBaseUrl(
+                  event.target.value,
+                )
+              }
+              placeholder="https://..."
+              className="h-12 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white outline-none focus:border-red-500/50"
+            />
+          </label>
+        )}
 
         {fields.map((field) => (
           <label key={field.key}>
@@ -490,18 +525,24 @@ export function IntegrationEditor({
         <div className="mt-5 grid gap-5 md:grid-cols-3">
           {[
             {
-              label: "API Key",
+              label: isOAuthProvider
+                ? "Client ID"
+                : "API Key",
               value: apiKey,
               setValue: setApiKey,
               configured:
                 integration.api_key_configured,
+              visible: true,
             },
             {
-              label: "API Secret",
+              label: isOAuthProvider
+                ? "Client Secret"
+                : "API Secret",
               value: apiSecret,
               setValue: setApiSecret,
               configured:
                 integration.api_secret_configured,
+              visible: true,
             },
             {
               label: "Webhook Secret",
@@ -510,8 +551,11 @@ export function IntegrationEditor({
                 setWebhookSecret,
               configured:
                 integration.webhook_secret_configured,
+              visible: !isOAuthProvider,
             },
-          ].map((field) => (
+          ]
+            .filter((field) => field.visible)
+            .map((field) => (
             <label key={field.label}>
               <span className="mb-2 block text-sm text-zinc-500">
                 {field.label}
