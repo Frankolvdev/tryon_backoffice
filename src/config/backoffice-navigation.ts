@@ -136,6 +136,11 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         icon: BadgePercent,
       },
       {
+        label: "Configuración de facturación",
+        href: "/dashboard/billing/settings",
+        icon: Settings,
+      },
+      {
         label: "Operaciones billing",
         href: "/dashboard/billing/operations",
         icon: ServerCog,

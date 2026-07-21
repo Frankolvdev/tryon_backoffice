@@ -18,6 +18,21 @@ export type SystemSettingValueType =
   | "json"
   | string;
 
+export interface SystemSettingCreate {
+  category: SystemSettingCategory;
+  key: string;
+  label: string;
+  description?: string | null;
+  value_type: SystemSettingValueType;
+  value?: unknown;
+  default_value?: unknown;
+  is_public?: boolean;
+  is_editable?: boolean;
+  is_sensitive?: boolean;
+  requires_restart?: boolean;
+  sort_order?: number;
+}
+
 export interface SystemSettingResponse {
   id: number;
   category: SystemSettingCategory;
