@@ -102,6 +102,8 @@ export function BillingCouponEditor({
     );
   const [isActive, setIsActive] =
     useState(coupon?.is_active ?? true);
+  const [appliesTo, setAppliesTo] = useState<"all" | "plans" | "token_packages">(coupon?.applies_to ?? "all");
+  const [eligibleIds, setEligibleIds] = useState((coupon?.eligible_item_ids ?? []).join(", "));
   const [metadata, setMetadata] =
     useState(
       JSON.stringify(
@@ -151,6 +153,8 @@ export function BillingCouponEditor({
       coupon?.first_time_transaction_only ?? false,
     );
     setIsActive(coupon?.is_active ?? true);
+    setAppliesTo(coupon?.applies_to ?? "all");
+    setEligibleIds((coupon?.eligible_item_ids ?? []).join(", "));
     setMetadata(
       JSON.stringify(coupon?.metadata ?? {}, null, 2),
     );
@@ -242,6 +246,8 @@ export function BillingCouponEditor({
         ? new Date(validUntil).toISOString()
         : null,
       is_active: isActive,
+      applies_to: appliesTo,
+      eligible_item_ids: eligibleIds.split(",").map((value) => Number(value.trim())).filter((value) => Number.isInteger(value) && value > 0),
       metadata: parsedMetadata,
     };
 
@@ -630,6 +636,21 @@ export function BillingCouponEditor({
               className="min-h-24 w-full rounded-xl border border-white/8 bg-black/30 p-4 text-sm text-white"
             />
           </label>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <label>
+              <span className="mb-2 block text-sm text-zinc-500">Aplicable a</span>
+              <select value={appliesTo} onChange={(event) => setAppliesTo(event.target.value as typeof appliesTo)} className="h-11 w-full rounded-xl border border-white/8 bg-[#09090a] px-4 text-sm text-zinc-300">
+                <option value="all">Todos los productos</option>
+                <option value="plans">Planes</option>
+                <option value="token_packages">Paquetes de tokens</option>
+              </select>
+            </label>
+            <label>
+              <span className="mb-2 block text-sm text-zinc-500">IDs elegibles (opcional)</span>
+              <input value={eligibleIds} onChange={(event) => setEligibleIds(event.target.value)} placeholder="1, 2, 3" className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white" />
+            </label>
+          </div>
 
           <label className="mt-5 block">
             <span className="mb-2 block text-sm text-zinc-500">
