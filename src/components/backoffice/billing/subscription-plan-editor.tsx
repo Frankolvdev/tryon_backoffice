@@ -3,10 +3,12 @@
 import {
   LoaderCircle,
   Save,
+  Sparkles,
   X,
 } from "lucide-react";
 import {
   useEffect,
+  useMemo,
   useState,
   type FormEvent,
 } from "react";
@@ -20,6 +22,7 @@ import type {
   SubscriptionPlanResponse,
   SubscriptionPlanUpdate,
 } from "@/types/admin-subscription-plans";
+import type { CommercialSettingsResponse } from "@/types/admin-pricing-coupons";
 
 interface SubscriptionPlanEditorProps {
   plan: SubscriptionPlanResponse | null;
@@ -64,14 +67,6 @@ export function SubscriptionPlanEditor({
     plan?.billing_interval ??
       "month",
   );
-  const [currency, setCurrency] =
-    useState(
-      plan?.currency ?? "USD",
-    );
-  const [priceAmount, setPriceAmount] =
-    useState(
-      plan?.price_amount ?? "0",
-    );
   const [
     tokensPerPeriod,
     setTokensPerPeriod,
@@ -123,6 +118,10 @@ export function SubscriptionPlanEditor({
     useState(
       plan?.is_active ?? true,
     );
+  const [commercialSettings, setCommercialSettings] =
+    useState<CommercialSettingsResponse | null>(null);
+  const [isLoadingEconomy, setIsLoadingEconomy] =
+    useState(true);
   const [isSaving, setIsSaving] =
     useState(false);
 
@@ -135,12 +134,6 @@ export function SubscriptionPlanEditor({
     setBillingInterval(
       plan?.billing_interval ??
         "month",
-    );
-    setCurrency(
-      plan?.currency ?? "USD",
-    );
-    setPriceAmount(
-      plan?.price_amount ?? "0",
     );
     setTokensPerPeriod(
       String(
@@ -187,6 +180,51 @@ export function SubscriptionPlanEditor({
     );
   }, [plan]);
 
+  useEffect(() => {
+    const loadCommercialSettings = async () => {
+      try {
+        const result = await browserApiRequest<CommercialSettingsResponse>(
+          "/api/admin/commercial-settings",
+        );
+        setCommercialSettings(result);
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "No fue posible cargar la economía global.",
+        );
+      } finally {
+        setIsLoadingEconomy(false);
+      }
+    };
+
+    void loadCommercialSettings();
+  }, []);
+
+  const calculatedPrice = useMemo(() => {
+    const tokens = Number(tokensPerPeriod);
+    const tokenValue = commercialSettings?.token_value_usd;
+
+    if (!Number.isFinite(tokens) || tokens < 0 || !tokenValue || tokenValue <= 0) {
+      return null;
+    }
+
+    return tokens * tokenValue;
+  }, [commercialSettings, tokensPerPeriod]);
+
+  const formattedPrice = useMemo(() => {
+    if (calculatedPrice === null || !commercialSettings) {
+      return "—";
+    }
+
+    return new Intl.NumberFormat("es-MX", {
+      style: "currency",
+      currency: commercialSettings.currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(calculatedPrice);
+  }, [calculatedPrice, commercialSettings]);
+
   const submit = async (
     event: FormEvent<HTMLFormElement>,
   ) => {
@@ -213,33 +251,12 @@ export function SubscriptionPlanEditor({
       return;
     }
 
-    if (
-      currency.trim().length !== 3
-    ) {
-      toast.error(
-        "La moneda debe tener tres letras.",
-      );
-      return;
-    }
-
-    const parsedPrice =
-      Number(priceAmount);
     const parsedTokens =
       Number(tokensPerPeriod);
     const parsedPriority =
       Number(priority);
     const parsedSortOrder =
       Number(sortOrder);
-
-    if (
-      !Number.isFinite(parsedPrice) ||
-      parsedPrice < 0
-    ) {
-      toast.error(
-        "El precio debe ser cero o mayor.",
-      );
-      return;
-    }
 
     if (
       !Number.isInteger(
@@ -326,6 +343,11 @@ export function SubscriptionPlanEditor({
       }
     }
 
+    if (!commercialSettings || calculatedPrice === null) {
+      toast.error("No fue posible calcular el precio con la economía global.");
+      return;
+    }
+
     const common = {
       name: name.trim(),
       description:
@@ -333,11 +355,8 @@ export function SubscriptionPlanEditor({
         null,
       billing_interval:
         billingInterval,
-      currency:
-        currency
-          .trim()
-          .toUpperCase(),
-      price_amount: parsedPrice,
+      currency: commercialSettings?.currency ?? plan?.currency ?? "USD",
+      price_amount: calculatedPrice ?? Number(plan?.price_amount ?? 0),
       tokens_per_period:
         parsedTokens,
       max_generations_per_period:
@@ -499,43 +518,6 @@ export function SubscriptionPlanEditor({
 
             <label>
               <span className="mb-2 block text-sm text-zinc-500">
-                Moneda
-              </span>
-
-              <input
-                value={currency}
-                maxLength={3}
-                onChange={(event) =>
-                  setCurrency(
-                    event.target.value
-                      .toUpperCase(),
-                  )
-                }
-                className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 font-mono text-sm uppercase text-white"
-              />
-            </label>
-
-            <label>
-              <span className="mb-2 block text-sm text-zinc-500">
-                Precio
-              </span>
-
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={priceAmount}
-                onChange={(event) =>
-                  setPriceAmount(
-                    event.target.value,
-                  )
-                }
-                className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"
-              />
-            </label>
-
-            <label>
-              <span className="mb-2 block text-sm text-zinc-500">
                 Tokens por periodo
               </span>
 
@@ -610,6 +592,40 @@ export function SubscriptionPlanEditor({
               />
             </label>
           </div>
+
+          <section className="mt-5 rounded-2xl border border-red-500/15 bg-red-950/10 p-5">
+            <div className="flex items-start gap-4">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-red-500/20 bg-red-950/30 text-red-400">
+                <Sparkles size={18} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold tracking-[0.16em] text-red-400 uppercase">
+                  Precio automático del plan
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-white">
+                  {isLoadingEconomy ? (
+                    <LoaderCircle size={20} className="animate-spin" />
+                  ) : (
+                    formattedPrice
+                  )}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-zinc-500">
+                  El precio se calcula con los tokens incluidos y el valor global configurado.
+                  El formulario ya no admite un precio ni una moneda manuales.
+                </p>
+                {commercialSettings ? (
+                  <div className="mt-4 flex flex-wrap gap-2 text-xs text-zinc-500">
+                    <span className="rounded-lg border border-white/7 bg-black/20 px-3 py-2">
+                      1 token = {commercialSettings.token_value_usd} {commercialSettings.currency}
+                    </span>
+                    <span className="rounded-lg border border-white/7 bg-black/20 px-3 py-2">
+                      {tokensPerPeriod || 0} tokens por {billingInterval === "year" ? "año" : "mes"}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </section>
 
           <label className="mt-5 block">
             <span className="mb-2 block text-sm text-zinc-500">

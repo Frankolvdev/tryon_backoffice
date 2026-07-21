@@ -308,7 +308,7 @@ export default function SubscriptionPlansPage() {
         currency: plan.currency,
       },
     ).format(
-      Number(plan.price_amount),
+      Number(plan.calculated_price_amount ?? plan.price_amount),
     );
 
   return (
@@ -333,9 +333,9 @@ export default function SubscriptionPlansPage() {
                 </h1>
 
                 <p className="mt-3 max-w-3xl text-sm leading-7 text-zinc-600">
-                  Crea y administra el catálogo de planes,
-                  sus precios, tokens, límites,
-                  visibilidad y sincronización con Stripe.
+                  Crea y administra el catálogo de planes, sus tokens, límites,
+                  visibilidad y sincronización con Stripe. El precio se calcula
+                  automáticamente desde la economía global.
                 </p>
               </div>
             </div>

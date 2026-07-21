@@ -10,6 +10,10 @@ export interface SubscriptionPlanResponse {
   billing_interval: BillingInterval;
   currency: string;
   price_amount: string;
+  calculated_price_amount?: string;
+  calculated_price_cents?: number;
+  commercial_token_value?: number;
+  price_is_automatic?: boolean;
   tokens_per_period: number;
   max_generations_per_period: number | null;
   priority: number;
