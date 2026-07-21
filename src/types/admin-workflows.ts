@@ -1,4 +1,5 @@
 export type WorkflowExecutionMode =
+  | "simulated"
   | "comfyui_local"
   | "runpod_serverless";
 

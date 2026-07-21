@@ -18,6 +18,10 @@ interface WorkflowStatusBadgesProps {
 function executionModeLabel(
   mode: WorkflowExecutionMode,
 ): string {
+  if (mode === "simulated") {
+    return "Simulado";
+  }
+
   if (mode === "comfyui_local") {
     return "ComfyUI local";
   }

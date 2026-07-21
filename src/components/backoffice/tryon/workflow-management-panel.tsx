@@ -463,6 +463,7 @@ export function WorkflowManagementPanel({
               <div className="mt-2 space-y-3">
                 {(
                   [
+                    "simulated",
                     "comfyui_local",
                     "runpod_serverless",
                   ] as WorkflowExecutionMode[]
