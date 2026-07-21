@@ -75,3 +75,18 @@ export interface BillingJobResult {
   success: boolean;
   errors: Array<Record<string, unknown>>;
 }
+
+
+export interface BillingOperationsOverview {
+  active_subscriptions: number;
+  subscriptions_needing_attention: number;
+  pending_token_purchases: number;
+  failed_token_purchases: number;
+  failed_billing_events: number;
+  open_invoices: number;
+  failed_payments: number;
+  succeeded_revenue_amount: number;
+  refunded_amount: number;
+  currency: string;
+  generated_at: string;
+}

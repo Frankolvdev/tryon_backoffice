@@ -29,6 +29,7 @@ import type {
   BillingEventListResponse,
   BillingEventResponse,
   BillingJobsCatalogResponse,
+  BillingOperationsOverview,
   BillingValidationResponse,
 } from "@/types/admin-billing-operations";
 
@@ -50,6 +51,7 @@ function statusClass(status: string): string {
 }
 
 export default function BillingOperationsPage() {
+  const [overview, setOverview] = useState<BillingOperationsOverview | null>(null);
   const [validation, setValidation] =
     useState<BillingValidationResponse | null>(
       null,
@@ -111,10 +113,14 @@ export default function BillingOperationsPage() {
 
     try {
       const [
+        overviewResponse,
         validationResponse,
         jobsResponse,
         eventsResponse,
       ] = await Promise.all([
+        browserApiRequest<BillingOperationsOverview>(
+          "/api/admin/billing/overview",
+        ),
         browserApiRequest<BillingValidationResponse>(
           "/api/admin/billing/validation",
         ),
@@ -126,6 +132,7 @@ export default function BillingOperationsPage() {
         ),
       ]);
 
+      setOverview(overviewResponse);
       setValidation(validationResponse);
       setJobs(jobsResponse);
       setEvents(eventsResponse);
@@ -258,6 +265,22 @@ export default function BillingOperationsPage() {
         !errorMessage &&
         validation && (
           <>
+            {overview && (
+              <section className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                {[
+                  ["Ingresos procesados", `${overview.currency} ${overview.succeeded_revenue_amount.toFixed(2)}`],
+                  ["Suscripciones activas", String(overview.active_subscriptions)],
+                  ["Compras por conciliar", String(overview.pending_token_purchases)],
+                  ["Incidencias críticas", String(overview.failed_billing_events + overview.failed_payments + overview.failed_token_purchases)],
+                ].map(([label, value]) => (
+                  <article key={label} className="luxia-panel rounded-2xl p-5">
+                    <p className="text-[10px] font-semibold tracking-[0.16em] text-zinc-600 uppercase">{label}</p>
+                    <p className="mt-3 text-2xl font-semibold text-white">{value}</p>
+                  </article>
+                ))}
+              </section>
+            )}
+
             <section
               className={
                 validation.ready
