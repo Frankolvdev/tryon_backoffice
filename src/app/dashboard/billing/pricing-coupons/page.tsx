@@ -23,6 +23,7 @@ import {
 import { toast } from "sonner";
 
 import { BillingCouponEditor } from "@/components/backoffice/billing/billing-coupon-editor";
+import { CommercialEconomyCard } from "@/components/backoffice/billing/commercial-economy-card";
 import { PricingRuleEditor } from "@/components/backoffice/billing/pricing-rule-editor";
 import { browserApiRequest } from "@/lib/api/browser-api";
 
@@ -274,6 +275,8 @@ export default function PricingCouponsPage() {
         </div>
       </section>
 
+      <CommercialEconomyCard onUpdated={() => void loadData()} />
+
       {isLoading && (
         <section className="luxia-panel mt-5 flex min-h-80 items-center justify-center rounded-3xl">
           <LoaderCircle className="animate-spin text-red-500" />
@@ -352,34 +355,34 @@ export default function PricingCouponsPage() {
                         Tokens
                       </p>
                       <p className="mt-1 text-lg font-semibold text-white">
-                        {rule.tokens_cost}
+                        {rule.required_tokens}
                       </p>
                     </div>
 
                     <div className="rounded-xl border border-white/6 bg-black/20 p-3">
                       <p className="text-[10px] text-zinc-700">
-                        Margen
+                        Ganancia deseada
                       </p>
                       <p className="mt-1 text-lg font-semibold text-white">
-                        {rule.margin_percent}%
+                        {rule.desired_profit_percent}%
                       </p>
                     </div>
 
                     <div className="rounded-xl border border-white/6 bg-black/20 p-3">
                       <p className="text-[10px] text-zinc-700">
-                        GPU
+                        Precio final
                       </p>
                       <p className="mt-1 text-sm font-semibold text-zinc-300">
-                        {rule.estimated_gpu_seconds}s
+                        {rule.final_price_usd.toFixed(2)} {rule.currency}
                       </p>
                     </div>
 
                     <div className="rounded-xl border border-white/6 bg-black/20 p-3">
                       <p className="text-[10px] text-zinc-700">
-                        Costo GPU
+                        Costo promedio (USD)
                       </p>
                       <p className="mt-1 text-sm font-semibold text-zinc-300">
-                        {rule.estimated_gpu_cost_cents}¢
+                        {rule.average_execution_cost_usd.toFixed(2)} USD
                       </p>
                     </div>
                   </div>

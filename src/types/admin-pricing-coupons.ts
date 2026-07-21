@@ -12,15 +12,33 @@ export type QualityMode =
   | "high"
   | string;
 
+export interface CommercialSettingsResponse {
+  token_value_usd: number;
+  currency: string;
+}
+
+export interface CommercialPricePreviewResponse {
+  average_execution_cost_usd: number;
+  desired_profit_percent: number;
+  token_value_usd: number;
+  currency: string;
+  final_price_usd: number;
+  required_tokens: number;
+  effective_margin_percent: number;
+}
+
 export interface PricingRuleResponse {
   id: number;
   operation_type: PricingOperationType;
   item_type: TryOnItemType;
   quality_mode: QualityMode;
-  tokens_cost: number;
-  estimated_gpu_seconds: number;
-  estimated_gpu_cost_cents: number;
-  margin_percent: number;
+  average_execution_cost_usd: number;
+  desired_profit_percent: number;
+  final_price_usd: number;
+  required_tokens: number;
+  effective_margin_percent: number;
+  token_value_usd: number;
+  currency: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -30,18 +48,14 @@ export interface PricingRuleCreate {
   operation_type: PricingOperationType;
   item_type: TryOnItemType;
   quality_mode: QualityMode;
-  tokens_cost: number;
-  estimated_gpu_seconds: number;
-  estimated_gpu_cost_cents: number;
-  margin_percent: number;
+  average_execution_cost_usd: number;
+  desired_profit_percent: number;
   is_active: boolean;
 }
 
 export interface PricingRuleUpdate {
-  tokens_cost?: number | null;
-  estimated_gpu_seconds?: number | null;
-  estimated_gpu_cost_cents?: number | null;
-  margin_percent?: number | null;
+  average_execution_cost_usd?: number | null;
+  desired_profit_percent?: number | null;
   is_active?: boolean | null;
 }
 
