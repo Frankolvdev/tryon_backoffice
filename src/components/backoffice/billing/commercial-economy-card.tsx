@@ -1,10 +1,12 @@
 "use client";
 
-import { Coins, LoaderCircle, Save } from "lucide-react";
+import { Coins, LoaderCircle, RefreshCcw, Save } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
 import { browserApiRequest } from "@/lib/api/browser-api";
+import type { CommercialRepriceResponse } from "@/types/admin-simulated-engine";
+
 import type { CommercialSettingsResponse } from "@/types/admin-pricing-coupons";
 
 interface CommercialEconomyCardProps {
@@ -15,6 +17,7 @@ export function CommercialEconomyCard({ onUpdated }: CommercialEconomyCardProps)
   const [tokenValue, setTokenValue] = useState("0.10");
   const [currency, setCurrency] = useState("USD");
   const [isLoading, setIsLoading] = useState(true);
+  const [isRepricing, setIsRepricing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -33,6 +36,17 @@ export function CommercialEconomyCard({ onUpdated }: CommercialEconomyCardProps)
     };
     void load();
   }, []);
+
+  const repriceCatalog = async () => {
+    setIsRepricing(true);
+    try {
+      const result = await browserApiRequest<CommercialRepriceResponse>("/api/admin/commercial-reprice", { method: "POST" });
+      toast.success(`${result.plans_updated} planes y ${result.packages_updated} paquetes recalculados.`);
+      onUpdated?.();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible recalcular el catálogo.");
+    } finally { setIsRepricing(false); }
+  };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -90,9 +104,14 @@ export function CommercialEconomyCard({ onUpdated }: CommercialEconomyCardProps)
             <span className="mb-2 block text-sm text-zinc-500">Moneda comercial</span>
             <input maxLength={3} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 font-mono text-sm uppercase text-white" />
           </label>
-          <button type="submit" disabled={isSaving} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-red-600 px-5 text-sm font-semibold text-white disabled:opacity-50">
-            {isSaving ? <LoaderCircle size={16} className="animate-spin" /> : <Save size={16} />} Guardar
-          </button>
+          <div className="flex flex-wrap gap-2 md:col-span-3">
+            <button type="button" onClick={() => void repriceCatalog()} disabled={isSaving || isRepricing} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/8 px-5 text-sm font-semibold text-zinc-300 disabled:opacity-50">
+              {isRepricing ? <LoaderCircle size={16} className="animate-spin" /> : <RefreshCcw size={16} />} Recalcular catálogo
+            </button>
+            <button type="submit" disabled={isSaving || isRepricing} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-red-600 px-5 text-sm font-semibold text-white disabled:opacity-50">
+              {isSaving ? <LoaderCircle size={16} className="animate-spin" /> : <Save size={16} />} Guardar
+            </button>
+          </div>
         </form>
       )}
     </section>

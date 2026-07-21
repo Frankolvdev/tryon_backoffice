@@ -7,12 +7,18 @@ import {
   Cpu,
   Database,
   Gauge,
+  FlaskConical,
   Server,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 const tabs = [
+  {
+    label: "Simulado",
+    href: "/dashboard/tryon/integrations/simulated",
+    icon: FlaskConical,
+  },
   {
     label: "ComfyUI",
     href: "/dashboard/tryon/integrations",
