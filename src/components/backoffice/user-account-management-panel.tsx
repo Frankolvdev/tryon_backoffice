@@ -1,7 +1,8 @@
 "use client";
 
-import { KeyRound, LoaderCircle, Save } from "lucide-react";
+import { KeyRound, LoaderCircle, Save, Trash2 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { browserApiRequest } from "@/lib/api/browser-api";
@@ -21,12 +22,15 @@ export function UserAccountManagementPanel({
   user,
   onUpdated,
 }: Props) {
+  const router = useRouter();
   const [email, setEmail] = useState(user.email);
   const [fullName, setFullName] = useState(user.full_name ?? "");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deletingPermanently, setDeletingPermanently] = useState(false);
 
   useEffect(() => {
     setEmail(user.email);
@@ -115,6 +119,40 @@ export function UserAccountManagementPanel({
       );
     } finally {
       setSavingPassword(false);
+    }
+  };
+
+  const permanentlyDeleteUser = async () => {
+    if (deleteConfirmation.trim().toLowerCase() !== user.email.toLowerCase()) {
+      toast.error("Escribe exactamente el correo del usuario para confirmar.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Esta acción eliminará permanentemente a ${user.email} y todos sus datos asociados. No se puede deshacer.`,
+    );
+
+    if (!confirmed) return;
+
+    setDeletingPermanently(true);
+
+    try {
+      const response = await browserApiRequest<SuccessResponse>(
+        `/api/admin/users/${user.id}/permanent`,
+        { method: "DELETE" },
+      );
+
+      toast.success(response.message);
+      router.replace("/dashboard/users");
+      router.refresh();
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No fue posible eliminar permanentemente el usuario.",
+      );
+    } finally {
+      setDeletingPermanently(false);
     }
   };
 
@@ -222,6 +260,44 @@ export function UserAccountManagementPanel({
           Restablecer contraseña
         </button>
       </form>
+
+      <section className="rounded-3xl border border-red-500/20 bg-red-950/10 p-6 xl:col-span-2">
+        <div className="flex items-center gap-3">
+          <Trash2 className="text-red-400" />
+          <div>
+            <h2 className="font-semibold text-white">Eliminación permanente</h2>
+            <p className="mt-1 text-sm leading-6 text-zinc-500">
+              Borra definitivamente la cuenta y sus datos asociados. El correo quedará libre para registrarse de nuevo. Solo un superadministrador puede ejecutar esta acción.
+            </p>
+          </div>
+        </div>
+
+        <label className="mt-5 block">
+          <span className="mb-2 block text-sm text-zinc-500">
+            Escribe {user.email} para confirmar
+          </span>
+          <input
+            value={deleteConfirmation}
+            onChange={(event) => setDeleteConfirmation(event.target.value)}
+            placeholder={user.email}
+            className="h-11 w-full rounded-xl border border-red-500/20 bg-black/30 px-4 text-sm text-white outline-none focus:border-red-500/50"
+          />
+        </label>
+
+        <button
+          type="button"
+          onClick={() => void permanentlyDeleteUser()}
+          disabled={deletingPermanently || deleteConfirmation.trim().toLowerCase() !== user.email.toLowerCase()}
+          className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl bg-red-700 px-5 text-sm font-semibold text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {deletingPermanently ? (
+            <LoaderCircle size={16} className="animate-spin" />
+          ) : (
+            <Trash2 size={16} />
+          )}
+          Eliminar permanentemente
+        </button>
+      </section>
     </div>
   );
 }
