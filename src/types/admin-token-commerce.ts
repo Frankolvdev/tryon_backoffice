@@ -13,6 +13,9 @@ export interface TokenPackageResponse {
   description: string | null;
   tokens_amount: number;
   price_cents: number;
+  calculated_price_cents: number;
+  commercial_token_value: number;
+  price_is_automatic: boolean;
   currency: string;
   stripe_price_id: string | null;
   is_active: boolean;
@@ -23,8 +26,8 @@ export interface TokenPackageCreate {
   name: string;
   description?: string | null;
   tokens_amount: number;
-  price_cents: number;
-  currency: string;
+  price_cents?: number | null;
+  currency?: string | null;
   stripe_price_id?: string | null;
   is_active: boolean;
 }
