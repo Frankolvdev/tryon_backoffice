@@ -7,6 +7,7 @@ import {
   Cpu,
   Database,
   Gauge,
+  Network,
   FlaskConical,
   Server,
 } from "lucide-react";
@@ -14,6 +15,11 @@ import {
 import { cn } from "@/lib/utils";
 
 const tabs = [
+  {
+    label: "Proveedores",
+    href: "/dashboard/tryon/integrations/providers",
+    icon: Network,
+  },
   {
     label: "Simulado",
     href: "/dashboard/tryon/integrations/simulated",
