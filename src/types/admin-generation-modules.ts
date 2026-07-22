@@ -1,5 +1,5 @@
 export type GenerationExecutionEngine = "simulated" | "local_docker" | "runpod_serverless";
-export type GenerationModuleInputType = "image" | "file" | "text" | "integer" | "float" | "boolean" | "json";
+export type GenerationModuleInputType = "image" | "file" | "text" | "textarea" | "select" | "integer" | "float" | "boolean" | "json";
 export type GenerationModuleOutputType = "image" | "images" | "file" | "json" | "metadata";
 export type GenerationModuleStepType = "workflow" | "python";
 
