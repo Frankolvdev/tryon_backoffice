@@ -7,35 +7,43 @@ import { createRouteErrorResponse } from "@/lib/server/route-error";
 
 interface ForwardAdminRequestOptions {
   backendPath: string;
-  method:
-    | "GET"
-    | "POST"
-    | "PUT"
-    | "PATCH"
-    | "DELETE";
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   request?: NextRequest | Request;
 }
 
 async function readRequestBody(
   request: NextRequest | Request | undefined,
-): Promise<string | undefined> {
+): Promise<BodyInit | undefined> {
   if (!request) {
     return undefined;
   }
 
-  const body = await request.text();
+  const contentType = request.headers.get("content-type") ?? "";
 
+  if (contentType.includes("multipart/form-data")) {
+    const incomingForm = await request.formData();
+    const forwardedForm = new FormData();
+
+    incomingForm.forEach((value, key) => {
+      if (typeof value === "string") {
+        forwardedForm.append(key, value);
+        return;
+      }
+
+      forwardedForm.append(key, value, value.name);
+    });
+
+    return forwardedForm;
+  }
+
+  const body = await request.text();
   return body.trim() ? body : undefined;
 }
 
 function canHaveBody(
   method: ForwardAdminRequestOptions["method"],
 ): boolean {
-  return (
-    method === "POST" ||
-    method === "PUT" ||
-    method === "PATCH"
-  );
+  return method === "POST" || method === "PUT" || method === "PATCH";
 }
 
 export async function forwardAdminRequest({
@@ -45,14 +53,12 @@ export async function forwardAdminRequest({
 }: ForwardAdminRequestOptions): Promise<NextResponse> {
   try {
     await getAuthenticatedAdmin();
-
     const accessToken = await getAccessToken();
 
     if (!accessToken) {
       return NextResponse.json(
         {
-          detail:
-            "No se encontró una sesión administrativa activa.",
+          detail: "No se encontró una sesión administrativa activa.",
         },
         {
           status: 401,
@@ -64,14 +70,11 @@ export async function forwardAdminRequest({
       ? await readRequestBody(request)
       : undefined;
 
-    const response = await backendRequest<unknown>(
-      backendPath,
-      {
-        method,
-        accessToken,
-        body,
-      },
-    );
+    const response = await backendRequest<unknown>(backendPath, {
+      method,
+      accessToken,
+      body,
+    });
 
     return NextResponse.json(response);
   } catch (error) {
