@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { browserApiRequest } from "@/lib/api/browser-api";
 import type {
   GenerationModule,
+  GenerationModuleOutput,
   GenerationModuleStep,
 } from "@/types/admin-generation-modules";
 
@@ -290,15 +291,27 @@ export function GenerationNodeCanvas({
       position: { x: 390 + ordered.length * 350, y: 140 },
       deletable: false,
       data: {
-        title: "Salidas publicadas",
-        subtitle: "Resultado del módulo",
+        title: "Output",
+        subtitle: "Salida final obligatoria",
         kind: "output",
         enabled: true,
-        inputs: module.outputs.map((output) => ({
+        inputs: (module.outputs.length > 0
+          ? module.outputs
+          : [
+              {
+                key: "output",
+                name: "Output final",
+                output_type: "image" as const,
+                position: 0,
+                is_required: true,
+                source_path: null,
+              },
+            ]
+        ).map((output) => ({
           key: output.key,
           label: output.name || output.key,
           type: output.output_type,
-          path: output.source_path ?? output.key,
+          path: output.source_path ?? "",
         })),
         outputs: [],
       },
@@ -330,6 +343,24 @@ export function GenerationNodeCanvas({
         });
       }
     }
+
+    for (const output of module.outputs) {
+      if (!output.source_path) continue;
+      const [stepKey, outputKey] = output.source_path.includes(".")
+        ? output.source_path.split(".", 2)
+        : [output.source_step_key ?? "", output.source_path];
+      const sourceStep = module.steps.find((candidate) => candidate.key === stepKey);
+      if (!sourceStep) continue;
+      edges.push({
+        id: `output-${output.key}-${sourceStep.id}-${outputKey}`,
+        source: `step:${sourceStep.id}`,
+        target: "module-outputs",
+        sourceHandle: `out:${outputKey}`,
+        targetHandle: `in:${output.key}`,
+        animated: true,
+        deletable: true,
+      });
+    }
     return edges;
   }, [module]);
 
@@ -341,92 +372,166 @@ export function GenerationNodeCanvas({
     setEdges(buildEdges());
   }, [buildEdges, buildNodes, setEdges, setNodes]);
 
+  const outputPayload = useCallback(
+    (overrides: Record<string, string | null>) => {
+      const outputs: GenerationModuleOutput[] = module.outputs.length
+        ? module.outputs
+        : [{
+            key: "output",
+            name: "Output final",
+            output_type: "image" as const,
+            position: 0,
+            is_required: true,
+            source_step_key: null,
+            source_path: null,
+            metadata: {},
+          }];
+      return outputs.map((output) => {
+        const sourcePath = Object.prototype.hasOwnProperty.call(overrides, output.key)
+          ? overrides[output.key]
+          : output.source_path ?? null;
+        return {
+          key: output.key,
+          name: output.name,
+          description: output.description ?? null,
+          output_type: output.output_type,
+          position: output.position,
+          is_required: output.is_required,
+          source_step_key: sourcePath?.includes(".") ? sourcePath.split(".", 1)[0] : null,
+          source_path: sourcePath,
+          metadata: output.metadata ?? {},
+        };
+      });
+    },
+    [module.outputs],
+  );
+
+  const disconnectEdge = useCallback(
+    async (edge: Edge) => {
+      if (!edge.targetHandle) return;
+      try {
+        let updated: GenerationModule;
+        if (edge.target === "module-outputs") {
+          const outputKey = edge.targetHandle.replace("in:", "");
+          updated = await browserApiRequest<GenerationModule>(
+            `/api/admin/generation-modules/${module.id}`,
+            { method: "PATCH", body: JSON.stringify({ outputs: outputPayload({ [outputKey]: null }) }) },
+          );
+        } else if (edge.target.startsWith("step:")) {
+          const target = module.steps.find((step) => String(step.id) === edge.target.split(":")[1]);
+          if (!target) return;
+          const targetKey = edge.targetHandle.replace("in:", "");
+          if (target.step_type === "python") {
+            const mapping = { ...(target.input_mapping ?? {}) };
+            delete mapping[targetKey];
+            updated = await browserApiRequest<GenerationModule>(
+              `/api/admin/generation-modules/${module.id}/steps/${target.id}/python`,
+              { method: "PATCH", body: JSON.stringify({ input_mapping: mapping }) },
+            );
+          } else {
+            const inputBindings = ((target.configuration?.input_bindings ?? []) as Array<Record<string, unknown>>).filter(
+              (binding) => `${String(binding.node_id ?? "")}.${String(binding.input_field ?? "")}` !== targetKey,
+            );
+            updated = await browserApiRequest<GenerationModule>(
+              `/api/admin/generation-modules/${module.id}/steps/${target.id}/workflow-bindings`,
+              { method: "PATCH", body: JSON.stringify({ input_bindings: inputBindings, output_bindings: target.configuration?.output_bindings ?? [] }) },
+            );
+          }
+        } else return;
+        setEdges((current) => current.filter((candidate) => candidate.id !== edge.id));
+        onModule(updated);
+        toast.success("Conexión eliminada.");
+      } catch (error) {
+        setEdges(buildEdges());
+        toast.error(error instanceof Error ? error.message : "No se pudo eliminar la conexión.");
+      }
+    },
+    [buildEdges, module, onModule, outputPayload, setEdges],
+  );
+
+  const onEdgesDeletePersisted = useCallback(
+    async (deletedEdges: Edge[]) => {
+      for (const edge of deletedEdges) await disconnectEdge(edge);
+    },
+    [disconnectEdge],
+  );
+
   const onConnect = useCallback(
     async (connection: Connection) => {
-      if (
-        !connection.sourceHandle ||
-        !connection.targetHandle ||
-        !connection.target?.startsWith("step:")
-      ) {
-        return;
-      }
+      if (!connection.sourceHandle || !connection.targetHandle || !connection.target) return;
 
-      const target = module.steps.find(
-        (step) => String(step.id) === connection.target!.split(":")[1],
-      );
-      if (!target) return;
-
-      const sourceNode =
-        connection.source === "module-inputs"
-          ? null
-          : module.steps.find(
-              (step) => String(step.id) === connection.source!.split(":")[1],
-            );
+      const sourceNode = connection.source === "module-inputs"
+        ? null
+        : module.steps.find((step) => String(step.id) === connection.source?.split(":")[1]);
       const sourceKey = connection.sourceHandle.replace("out:", "");
-      const targetKey = connection.targetHandle.replace("in:", "");
       const sourcePath = sourceNode ? `${sourceNode.key}.${sourceKey}` : sourceKey;
 
       try {
         let updated: GenerationModule;
+        if (connection.target === "module-outputs") {
+          if (!sourceNode) {
+            toast.error("El bloque Output debe conectarse desde la salida de un paso.");
+            return;
+          }
+          const outputKey = connection.targetHandle.replace("in:", "");
+          updated = await browserApiRequest<GenerationModule>(
+            `/api/admin/generation-modules/${module.id}`,
+            { method: "PATCH", body: JSON.stringify({ outputs: outputPayload({ [outputKey]: sourcePath }) }) },
+          );
+          setEdges((current) => addEdge({ ...connection, animated: true, deletable: true }, current.filter(
+            (edge) => !(edge.target === "module-outputs" && edge.targetHandle === connection.targetHandle),
+          )));
+          onModule(updated);
+          toast.success("Output final conectado.");
+          return;
+        }
+
+        if (!connection.target.startsWith("step:")) return;
+        const target = module.steps.find((step) => String(step.id) === connection.target?.split(":")[1]);
+        if (!target) return;
+        const targetKey = connection.targetHandle.replace("in:", "");
+
         if (target.step_type === "python") {
           updated = await browserApiRequest<GenerationModule>(
             `/api/admin/generation-modules/${module.id}/steps/${target.id}/python`,
-            {
-              method: "PATCH",
-              body: JSON.stringify({
-                input_mapping: {
-                  ...(target.input_mapping ?? {}),
-                  [targetKey]: sourcePath,
-                },
-              }),
-            },
+            { method: "PATCH", body: JSON.stringify({ input_mapping: { ...(target.input_mapping ?? {}), [targetKey]: sourcePath } }) },
           );
         } else {
           const [nodeId, inputField] = targetKey.split(".", 2);
-          const existing = (
-            (target.configuration?.input_bindings ?? []) as Array<Record<string, unknown>>
-          ).filter(
-            (binding) =>
-              `${String(binding.node_id ?? "")}.${String(binding.input_field ?? "")}` !==
-              targetKey,
+          const existing = ((target.configuration?.input_bindings ?? []) as Array<Record<string, unknown>>).filter(
+            (binding) => `${String(binding.node_id ?? "")}.${String(binding.input_field ?? "")}` !== targetKey,
           );
           updated = await browserApiRequest<GenerationModule>(
             `/api/admin/generation-modules/${module.id}/steps/${target.id}/workflow-bindings`,
-            {
-              method: "PATCH",
-              body: JSON.stringify({
-                input_bindings: [
-                  ...existing,
-                  { source_path: sourcePath, node_id: nodeId, input_field: inputField },
-                ],
-                output_bindings: target.configuration?.output_bindings ?? [],
-              }),
-            },
+            { method: "PATCH", body: JSON.stringify({ input_bindings: [...existing, { source_path: sourcePath, node_id: nodeId, input_field: inputField }], output_bindings: target.configuration?.output_bindings ?? [] }) },
           );
         }
-        setEdges((current) => addEdge({ ...connection, animated: true }, current));
+        setEdges((current) => addEdge({ ...connection, animated: true, deletable: true }, current));
         onModule(updated);
         toast.success("Conexión guardada.");
       } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : "No se pudo guardar la conexión.",
-        );
+        toast.error(error instanceof Error ? error.message : "No se pudo guardar la conexión.");
       }
     },
-    [module, onModule, setEdges],
+    [module, onModule, outputPayload, setEdges],
   );
 
   return (
-    <div className="h-[650px] overflow-hidden rounded-2xl border border-white/10 bg-[#08090c]">
+    <div className="relative h-[650px] overflow-hidden rounded-2xl border border-white/10 bg-[#08090c]">
+      <div className="pointer-events-none absolute left-4 top-4 z-10 rounded-lg border border-white/10 bg-black/70 px-3 py-2 text-[11px] text-zinc-400 backdrop-blur">
+        Selecciona un cable y pulsa Supr/Backspace, o haz doble clic para desconectarlo.
+      </div>
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onEdgesDelete={onEdgesDeletePersisted}
+        onEdgeDoubleClick={(_event, edge) => void disconnectEdge(edge)}
         onConnect={onConnect}
         fitView
-        deleteKeyCode={null}
+        deleteKeyCode={["Backspace", "Delete"]}
       >
         <Background gap={20} size={1} />
         <MiniMap pannable zoomable />
