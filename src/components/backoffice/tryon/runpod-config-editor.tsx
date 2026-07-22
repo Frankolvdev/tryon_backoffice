@@ -62,15 +62,6 @@ export function RunPodConfigEditor({
   const [workflowName, setWorkflowName] =
     useState("");
 
-  const [minWorkers, setMinWorkers] =
-    useState("0");
-
-  const [maxWorkers, setMaxWorkers] =
-    useState("3");
-
-  const [cost, setCost] =
-    useState("1");
-
   const [isActive, setIsActive] =
     useState(true);
 
@@ -93,19 +84,6 @@ export function RunPodConfigEditor({
     );
     setWorkflowName(
       config?.comfy_workflow_name ?? "",
-    );
-    setMinWorkers(
-      String(config?.min_workers ?? 0),
-    );
-    setMaxWorkers(
-      String(config?.max_workers ?? 3),
-    );
-    setCost(
-      String(
-        config
-          ?.estimated_cost_per_second_cents ??
-          1,
-      ),
     );
     setIsActive(
       config?.is_active ?? true,
@@ -157,50 +135,13 @@ export function RunPodConfigEditor({
   ) => {
     event.preventDefault();
 
-    const minimum =
-      Number.parseInt(
-        minWorkers,
-        10,
-      );
-
-    const maximum =
-      Number.parseInt(
-        maxWorkers,
-        10,
-      );
-
-    const cents =
-      Number.parseInt(
-        cost,
-        10,
-      );
+    const minimum = config?.min_workers ?? 0;
+    const maximum = config?.max_workers ?? 3;
+    const cents = config?.estimated_cost_per_second_cents ?? 1;
 
     if (name.trim().length < 2) {
       toast.error(
         "El nombre debe tener al menos 2 caracteres.",
-      );
-      return;
-    }
-
-    if (
-      !Number.isInteger(minimum) ||
-      minimum < 0 ||
-      !Number.isInteger(maximum) ||
-      maximum < 1 ||
-      maximum < minimum
-    ) {
-      toast.error(
-        "Revisa min_workers y max_workers.",
-      );
-      return;
-    }
-
-    if (
-      !Number.isInteger(cents) ||
-      cents < 0
-    ) {
-      toast.error(
-        "El costo estimado debe ser un entero mayor o igual a cero.",
       );
       return;
     }
@@ -239,7 +180,7 @@ export function RunPodConfigEditor({
         );
 
         toast.success(
-          "Configuración RunPod actualizada.",
+          "Conexión RunPod actualizada.",
         );
       } else {
         const payload: RunPodConfigCreate = {
@@ -273,7 +214,7 @@ export function RunPodConfigEditor({
         );
 
         toast.success(
-          "Configuración RunPod creada.",
+          "Conexión RunPod creada.",
         );
       }
 
@@ -297,13 +238,13 @@ export function RunPodConfigEditor({
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-[10px] font-semibold tracking-[0.2em] text-red-500 uppercase">
-            Configuración Serverless
+            Conexión Serverless
           </p>
 
           <h2 className="mt-2 text-lg font-semibold text-white">
             {config
               ? `Editar ${config.name}`
-              : "Nueva configuración RunPod"}
+              : "Nueva conexión RunPod"}
           </h2>
         </div>
 
@@ -338,63 +279,6 @@ export function RunPodConfigEditor({
           </label>
         ))}
 
-        <label>
-          <span className="mb-2 block text-sm text-zinc-500">
-            Workers mínimos
-          </span>
-
-          <input
-            type="number"
-            min={0}
-            step={1}
-            value={minWorkers}
-            onChange={(event) =>
-              setMinWorkers(
-                event.target.value,
-              )
-            }
-            className="h-12 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white outline-none focus:border-red-500/50"
-          />
-        </label>
-
-        <label>
-          <span className="mb-2 block text-sm text-zinc-500">
-            Workers máximos
-          </span>
-
-          <input
-            type="number"
-            min={1}
-            step={1}
-            value={maxWorkers}
-            onChange={(event) =>
-              setMaxWorkers(
-                event.target.value,
-              )
-            }
-            className="h-12 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white outline-none focus:border-red-500/50"
-          />
-        </label>
-
-        <label>
-          <span className="mb-2 block text-sm text-zinc-500">
-            Costo estimado/segundo
-            (centavos)
-          </span>
-
-          <input
-            type="number"
-            min={0}
-            step={1}
-            value={cost}
-            onChange={(event) =>
-              setCost(
-                event.target.value,
-              )
-            }
-            className="h-12 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white outline-none focus:border-red-500/50"
-          />
-        </label>
       </div>
 
       <label className="mt-5 flex items-center gap-3 text-sm text-zinc-300">

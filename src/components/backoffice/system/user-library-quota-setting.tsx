@@ -50,7 +50,7 @@ export function UserLibraryQuotaSetting() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[.2em] text-red-400">Almacenamiento de usuarios</p>
             <h2 className="mt-2 text-xl font-semibold text-white">Cuota global de la librería</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">Límite máximo que cada usuario final puede ocupar entre archivos subidos y guardados en su librería privada.</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">Espacio máximo asignado a cada usuario final para las imágenes que sube a su librería privada. Las imágenes generadas no consumen esta cuota y permanecen ilimitadas.</p>
             {summary && <p className="mt-2 text-xs text-zinc-600">Uso actual: {formatBytes(summary.used_bytes)} en {summary.file_count} archivos de {summary.user_count} usuarios.</p>}
           </div>
         </div>

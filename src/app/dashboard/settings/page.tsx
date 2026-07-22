@@ -428,8 +428,8 @@ export default function SystemSettingsPage() {
                 </div>
               </div>
 
-              {visibleSettings.length >
-              0 ? (
+              {visibleSettings.length > 0 ||
+              ((category === "all" || category === "storage") && !search.trim()) ? (
                 <div className="grid gap-4 p-5 lg:grid-cols-2 2xl:grid-cols-3">
                   {visibleSettings.map(
                     (setting) => (
