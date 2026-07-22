@@ -45,6 +45,8 @@ export default function TryOnStoragePage() {
   const [typeFilter, setTypeFilter] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [librarySummary, setLibrarySummary] = useState<{quota_mb:number;used_bytes:number;file_count:number;user_count:number}|null>(null);
+  const [quotaMb, setQuotaMb] = useState("1024");
 
   const loadFiles = useCallback(async () => {
     setIsLoading(true);
@@ -71,6 +73,8 @@ export default function TryOnStoragePage() {
       setIsLoading(false);
     }
   }, [page, provider, role, search, typeFilter, userFilter]);
+
+  useEffect(() => { void browserApiRequest<{quota_mb:number;used_bytes:number;file_count:number;user_count:number}>("/api/admin/user-library/summary").then((value)=>{setLibrarySummary(value);setQuotaMb(String(value.quota_mb))}).catch(()=>undefined); }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadFiles(), 250);
@@ -100,6 +104,8 @@ export default function TryOnStoragePage() {
           <RefreshCcw size={16} className={isLoading ? "animate-spin" : undefined} /> Actualizar
         </button>
       </div>
+
+      <section className="luxia-panel mt-5 rounded-3xl p-5"><div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-xs uppercase tracking-[.18em] text-red-400">Librería de usuarios</p><h2 className="mt-2 text-xl font-semibold text-white">Cuota global por usuario</h2><p className="mt-2 text-sm text-zinc-500">{librarySummary ? `${formatBytes(librarySummary.used_bytes)} usados en ${librarySummary.file_count} archivos de ${librarySummary.user_count} usuarios.` : "Cargando resumen..."}</p></div><div className="flex gap-2"><input type="number" min="1" value={quotaMb} onChange={(e)=>setQuotaMb(e.target.value)} className="h-11 w-36 rounded-xl border border-white/7 bg-black/30 px-3 text-white"/><span className="self-center text-sm text-zinc-500">MB</span><button type="button" onClick={async()=>{const value=await browserApiRequest<{quota_mb:number}>("/api/admin/user-library/quota",{method:"PUT",body:JSON.stringify({quota_mb:Number(quotaMb)})});setQuotaMb(String(value.quota_mb));setLibrarySummary((current)=>current?{...current,quota_mb:value.quota_mb}:current)}} className="h-11 rounded-xl bg-red-600 px-4 text-sm font-medium text-white">Guardar cuota</button></div></div></section>
 
       <section className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
