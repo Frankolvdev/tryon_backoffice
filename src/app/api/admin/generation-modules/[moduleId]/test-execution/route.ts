@@ -13,7 +13,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ mo
     const incoming = await request.formData();
     const forwarded = new FormData();
     incoming.forEach((value, key) => typeof value === "string" ? forwarded.append(key, value) : forwarded.append(key, value, value.name));
-    const response = await backendRequest(`/api/v1/generation-modules/${encodeURIComponent(moduleId)}/executions`, {
+    const response = await backendRequest(`/api/v1/admin/generation-modules/${encodeURIComponent(moduleId)}/executions`, {
       method: "POST", accessToken, body: forwarded,
     });
     return NextResponse.json(response, { status: 202 });
