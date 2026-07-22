@@ -34,7 +34,7 @@ function optionsFor(input: GenerationModuleInput): Array<{ label: string; value:
 
 export function DynamicGenerationForm({ inputs, values, onChange, disabled }: Props) {
   const setValue = (key: string, value: unknown) => onChange({ ...values, [key]: value });
-  return <div className="grid gap-4 md:grid-cols-2">
+  return <div className="space-y-4"><p className="rounded-xl border border-emerald-500/15 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-300">Las imágenes y archivos se cargarán automáticamente al entorno del motor; no escribas rutas locales de Windows ni Docker.</p><div className="grid gap-4 md:grid-cols-2">
     {[...inputs].sort((a,b)=>a.position-b.position).map((input) => {
       const rules = input.validation ?? {};
       const common = { disabled, required: input.is_required, className: "gm-input" };
@@ -49,5 +49,5 @@ export function DynamicGenerationForm({ inputs, values, onChange, disabled }: Pr
          <input {...common} type={input.input_type === "integer" || input.input_type === "float" ? "number" : "text"} step={input.input_type === "integer" ? 1 : input.input_type === "float" ? "any" : undefined} min={typeof rules.min === "number" ? rules.min : undefined} max={typeof rules.max === "number" ? rules.max : undefined} minLength={typeof rules.min_length === "number" ? rules.min_length : undefined} maxLength={typeof rules.max_length === "number" ? rules.max_length : undefined} placeholder={typeof rules.placeholder === "string" ? rules.placeholder : undefined} value={String(values[input.key] ?? "")} onChange={e=>setValue(input.key,input.input_type === "integer" ? Number.parseInt(e.target.value || "0",10) : input.input_type === "float" ? Number(e.target.value) : e.target.value)}/>} 
       </label>;
     })}
-  </div>;
+  </div></div>;
 }
