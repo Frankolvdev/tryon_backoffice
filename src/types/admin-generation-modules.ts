@@ -29,3 +29,8 @@ export interface GenerationModule {
 export interface GenerationModuleListResponse { items: GenerationModule[]; total: number; skip: number; limit: number; }
 export interface WorkflowInputBinding { module_input_key: string; node_id: string; input_field: string; }
 export interface WorkflowOutputBinding { module_output_key: string; node_id: string; }
+
+export type GenerationExecutionStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
+export interface GenerationExecutionLog { timestamp: string; level: "info" | "warning" | "error"; step_key?: string | null; message: string; }
+export interface GenerationStepExecution { step_key: string; step_name: string; step_type: string; status: "pending" | "running" | "completed" | "failed" | "cancelled"; started_at?: string | null; finished_at?: string | null; duration_ms?: number | null; outputs: Record<string, unknown>; error?: string | null; }
+export interface GenerationModuleExecution { id: string; module_id: number; module_key: string; engine: GenerationExecutionEngine; status: GenerationExecutionStatus; progress: number; inputs: Record<string, unknown>; context: Record<string, unknown>; outputs: Record<string, unknown>; steps: GenerationStepExecution[]; logs: GenerationExecutionLog[]; error?: string | null; created_at: string; started_at?: string | null; finished_at?: string | null; duration_ms?: number | null; cancel_requested: boolean; }
