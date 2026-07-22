@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { GenerationNodeCanvas } from "@/components/generation/generation-node-canvas";
 import { GenerationTestConsole } from "@/components/generation/generation-test-console";
 import { browserApiRequest } from "@/lib/api/browser-api";
+import type { PricingRuleResponse } from "@/types/admin-pricing-coupons";
 import type {
   GenerationExecutionEngine, GenerationModule, GenerationModuleInput,
   GenerationModuleListResponse, GenerationModuleOutput, GenerationModuleStep,
@@ -31,6 +32,7 @@ type Port = { key: string; label: string; type: string; path: string; origin: st
 
 export default function GenerationModulesPage() {
   const [items, setItems] = useState<GenerationModule[]>([]);
+  const [pricingRules, setPricingRules] = useState<PricingRuleResponse[]>([]);
   const [selected, setSelected] = useState<GenerationModule | null>(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -43,8 +45,12 @@ export default function GenerationModulesPage() {
     try {
       const q = new URLSearchParams({ limit: "200" });
       if (search.trim()) q.set("search", search.trim());
-      const response = await browserApiRequest<GenerationModuleListResponse>(`/api/admin/generation-modules?${q}`);
+      const [response, rules] = await Promise.all([
+        browserApiRequest<GenerationModuleListResponse>(`/api/admin/generation-modules?${q}`),
+        browserApiRequest<PricingRuleResponse[]>("/api/admin/pricing-rules"),
+      ]);
       setItems(response.items);
+      setPricingRules(rules);
       setSelected(current => current ? response.items.find(item => item.id === current.id) ?? null : current);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No fue posible cargar los módulos.");
@@ -61,7 +67,7 @@ export default function GenerationModulesPage() {
         method: "PATCH",
         body: JSON.stringify({
           name: selected.name, description: selected.description, category: selected.category,
-          default_execution_engine: selected.default_execution_engine, is_active: selected.is_active,
+          default_execution_engine: selected.default_execution_engine, is_active: selected.is_active, pricing_rule_id: selected.pricing_rule_id ?? null,
           inputs: selected.inputs.map(({ id, ...item }) => item),
           outputs: selected.outputs.map(({ id, ...item }) => item),
         }),
@@ -90,7 +96,7 @@ export default function GenerationModulesPage() {
           </button>;
         })}</div>
       </section>
-      {!selected ? <EmptyState/> : <ModuleEditor module={selected} setModule={setSelected} saving={saving} onSave={saveModule} onOpenEditor={setEditor}/>} 
+      {!selected ? <EmptyState/> : <ModuleEditor module={selected} pricingRules={pricingRules} setModule={setSelected} saving={saving} onSave={saveModule} onOpenEditor={setEditor}/>} 
     </div>
     {editor && selected && <StepEditor module={selected} target={editor} onClose={() => setEditor(null)} onSaved={module => { setSelected(module); setEditor(null); void load(); }}/>} 
     {createOpen && <CreateModuleModal onClose={() => setCreateOpen(false)} onCreated={module => { setItems(current => [module, ...current]); setSelected(module); setCreateOpen(false); }}/>} 
@@ -99,12 +105,12 @@ export default function GenerationModulesPage() {
 
 function EmptyState() { return <section className="luxia-panel flex min-h-[560px] flex-col items-center justify-center rounded-3xl p-10 text-center"><Boxes size={44} className="text-zinc-800"/><h2 className="mt-5 text-xl font-semibold text-white">Selecciona un módulo</h2><p className="mt-2 max-w-md text-sm text-zinc-600">Aquí aparecerá el editor visual del pipeline.</p></section>; }
 
-function ModuleEditor({ module, setModule, saving, onSave, onOpenEditor }: { module: GenerationModule; setModule: (module: GenerationModule) => void; saving: boolean; onSave: () => void; onOpenEditor: (target: EditorTarget) => void }) {
+function ModuleEditor({ module, pricingRules, setModule, saving, onSave, onOpenEditor }: { module: GenerationModule; pricingRules: PricingRuleResponse[]; setModule: (module: GenerationModule) => void; saving: boolean; onSave: () => void; onOpenEditor: (target: EditorTarget) => void }) {
   const patch = (value: Partial<GenerationModule>) => setModule({ ...module, ...value });
   return <section className="luxia-panel overflow-hidden rounded-3xl">
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/6 p-5"><div className="flex items-center gap-3"><span className={`h-3 w-3 rounded-full ${module.is_active ? "bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,.9)]" : "bg-red-500 shadow-[0_0_14px_rgba(239,68,68,.55)]"}`}/><div><h2 className="text-xl font-semibold text-white">{module.name}</h2><p className="mt-1 font-mono text-xs text-zinc-600">{module.key} · ID {module.id} · {module.is_active ? "ACTIVO" : "INACTIVO"}</p></div></div><button onClick={onSave} disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-50">{saving ? <LoaderCircle size={16} className="animate-spin"/> : <Save size={16}/>}Guardar módulo</button></div>
     <div className="space-y-7 p-5">
-      <div className="grid gap-4 md:grid-cols-4"><Field label="Nombre"><input value={module.name} onChange={e => patch({ name: e.target.value })} className="gm-input"/></Field><Field label="Categoría"><input value={module.category} onChange={e => patch({ category: e.target.value })} className="gm-input"/></Field><Field label="Motor"><select value={module.default_execution_engine} onChange={e => patch({ default_execution_engine: e.target.value as GenerationExecutionEngine })} className="gm-input">{engines.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field><Field label="Estado"><select value={String(module.is_active)} onChange={e => patch({ is_active: e.target.value === "true" })} className={`gm-input ${module.is_active ? "border-emerald-500/40 text-emerald-300" : ""}`}><option value="true">Activo</option><option value="false">Inactivo</option></select></Field></div>
+      <div className="grid gap-4 md:grid-cols-5"><Field label="Nombre"><input value={module.name} onChange={e => patch({ name: e.target.value })} className="gm-input"/></Field><Field label="Categoría"><input value={module.category} onChange={e => patch({ category: e.target.value })} className="gm-input"/></Field><Field label="Motor"><select value={module.default_execution_engine} onChange={e => patch({ default_execution_engine: e.target.value as GenerationExecutionEngine })} className="gm-input">{engines.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field><Field label="Pricing rule"><select value={module.pricing_rule_id ?? ""} onChange={e => patch({ pricing_rule_id: e.target.value ? Number(e.target.value) : null })} className="gm-input"><option value="">Sin regla</option>{pricingRules.map(rule => <option key={rule.id} value={rule.id}>{rule.title} · {rule.required_tokens} tokens</option>)}</select></Field><Field label="Estado"><select value={String(module.is_active)} onChange={e => patch({ is_active: e.target.value === "true" })} className={`gm-input ${module.is_active ? "border-emerald-500/40 text-emerald-300" : ""}`}><option value="true">Activo</option><option value="false">Inactivo</option></select></Field></div>
       <ContractEditor module={module} setModule={setModule}/>
       <div>
         <div className="mb-3 flex flex-col gap-3 rounded-2xl border border-white/7 bg-black/25 p-4 sm:flex-row sm:items-center sm:justify-between">

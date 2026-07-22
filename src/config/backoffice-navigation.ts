@@ -113,8 +113,13 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         icon: CircleDollarSign,
       },
       {
-        label: "Tokens",
+        label: "Movimientos de tokens",
         href: "/dashboard/billing/tokens",
+        icon: PackageOpen,
+      },
+      {
+        label: "Paquetes de tokens",
+        href: "/dashboard/billing/token-packages",
         icon: PackageOpen,
       },
       {

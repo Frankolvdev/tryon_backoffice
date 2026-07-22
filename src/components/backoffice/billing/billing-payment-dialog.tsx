@@ -421,86 +421,22 @@ export function BillingPaymentDialog({
                   Reembolso
                 </h3>
 
-                {payment.payment_type ===
-                "token_purchase" ? (
-                  <p className="mt-3 text-xs leading-6 text-red-300/75">
-                    Este pago pertenece a una compra de
-                    tokens. El backend exige reembolsarlo
-                    desde Comercial → Tokens para poder
-                    retirar los tokens correctamente.
-                  </p>
-                ) : (
-                  <>
-                    <div className="mt-4 grid gap-4 md:grid-cols-2">
-                      <label>
-                        <span className="mb-2 block text-xs text-zinc-600">
-                          Importe opcional
-                        </span>
-                        <input
-                          type="number"
-                          min="0.01"
-                          step="0.01"
-                          value={refundAmount}
-                          onChange={(event) =>
-                            setRefundAmount(
-                              event.target.value,
-                            )
-                          }
-                          placeholder={`Vacío = ${payment.refundable_amount}`}
-                          className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"
-                        />
-                      </label>
-
-                      <label>
-                        <span className="mb-2 block text-xs text-zinc-600">
-                          Razón
-                        </span>
-                        <select
-                          value={refundReason}
-                          onChange={(event) =>
-                            setRefundReason(
-                              event.target
-                                .value as BillingPaymentRefundRequest["reason"],
-                            )
-                          }
-                          className="h-11 w-full rounded-xl border border-white/8 bg-[#09090a] px-4 text-sm text-zinc-300"
-                        >
-                          <option value="requested_by_customer">
-                            Solicitado por cliente
-                          </option>
-                          <option value="duplicate">
-                            Duplicado
-                          </option>
-                          <option value="fraudulent">
-                            Fraudulento
-                          </option>
-                        </select>
-                      </label>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => void refund()}
-                      disabled={
-                        Boolean(action) ||
-                        Number(
-                          payment.refundable_amount,
-                        ) <= 0
-                      }
-                      className="mt-4 inline-flex h-10 items-center gap-2 rounded-xl border border-red-500/15 px-4 text-sm text-red-300 disabled:opacity-40"
-                    >
-                      {action === "refund" ? (
-                        <LoaderCircle
-                          size={15}
-                          className="animate-spin"
-                        />
-                      ) : (
-                        <RotateCcw size={15} />
-                      )}
-                      Reembolsar
-                    </button>
-                  </>
-                )}
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <label>
+                    <span className="mb-2 block text-xs text-zinc-600">Importe opcional</span>
+                    <input type="number" min="0.01" step="0.01" value={refundAmount} onChange={(event) => setRefundAmount(event.target.value)} placeholder={`Vacío = ${payment.refundable_amount}`} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"/>
+                  </label>
+                  <label>
+                    <span className="mb-2 block text-xs text-zinc-600">Razón</span>
+                    <select value={refundReason} onChange={(event) => setRefundReason(event.target.value as BillingPaymentRefundRequest["reason"])} className="h-11 w-full rounded-xl border border-white/8 bg-[#09090a] px-4 text-sm text-zinc-300">
+                      <option value="requested_by_customer">Solicitado por cliente</option><option value="duplicate">Duplicado</option><option value="fraudulent">Fraudulento</option>
+                    </select>
+                  </label>
+                </div>
+                {payment.payment_type === "token_purchase" && <label className="mt-4 flex items-center justify-between gap-4 rounded-xl border border-white/8 bg-black/20 p-4 text-sm text-zinc-400"><span><strong className="block text-white">Retirar tokens acreditados</strong><span className="mt-1 block text-xs text-zinc-600">Descuenta del saldo del usuario los tokens relacionados con el reembolso.</span></span><input type="checkbox" checked={removeTokens} onChange={(event) => setRemoveTokens(event.target.checked)} className="size-4 accent-red-700"/></label>}
+                <button type="button" onClick={() => void refund()} disabled={Boolean(action) || Number(payment.refundable_amount) <= 0} className="mt-4 inline-flex h-10 items-center gap-2 rounded-xl border border-red-500/15 px-4 text-sm text-red-300 disabled:opacity-40">
+                  {action === "refund" ? <LoaderCircle size={15} className="animate-spin"/> : <RotateCcw size={15}/>} Reembolsar
+                </button>
               </section>
             </>
           )}
