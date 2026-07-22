@@ -13,7 +13,7 @@ import { browserApiRequest } from "@/lib/api/browser-api";
 import type {
   GenerationExecutionEngine, GenerationModule, GenerationModuleInput,
   GenerationModuleListResponse, GenerationModuleOutput, GenerationModuleStep,
-  WorkflowInputBinding, WorkflowOutputBinding,
+  GenerationNodePort, WorkflowInputBinding, WorkflowOutputBinding,
 } from "@/types/admin-generation-modules";
 
 const engines: { value: GenerationExecutionEngine; label: string }[] = [
@@ -160,47 +160,139 @@ function suggestConnections(module: GenerationModule, previous: GenerationModule
 function ContractEditor({ module, setModule }: { module: GenerationModule; setModule: (module: GenerationModule) => void }) {
   const updateInput = (index: number, value: Partial<GenerationModuleInput>) => setModule({ ...module, inputs: module.inputs.map((item, current) => current === index ? { ...item, ...value } : item) });
   const updateOutput = (index: number, value: Partial<GenerationModuleOutput>) => setModule({ ...module, outputs: module.outputs.map((item, current) => current === index ? { ...item, ...value } : item) });
-  return <div className="grid gap-5 xl:grid-cols-2"><Contract title="Entradas" onAdd={() => setModule({ ...module, inputs: [...module.inputs, emptyInput(module.inputs.length)] })}>{module.inputs.map((input, index) => <div key={input.id ?? index} className="grid gap-2 rounded-xl border border-white/5 p-3 md:grid-cols-[1fr_1fr_auto]"><input className="gm-input" value={input.key} onChange={e => updateInput(index, { key: e.target.value })}/><select className="gm-input" value={input.input_type} onChange={e => updateInput(index, { input_type: e.target.value as GenerationModuleInput["input_type"] })}>{inputTypes.map(type => <option key={type}>{type}</option>)}</select><button className="gm-delete" onClick={() => setModule({ ...module, inputs: module.inputs.filter((_, current) => current !== index).map((item, position) => ({ ...item, position })) })}><X size={15}/></button></div>)}</Contract><Contract title="Salidas" onAdd={() => setModule({ ...module, outputs: [...module.outputs, emptyOutput(module.outputs.length)] })}>{module.outputs.map((output, index) => <div key={output.id ?? index} className="grid gap-2 rounded-xl border border-white/5 p-3 md:grid-cols-[1fr_1fr_auto]"><input className="gm-input" value={output.key} onChange={e => updateOutput(index, { key: e.target.value })}/><select className="gm-input" value={output.output_type} onChange={e => updateOutput(index, { output_type: e.target.value as GenerationModuleOutput["output_type"] })}>{outputTypes.map(type => <option key={type}>{type}</option>)}</select><button className="gm-delete" onClick={() => setModule({ ...module, outputs: module.outputs.filter((_, current) => current !== index).map((item, position) => ({ ...item, position })) })}><X size={15}/></button></div>)}</Contract></div>;
+  return <div className="grid gap-5 xl:grid-cols-2">
+    <Contract title="Assets del formulario" onAdd={() => setModule({ ...module, inputs: [...module.inputs, emptyInput(module.inputs.length)] })}>
+      {module.inputs.map((input, index) => <div key={input.id ?? index} className="grid gap-2 rounded-xl border border-white/5 p-3">
+        <div className="grid gap-2 md:grid-cols-2"><input className="gm-input" value={input.key} onChange={e => updateInput(index, { key: e.target.value })} placeholder="id_estable"/><input className="gm-input" value={input.name} onChange={e => updateInput(index, { name: e.target.value })} placeholder="Título visible"/></div>
+        <div className="grid gap-2 md:grid-cols-[1fr_auto_auto]"><select className="gm-input" value={input.input_type} onChange={e => updateInput(index, { input_type: e.target.value as GenerationModuleInput["input_type"] })}>{inputTypes.map(type => <option key={type}>{type}</option>)}</select><label className="flex items-center gap-2 px-2 text-xs text-zinc-400"><input type="checkbox" checked={input.is_required} onChange={e => updateInput(index, { is_required: e.target.checked })}/>Obligatorio</label><button className="gm-delete" onClick={() => setModule({ ...module, inputs: module.inputs.filter((_, current) => current !== index).map((item, position) => ({ ...item, position })) })}><X size={15}/></button></div>
+      </div>)}
+    </Contract>
+    <Contract title="Puertos del nodo Output" onAdd={() => setModule({ ...module, outputs: [...module.outputs, emptyOutput(module.outputs.length)] })}>
+      {module.outputs.map((output, index) => <div key={output.id ?? index} className="grid gap-2 rounded-xl border border-white/5 p-3">
+        <div className="grid gap-2 md:grid-cols-2"><input className="gm-input" value={output.key} onChange={e => updateOutput(index, { key: e.target.value })} placeholder="id_estable"/><input className="gm-input" value={output.name} onChange={e => updateOutput(index, { name: e.target.value })} placeholder="Título visible"/></div>
+        <div className="grid gap-2 md:grid-cols-[1fr_auto]"><select className="gm-input" value={output.output_type} onChange={e => updateOutput(index, { output_type: e.target.value as GenerationModuleOutput["output_type"] })}>{outputTypes.map(type => <option key={type}>{type}</option>)}</select><button className="gm-delete" onClick={() => setModule({ ...module, outputs: module.outputs.filter((_, current) => current !== index).map((item, position) => ({ ...item, position })) })}><X size={15}/></button></div>
+      </div>)}
+    </Contract>
+  </div>;
 }
 
 function StepEditor({ module, target, onClose, onSaved }: { module: GenerationModule; target: NonNullable<EditorTarget>; onClose: () => void; onSaved: (module: GenerationModule) => void }) {
   return target.type === "workflow" ? <WorkflowStepEditor module={module} target={target} onClose={onClose} onSaved={onSaved}/> : <PythonStepEditor module={module} target={target} onClose={onClose} onSaved={onSaved}/>;
 }
+function emptyPort(side: "input" | "output", index: number): GenerationNodePort {
+  return { id: `${side}_${index + 1}`, label: `${side === "input" ? "Entrada" : "Salida"} ${index + 1}`, data_type: "image", node_id: "", field: side === "input" ? "image" : "images", is_required: true };
+}
+
+const nodePortTypes = ["image", "images", "mask", "file", "text", "integer", "float", "boolean", "json", "metadata", "auto"];
+
+function NodePortsEditor({ title, side, ports, setPorts, comfy }: { title: string; side: "input" | "output"; ports: GenerationNodePort[]; setPorts: (ports: GenerationNodePort[]) => void; comfy: boolean }) {
+  const update = (index: number, patch: Partial<GenerationNodePort>) => setPorts(ports.map((port, current) => current === index ? { ...port, ...patch } : port));
+  return <Contract title={title} onAdd={() => setPorts([...ports, emptyPort(side, ports.length)])}>
+    {ports.map((port, index) => <div key={`${port.id}-${index}`} className="space-y-2 rounded-xl border border-white/5 p-3">
+      <div className="grid gap-2 md:grid-cols-2"><input className="gm-input" value={port.id} onChange={e => update(index, { id: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, "_") })} placeholder="id_puerto"/><input className="gm-input" value={port.label} onChange={e => update(index, { label: e.target.value })} placeholder="Título visible"/></div>
+      <div className={`grid gap-2 ${comfy ? "md:grid-cols-[1fr_1fr_1fr_auto]" : "md:grid-cols-[1fr_auto]"}`}>
+        <select className="gm-input" value={port.data_type} onChange={e => update(index, { data_type: e.target.value })}>{nodePortTypes.map(type => <option key={type}>{type}</option>)}</select>
+        {comfy && <input className="gm-input" value={port.node_id ?? ""} onChange={e => update(index, { node_id: e.target.value })} placeholder="Node ID ComfyUI"/>}
+        {comfy && <input className="gm-input" value={port.field ?? ""} onChange={e => update(index, { field: e.target.value })} placeholder={side === "input" ? "input_field" : "output_field"}/>}
+        <button className="gm-delete" onClick={() => setPorts(ports.filter((_, current) => current !== index))}><X size={15}/></button>
+      </div>
+    </div>)}
+  </Contract>;
+}
+
 function WorkflowStepEditor({ module, target, onClose, onSaved }: { module: GenerationModule; target: NonNullable<EditorTarget>; onClose: () => void; onSaved: (module: GenerationModule) => void }) {
   const step = target.step; const config = step?.configuration ?? {};
-  const [key, setKey] = useState(step?.key ?? `workflow_${module.steps.length + 1}`); const [name, setName] = useState(step?.name ?? "Workflow ComfyUI"); const [description, setDescription] = useState(step?.description ?? "");
-  const [json, setJson] = useState(JSON.stringify(config.workflow ?? {}, null, 2)); const [inputs, setInputs] = useState<WorkflowInputBinding[]>((config.input_bindings ?? []) as WorkflowInputBinding[]); const [outputs, setOutputs] = useState<WorkflowOutputBinding[]>((config.output_bindings ?? []) as WorkflowOutputBinding[]); const [enabled, setEnabled] = useState(step?.is_enabled ?? true); const [busy, setBusy] = useState(false);
+  const [key, setKey] = useState(step?.key ?? `workflow_${module.steps.length + 1}`);
+  const [name, setName] = useState(step?.name ?? "Workflow ComfyUI");
+  const [description, setDescription] = useState(step?.description ?? "");
+  const [json, setJson] = useState(JSON.stringify(config.workflow ?? {}, null, 2));
+  const [inputPorts, setInputPorts] = useState<GenerationNodePort[]>((config.input_ports ?? []) as GenerationNodePort[]);
+  const [outputPorts, setOutputPorts] = useState<GenerationNodePort[]>((config.output_ports ?? []) as GenerationNodePort[]);
+  const [enabled, setEnabled] = useState(step?.is_enabled ?? true);
+  const [busy, setBusy] = useState(false);
   const parsed = useMemo(() => { try { return JSON.parse(json); } catch { return null; } }, [json]);
+
   const autoDetect = () => {
     if (!parsed) return toast.error("El JSON no es válido.");
     const nodes = Object.entries(parsed) as [string, { class_type?: string; inputs?: Record<string, unknown> }][];
-    const imageInputs = nodes.flatMap(([nodeId, node]) => Object.keys(node.inputs ?? {}).filter(field => /image|mask|photo/i.test(field)).map(field => ({ nodeId, field })));
-    const nextInputs = module.inputs.map((input, index) => ({ module_input_key: input.key, node_id: imageInputs[index]?.nodeId ?? nodes[index]?.[0] ?? "", input_field: imageInputs[index]?.field ?? "image" })).filter(item => item.node_id);
+    const candidates = nodes.flatMap(([nodeId, node]) => Object.keys(node.inputs ?? {}).filter(field => /image|mask|text|prompt|seed/i.test(field)).map(field => ({ nodeId, field })));
+    if (!inputPorts.length) setInputPorts(candidates.slice(0, Math.max(1, module.inputs.length)).map((item, index) => ({ id: `input_${index + 1}`, label: item.field, data_type: /image/i.test(item.field) ? "image" : /mask/i.test(item.field) ? "mask" : "text", node_id: item.nodeId, field: item.field, is_required: true })));
     const outputNodes = nodes.filter(([, node]) => /saveimage|previewimage|vae decode/i.test(node.class_type ?? ""));
-    const nextOutputs = module.outputs.map((output, index) => ({ module_output_key: output.key, node_id: outputNodes[index]?.[0] ?? outputNodes[0]?.[0] ?? "" })).filter(item => item.node_id);
-    setInputs(nextInputs); setOutputs(nextOutputs); toast.success("Bindings sugeridos automáticamente. Revísalos antes de guardar.");
+    if (!outputPorts.length && outputNodes.length) setOutputPorts(outputNodes.map(([nodeId], index) => ({ id: `output_${index + 1}`, label: `Salida ${index + 1}`, data_type: "image", node_id: nodeId, field: "images", is_required: true })));
+    toast.success("Puertos sugeridos. Revisa IDs, títulos y tipos.");
   };
+
   const save = async () => {
-    if (!parsed) return toast.error("El JSON no es válido."); setBusy(true);
+    if (!parsed) return toast.error("El JSON no es válido.");
+    if (!inputPorts.every(port => port.id && port.label && port.node_id && port.field) || !outputPorts.every(port => port.id && port.label && port.node_id)) return toast.error("Completa todos los puertos del Workflow.");
+    setBusy(true);
     try {
+      const existingInputs = (config.input_bindings ?? []) as WorkflowInputBinding[];
+      const existingOutputs = (config.output_bindings ?? []) as WorkflowOutputBinding[];
+      const inputBindings = inputPorts.map(port => {
+        const previous = existingInputs.find(binding => binding.port_id === port.id || binding.input_field === port.field);
+        return { port_id: port.id, module_input_key: previous?.module_input_key ?? null, source_path: previous?.source_path ?? null, node_id: String(port.node_id), input_field: String(port.field) };
+      }).filter(binding => binding.module_input_key || binding.source_path);
+      const outputBindings = outputPorts.map(port => ({ port_id: port.id, module_output_key: port.id, node_id: String(port.node_id) }));
       const url = target.mode === "edit" ? `/api/admin/generation-modules/${module.id}/steps/${step!.id}/workflow` : `/api/admin/generation-modules/${module.id}/steps/workflow`;
-      const body = target.mode === "edit" ? { name, description, workflow_name: name, workflow_json: parsed, input_bindings: inputs, output_bindings: outputs, is_enabled: enabled } : { key, name, description, position: module.steps.length, workflow_name: name, workflow_json: parsed, input_bindings: inputs, output_bindings: outputs, is_enabled: enabled };
-      onSaved(await browserApiRequest<GenerationModule>(url, { method: target.mode === "edit" ? "PATCH" : "POST", body: JSON.stringify(body) })); toast.success(target.mode === "edit" ? "Workflow actualizado." : "Workflow agregado.");
+      const body = target.mode === "edit"
+        ? { name, description, workflow_name: name, workflow_json: parsed, input_bindings: inputBindings, output_bindings: outputBindings, input_ports: inputPorts, output_ports: outputPorts, is_enabled: enabled }
+        : { key, name, description, position: module.steps.length, workflow_name: name, workflow_json: parsed, input_bindings: inputBindings, output_bindings: outputBindings, input_ports: inputPorts, output_ports: outputPorts, is_enabled: enabled };
+      onSaved(await browserApiRequest<GenerationModule>(url, { method: target.mode === "edit" ? "PATCH" : "POST", body: JSON.stringify(body) }));
+      toast.success(target.mode === "edit" ? "Workflow actualizado." : "Workflow agregado.");
     } catch (error) { toast.error(error instanceof Error ? error.message : "No fue posible guardar."); } finally { setBusy(false); }
   };
-  return <ModalShell title={target.mode === "edit" ? "Editar Workflow" : "Agregar Workflow"} onClose={onClose}><div className="grid gap-3 md:grid-cols-2">{target.mode === "create" && <Field label="Clave"><input className="gm-input" value={key} onChange={e => setKey(e.target.value)}/></Field>}<Field label="Nombre"><input className="gm-input" value={name} onChange={e => setName(e.target.value)}/></Field></div><Field label="Descripción"><input className="gm-input" value={description} onChange={e => setDescription(e.target.value)}/></Field><div className="mt-4 flex items-center justify-between"><p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">JSON API de ComfyUI</p><button onClick={autoDetect} className="gm-secondary"><Sparkles size={14}/>Detectar conexiones</button></div><textarea className="gm-input mt-2 min-h-64 py-3 font-mono text-xs" value={json} onChange={e => setJson(e.target.value)}/><Bindings module={module} inputs={inputs} setInputs={setInputs} outputs={outputs} setOutputs={setOutputs}/><label className="mt-4 flex items-center gap-2 text-sm text-zinc-400"><input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)}/>Paso activo</label><button onClick={() => void save()} disabled={busy || !parsed} className="mt-5 h-11 w-full rounded-xl bg-red-600 font-semibold text-white disabled:opacity-40">{busy ? "Guardando..." : "Guardar Workflow"}</button></ModalShell>;
+
+  return <ModalShell title={target.mode === "edit" ? "Editar Workflow" : "Agregar Workflow"} onClose={onClose}>
+    <div className="grid gap-3 md:grid-cols-2">{target.mode === "create" && <Field label="Clave"><input className="gm-input" value={key} onChange={e => setKey(e.target.value)}/></Field>}<Field label="Nombre"><input className="gm-input" value={name} onChange={e => setName(e.target.value)}/></Field></div>
+    <Field label="Descripción"><input className="gm-input" value={description} onChange={e => setDescription(e.target.value)}/></Field>
+    <div className="mt-4 flex items-center justify-between"><p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">JSON API de ComfyUI</p><button onClick={autoDetect} className="gm-secondary"><Sparkles size={14}/>Detectar puertos</button></div>
+    <textarea className="gm-input mt-2 min-h-64 py-3 font-mono text-xs" value={json} onChange={e => setJson(e.target.value)}/>
+    <div className="mt-5 grid gap-4 xl:grid-cols-2"><NodePortsEditor title="Inputs del Workflow" side="input" ports={inputPorts} setPorts={setInputPorts} comfy/><NodePortsEditor title="Outputs del Workflow" side="output" ports={outputPorts} setPorts={setOutputPorts} comfy/></div>
+    <label className="mt-4 flex items-center gap-2 text-sm text-zinc-400"><input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)}/>Nodo activo</label>
+    <button onClick={() => void save()} disabled={busy || !parsed} className="mt-5 h-11 w-full rounded-xl bg-red-600 font-semibold text-white disabled:opacity-40">{busy ? "Guardando..." : "Guardar Workflow"}</button>
+  </ModalShell>;
 }
-function Bindings({ module, inputs, setInputs, outputs, setOutputs }: { module: GenerationModule; inputs: WorkflowInputBinding[]; setInputs: (value: WorkflowInputBinding[]) => void; outputs: WorkflowOutputBinding[]; setOutputs: (value: WorkflowOutputBinding[]) => void }) { return <div className="mt-5 grid gap-4 xl:grid-cols-2"><Contract title="Entradas detectadas" onAdd={() => setInputs([...inputs, { module_input_key: module.inputs[0]?.key ?? "", node_id: "", input_field: "image" }])}>{inputs.map((item, index) => <div key={index} className="grid gap-2 rounded-xl border border-white/5 p-3"><select className="gm-input" value={item.module_input_key ?? ""} onChange={e => setInputs(inputs.map((value, current) => current === index ? { ...value, module_input_key: e.target.value } : value))}>{module.inputs.map(input => <option key={input.key}>{input.key}</option>)}</select><div className="grid grid-cols-2 gap-2"><input className="gm-input" value={item.node_id ?? ""} onChange={e => setInputs(inputs.map((value, current) => current === index ? { ...value, node_id: e.target.value } : value))} placeholder="node_id"/><input className="gm-input" value={item.input_field ?? ""} onChange={e => setInputs(inputs.map((value, current) => current === index ? { ...value, input_field: e.target.value } : value))} placeholder="campo"/></div></div>)}</Contract><Contract title="Salidas detectadas" onAdd={() => setOutputs([...outputs, { module_output_key: module.outputs[0]?.key ?? "", node_id: "" }])}>{outputs.map((item, index) => <div key={index} className="grid gap-2 rounded-xl border border-white/5 p-3"><select className="gm-input" value={item.module_output_key ?? ""} onChange={e => setOutputs(outputs.map((value, current) => current === index ? { ...value, module_output_key: e.target.value } : value))}>{module.outputs.map(output => <option key={output.key}>{output.key}</option>)}</select><input className="gm-input" value={item.node_id ?? ""} onChange={e => setOutputs(outputs.map((value, current) => current === index ? { ...value, node_id: e.target.value } : value))} placeholder="node_id"/></div>)}</Contract></div>; }
 
 function PythonStepEditor({ module, target, onClose, onSaved }: { module: GenerationModule; target: NonNullable<EditorTarget>; onClose: () => void; onSaved: (module: GenerationModule) => void }) {
   const step = target.step; const config = step?.configuration ?? {};
-  const [key, setKey] = useState(step?.key ?? `python_${module.steps.length + 1}`); const [name, setName] = useState(step?.name ?? "Paso Python"); const [description, setDescription] = useState(step?.description ?? ""); const [entrypoint, setEntrypoint] = useState(String(config.entrypoint ?? "run")); const [source, setSource] = useState(String(config.source_code ?? "def run(inputs):\n    return inputs\n")); const [inputMapping, setInputMapping] = useState<Record<string, unknown>>(step?.input_mapping ?? {}); const [outputMapping, setOutputMapping] = useState<Record<string, unknown>>(step?.output_mapping ?? {}); const [enabled, setEnabled] = useState(step?.is_enabled ?? true); const [busy, setBusy] = useState(false);
-  const available = useMemo(() => collectAvailablePorts(module, step), [module, step]);
-  const applyTemplate = (kind: string) => { if (kind === "passthrough") { setSource("def run(inputs):\n    return inputs\n"); setOutputMapping({}); } else if (kind === "first_image") { setSource("def run(inputs):\n    files = inputs.get('files') or []\n    image = files[0] if files else inputs.get('image')\n    return {'image': image}\n"); setOutputMapping({ image: "image" }); } else { setSource("def run(inputs):\n    result = dict(inputs)\n    result['processed'] = True\n    return result\n"); setOutputMapping({ processed: "boolean" }); } };
-  const autoMap = () => { const mapping: Record<string, unknown> = {}; available.slice(-4).forEach(port => { mapping[port.key] = port.path; }); setInputMapping(mapping); toast.success("Entradas sugeridas desde los pasos anteriores."); };
-  const save = async () => { setBusy(true); try { const url = target.mode === "edit" ? `/api/admin/generation-modules/${module.id}/steps/${step!.id}/python` : `/api/admin/generation-modules/${module.id}/steps/python`; const body = target.mode === "edit" ? { name, description, source_code: source, entrypoint, timeout_seconds: Number(config.timeout_seconds ?? 300), input_mapping: inputMapping, output_mapping: outputMapping, is_enabled: enabled } : { key, name, description, position: module.steps.length, source_code: source, entrypoint, timeout_seconds: 300, input_mapping: inputMapping, output_mapping: outputMapping, is_enabled: enabled }; onSaved(await browserApiRequest<GenerationModule>(url, { method: target.mode === "edit" ? "PATCH" : "POST", body: JSON.stringify(body) })); toast.success(target.mode === "edit" ? "Python actualizado." : "Python agregado."); } catch (error) { toast.error(error instanceof Error ? error.message : "No fue posible guardar."); } finally { setBusy(false); } };
-  return <ModalShell title={target.mode === "edit" ? "Editar Python" : "Agregar Python"} onClose={onClose}><div className="grid gap-3 md:grid-cols-3">{target.mode === "create" && <Field label="Clave"><input className="gm-input" value={key} onChange={e => setKey(e.target.value)}/></Field>}<Field label="Nombre"><input className="gm-input" value={name} onChange={e => setName(e.target.value)}/></Field><Field label="Función"><input className="gm-input" value={entrypoint} onChange={e => setEntrypoint(e.target.value)}/></Field></div><Field label="Descripción"><input className="gm-input" value={description} onChange={e => setDescription(e.target.value)}/></Field><div className="mt-4 grid gap-4 xl:grid-cols-[1fr_240px]"><div><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Código</p><select className="gm-input max-w-52" defaultValue="" onChange={e => { if (e.target.value) applyTemplate(e.target.value); }}><option value="" disabled>Plantilla...</option><option value="passthrough">Devolver sin cambios</option><option value="first_image">Seleccionar primera imagen</option><option value="flag">Agregar indicador</option></select></div><textarea className="gm-input min-h-96 py-3 font-mono text-xs" value={source} onChange={e => setSource(e.target.value)}/></div><div><div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Datos disponibles</p><button onClick={autoMap} className="gm-icon" title="Mapear automáticamente"><Sparkles size={15}/></button></div><div className="max-h-96 space-y-2 overflow-y-auto rounded-xl border border-white/6 bg-black/20 p-3">{available.map(port => <button key={port.path} onClick={() => setInputMapping(current => ({ ...current, [port.key]: port.path }))} className="w-full rounded-lg border border-white/5 p-2 text-left hover:border-red-500/20"><p className="font-mono text-[11px] text-zinc-300">{port.path}</p><p className="mt-1 text-[10px] text-zinc-600">{port.type}</p></button>)}</div></div></div><JsonMapping title="Mapeo de entradas" value={inputMapping} onChange={setInputMapping}/><JsonMapping title="Salidas declaradas" value={outputMapping} onChange={setOutputMapping}/><label className="mt-4 flex items-center gap-2 text-sm text-zinc-400"><input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)}/>Paso activo</label><button onClick={() => void save()} disabled={busy} className="mt-5 h-11 w-full rounded-xl bg-red-600 font-semibold text-white disabled:opacity-40">{busy ? "Guardando..." : "Guardar Python"}</button></ModalShell>;
+  const [key, setKey] = useState(step?.key ?? `python_${module.steps.length + 1}`);
+  const [name, setName] = useState(step?.name ?? "Paso Python");
+  const [description, setDescription] = useState(step?.description ?? "");
+  const [entrypoint, setEntrypoint] = useState(String(config.entrypoint ?? "run"));
+  const [source, setSource] = useState(String(config.source_code ?? "def run(inputs):\n    return inputs\n"));
+  const [inputPorts, setInputPorts] = useState<GenerationNodePort[]>(((config.input_ports ?? []) as GenerationNodePort[]).length ? (config.input_ports as GenerationNodePort[]) : Object.keys(step?.input_mapping ?? {}).map(id => ({ id, label: id, data_type: "auto" })));
+  const [outputPorts, setOutputPorts] = useState<GenerationNodePort[]>(((config.output_ports ?? []) as GenerationNodePort[]).length ? (config.output_ports as GenerationNodePort[]) : Object.keys(step?.output_mapping ?? {}).map(id => ({ id, label: id, data_type: "auto" })));
+  const [enabled, setEnabled] = useState(step?.is_enabled ?? true);
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    if (!inputPorts.every(port => port.id && port.label) || !outputPorts.every(port => port.id && port.label)) return toast.error("Completa IDs y títulos de todos los puertos.");
+    setBusy(true);
+    try {
+      const currentInputMapping = step?.input_mapping ?? {};
+      const inputMapping = Object.fromEntries(inputPorts.filter(port => currentInputMapping[port.id] !== undefined).map(port => [port.id, currentInputMapping[port.id]]));
+      const outputMapping = Object.fromEntries(outputPorts.map(port => [port.id, String(step?.output_mapping?.[port.id] ?? port.id)]));
+      const url = target.mode === "edit" ? `/api/admin/generation-modules/${module.id}/steps/${step!.id}/python` : `/api/admin/generation-modules/${module.id}/steps/python`;
+      const body = target.mode === "edit"
+        ? { name, description, source_code: source, entrypoint, timeout_seconds: Number(config.timeout_seconds ?? 300), input_mapping: inputMapping, output_mapping: outputMapping, input_ports: inputPorts, output_ports: outputPorts, is_enabled: enabled }
+        : { key, name, description, position: module.steps.length, source_code: source, entrypoint, timeout_seconds: 300, input_mapping: inputMapping, output_mapping: outputMapping, input_ports: inputPorts, output_ports: outputPorts, is_enabled: enabled };
+      onSaved(await browserApiRequest<GenerationModule>(url, { method: target.mode === "edit" ? "PATCH" : "POST", body: JSON.stringify(body) }));
+      toast.success(target.mode === "edit" ? "Python actualizado." : "Python agregado.");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "No fue posible guardar."); } finally { setBusy(false); }
+  };
+
+  return <ModalShell title={target.mode === "edit" ? "Editar Python" : "Agregar Python"} onClose={onClose}>
+    <div className="grid gap-3 md:grid-cols-3">{target.mode === "create" && <Field label="Clave"><input className="gm-input" value={key} onChange={e => setKey(e.target.value)}/></Field>}<Field label="Nombre"><input className="gm-input" value={name} onChange={e => setName(e.target.value)}/></Field><Field label="Función"><input className="gm-input" value={entrypoint} onChange={e => setEntrypoint(e.target.value)}/></Field></div>
+    <Field label="Descripción"><input className="gm-input" value={description} onChange={e => setDescription(e.target.value)}/></Field>
+    <div className="mt-5 grid gap-4 xl:grid-cols-2"><NodePortsEditor title="Inputs de Python" side="input" ports={inputPorts} setPorts={setInputPorts} comfy={false}/><NodePortsEditor title="Outputs de Python" side="output" ports={outputPorts} setPorts={setOutputPorts} comfy={false}/></div>
+    <div className="mt-5 rounded-xl border border-cyan-500/15 bg-cyan-500/5 p-3"><p className="text-xs font-semibold uppercase tracking-wider text-cyan-300">Variables disponibles en el código</p><div className="mt-2 space-y-1">{inputPorts.map(port => <code key={port.id} className="block text-xs text-zinc-300">inputs[{JSON.stringify(port.id)}] <span className="text-zinc-600"># {port.label} · {port.data_type}</span></code>)}</div><div className="mt-3 space-y-1">{outputPorts.map(port => <code key={port.id} className="block text-xs text-zinc-300">return &#123;{JSON.stringify(port.id)}: valor&#125; <span className="text-zinc-600"># {port.label} · {port.data_type}</span></code>)}</div></div>
+    <div className="mt-4"><p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">Código Python</p><textarea className="gm-input min-h-96 py-3 font-mono text-xs" value={source} onChange={e => setSource(e.target.value)}/></div>
+    <label className="mt-4 flex items-center gap-2 text-sm text-zinc-400"><input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)}/>Nodo activo</label>
+    <button onClick={() => void save()} disabled={busy} className="mt-5 h-11 w-full rounded-xl bg-red-600 font-semibold text-white disabled:opacity-40">{busy ? "Guardando..." : "Guardar Python"}</button>
+  </ModalShell>;
 }
+
 function collectAvailablePorts(module: GenerationModule, current?: GenerationModuleStep) { const ordered = [...module.steps].sort((a, b) => a.position - b.position); const limit = current ? ordered.findIndex(item => item.id === current.id) : ordered.length; return [...module.inputs.map(input => ({ key: input.key, label: input.name, type: input.input_type, path: input.key, origin: "module" })), ...ordered.slice(0, limit).flatMap(step => describeStepOutputs(step, module))]; }
 function JsonMapping({ title, value, onChange }: { title: string; value: Record<string, unknown>; onChange: (value: Record<string, unknown>) => void }) { const [text, setText] = useState(JSON.stringify(value, null, 2)); useEffect(() => setText(JSON.stringify(value, null, 2)), [value]); return <div className="mt-4"><p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">{title}</p><textarea className="gm-input min-h-28 py-3 font-mono text-xs" value={text} onChange={e => { setText(e.target.value); try { onChange(JSON.parse(e.target.value)); } catch {} }}/></div>; }
 

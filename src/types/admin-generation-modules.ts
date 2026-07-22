@@ -27,8 +27,16 @@ export interface GenerationModule {
   created_at: string; updated_at: string;
 }
 export interface GenerationModuleListResponse { items: GenerationModule[]; total: number; skip: number; limit: number; }
-export interface WorkflowInputBinding { module_input_key?: string | null; source_path?: string | null; node_id: string; input_field: string; }
-export interface WorkflowOutputBinding { module_output_key: string; node_id: string; }
+export interface GenerationNodePort {
+  id: string;
+  label: string;
+  data_type: string;
+  node_id?: string | null;
+  field?: string | null;
+  is_required?: boolean;
+}
+export interface WorkflowInputBinding { module_input_key?: string | null; source_path?: string | null; node_id: string; input_field: string; port_id?: string | null; }
+export interface WorkflowOutputBinding { module_output_key: string; node_id: string; port_id?: string | null; }
 
 export type GenerationExecutionStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
 export interface GenerationExecutionLog { timestamp: string; level: "info" | "warning" | "error"; step_key?: string | null; message: string; }
