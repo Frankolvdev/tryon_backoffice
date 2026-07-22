@@ -58,15 +58,21 @@ const compatibleTypes = (source: string, target: string) => {
   return false;
 };
 
-const handleId = (nodeId: string, side: "input" | "output", portId: string) =>
-  `handle__${encodeURIComponent(nodeId)}__${side}__${encodeURIComponent(portId)}`;
+const safePortToken = (value: string) =>
+  value.trim().replace(/[^a-zA-Z0-9_-]/g, (character) =>
+    `_${character.codePointAt(0)?.toString(16) ?? "0"}_`,
+  );
 
-const edgeId = (
-  source: string,
-  sourceHandle: string,
-  target: string,
-  targetHandle: string,
-) => `edge__${encodeURIComponent(source)}__${encodeURIComponent(sourceHandle)}__${encodeURIComponent(target)}__${encodeURIComponent(targetHandle)}`;
+// Los Handle IDs solo necesitan ser únicos dentro de su propio nodo.
+// No incluimos el nodeId para evitar codificación doble y desajustes entre
+// el Handle renderizado y el targetHandle/sourceHandle del edge.
+const handleId = (side: "input" | "output", portId: string) =>
+  `port__${side}__${safePortToken(portId)}`;
+
+// Cada input admite una sola conexión, por lo que el destino es la identidad
+// estable y única del wire. Esto también evita keys duplicadas en React.
+const edgeId = (target: string, targetHandle: string) =>
+  `edge__${safePortToken(target)}__${safePortToken(targetHandle)}`;
 
 const uniquePorts = (ports: Port[]) => {
   const seen = new Set<string>();
@@ -110,7 +116,7 @@ function NodeCard({ id, data, selected }: NodeProps<FlowNode>) {
           {data.inputs.map((port) => (
             <div key={port.id} className="relative min-h-6 rounded-md bg-white/[.025] py-1 pl-3 pr-1 text-left text-[11px] text-zinc-300">
               <Handle
-                id={handleId(id, "input", port.id)}
+                id={handleId("input", port.id)}
                 type="target"
                 position={Position.Left}
                 className="!h-3 !w-3 !border-2 !border-zinc-200 !bg-zinc-900"
@@ -128,7 +134,7 @@ function NodeCard({ id, data, selected }: NodeProps<FlowNode>) {
               <span className="block truncate">{port.label}</span>
               <small className="text-[9px] uppercase text-zinc-600">{port.type}</small>
               <Handle
-                id={handleId(id, "output", port.id)}
+                id={handleId("output", port.id)}
                 type="source"
                 position={Position.Right}
                 className="!h-3 !w-3 !border-2 !border-zinc-200 !bg-zinc-900"
@@ -288,8 +294,19 @@ export function GenerationNodeCanvas({
   const buildEdges = useCallback((): Edge[] => {
     // Cada input admite una sola conexión. Usar un Map elimina bindings
     // históricos duplicados antes de entregar los edges a React Flow.
+    const graphNodes = buildNodes();
+    const graphNodeMap = new Map(graphNodes.map((node) => [node.id, node]));
+    const hasHandle = (nodeId: string, side: "input" | "output", candidate: string | null | undefined) => {
+      if (!candidate) return false;
+      const node = graphNodeMap.get(nodeId);
+      const ports = side === "input" ? node?.data.inputs : node?.data.outputs;
+      return Boolean(ports?.some((port) => handleId(side, port.id) === candidate));
+    };
+
     const edgesByTarget = new Map<string, Edge>();
     const registerEdge = (edge: Edge) => {
+      if (!hasHandle(edge.source, "output", edge.sourceHandle)) return;
+      if (!hasHandle(edge.target, "input", edge.targetHandle)) return;
       const key = `${edge.target}::${edge.targetHandle ?? ""}`;
       edgesByTarget.set(key, edge);
     };
@@ -301,9 +318,9 @@ export function GenerationNodeCanvas({
           const source = sourceForPath(path);
           if (!source) continue;
           {
-            const sourceHandle = handleId(source.node, "output", source.handle);
-            const targetHandle = handleId(`step:${step.id}`, "input", port.id);
-            registerEdge({ id: edgeId(source.node, sourceHandle, `step:${step.id}`, targetHandle), source: source.node, target: `step:${step.id}`, sourceHandle, targetHandle, animated: true, deletable: true });
+            const sourceHandle = handleId("output", source.handle);
+            const targetHandle = handleId("input", port.id);
+            registerEdge({ id: edgeId(`step:${step.id}`, targetHandle), source: source.node, target: `step:${step.id}`, sourceHandle, targetHandle, animated: true, deletable: true });
           }
         }
       } else {
@@ -314,9 +331,9 @@ export function GenerationNodeCanvas({
           const source = sourceForPath(path);
           if (!portId || !source) continue;
           {
-            const sourceHandle = handleId(source.node, "output", source.handle);
-            const targetHandle = handleId(`step:${step.id}`, "input", portId);
-            registerEdge({ id: edgeId(source.node, sourceHandle, `step:${step.id}`, targetHandle), source: source.node, target: `step:${step.id}`, sourceHandle, targetHandle, animated: true, deletable: true });
+            const sourceHandle = handleId("output", source.handle);
+            const targetHandle = handleId("input", portId);
+            registerEdge({ id: edgeId(`step:${step.id}`, targetHandle), source: source.node, target: `step:${step.id}`, sourceHandle, targetHandle, animated: true, deletable: true });
           }
         }
       }
@@ -326,27 +343,32 @@ export function GenerationNodeCanvas({
       const source = sourceForPath(String(output.source_path ?? ""));
       if (!source || source.node === "assets") continue;
       {
-        const sourceHandle = handleId(source.node, "output", source.handle);
-        const targetHandle = handleId("output", "input", output.key);
-        registerEdge({ id: edgeId(source.node, sourceHandle, "output", targetHandle), source: source.node, target: "output", sourceHandle, targetHandle, animated: true, deletable: true });
+        const sourceHandle = handleId("output", source.handle);
+        const targetHandle = handleId("input", output.key);
+        registerEdge({ id: edgeId("output", targetHandle), source: source.node, target: "output", sourceHandle, targetHandle, animated: true, deletable: true });
       }
     }
     return [...edgesByTarget.values()];
-  }, [module.outputs, module.steps, sourceForPath]);
+  }, [buildNodes, module.outputs, module.steps, sourceForPath]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(buildNodes());
-  const [edges, setEdges, onEdgesChange] = useEdgesState(buildEdges());
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
   useEffect(() => {
+    // Primero se renderizan los nodos y sus Handles. Los edges se incorporan
+    // en el siguiente frame, cuando React Flow ya registró los puertos.
     setNodes(buildNodes());
-    setEdges(buildEdges());
+    const frame = requestAnimationFrame(() => {
+      setEdges(buildEdges());
+    });
+    return () => cancelAnimationFrame(frame);
   }, [buildEdges, buildNodes, setEdges, setNodes]);
 
   const findPort = useCallback((nodeId: string | null, candidateHandleId: string | null, side: "input" | "output") => {
     if (!nodeId || !candidateHandleId) return undefined;
     const node = nodes.find((item) => item.id === nodeId);
     const ports = side === "input" ? node?.data.inputs : node?.data.outputs;
-    return ports?.find((port) => handleId(nodeId, side, port.id) === candidateHandleId);
+    return ports?.find((port) => handleId(side, port.id) === candidateHandleId);
   }, [nodes]);
 
   const findPortId = useCallback((nodeId: string, candidateHandleId: string | null, side: "input" | "output") =>
@@ -450,7 +472,7 @@ export function GenerationNodeCanvas({
         const next = current.filter((edge) => !(edge.target === connection.target && edge.targetHandle === connection.targetHandle));
         return addEdge({
           ...connection,
-          id: edgeId(connection.source, connection.sourceHandle, connection.target, connection.targetHandle),
+          id: edgeId(connection.target, connection.targetHandle),
           animated: true,
           deletable: true,
         }, next);
