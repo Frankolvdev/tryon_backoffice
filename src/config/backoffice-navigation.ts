@@ -82,6 +82,11 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         href: "/dashboard/tryon/generation-modules",
         icon: Boxes,
       },
+      {
+        label: "Runtime Builder",
+        href: "/dashboard/runtime-builder",
+        icon: ServerCog,
+      },
     ],
   },
   {
