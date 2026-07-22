@@ -1,0 +1,31 @@
+export type GenerationExecutionEngine = "simulated" | "local_docker" | "runpod_serverless";
+export type GenerationModuleInputType = "image" | "file" | "text" | "integer" | "float" | "boolean" | "json";
+export type GenerationModuleOutputType = "image" | "images" | "file" | "json" | "metadata";
+export type GenerationModuleStepType = "workflow" | "python";
+
+export interface GenerationModuleInput {
+  id?: number; key: string; name: string; description?: string | null;
+  input_type: GenerationModuleInputType; position: number; is_required: boolean;
+  default_value?: unknown; validation?: Record<string, unknown>;
+}
+export interface GenerationModuleOutput {
+  id?: number; key: string; name: string; description?: string | null;
+  output_type: GenerationModuleOutputType; position: number; is_required: boolean;
+  source_step_key?: string | null; source_path?: string | null; metadata?: Record<string, unknown>;
+}
+export interface GenerationModuleStep {
+  id: number; key: string; name: string; description?: string | null;
+  step_type: GenerationModuleStepType; position: number; is_enabled: boolean;
+  configuration: Record<string, unknown>; input_mapping: Record<string, unknown>;
+  output_mapping: Record<string, unknown>; created_at: string; updated_at: string;
+}
+export interface GenerationModule {
+  id: number; key: string; name: string; description?: string | null; version: number;
+  category: string; default_execution_engine: GenerationExecutionEngine;
+  metadata: Record<string, unknown>; is_active: boolean; created_by_user_id?: number | null;
+  inputs: GenerationModuleInput[]; outputs: GenerationModuleOutput[]; steps: GenerationModuleStep[];
+  created_at: string; updated_at: string;
+}
+export interface GenerationModuleListResponse { items: GenerationModule[]; total: number; skip: number; limit: number; }
+export interface WorkflowInputBinding { module_input_key: string; node_id: string; input_field: string; }
+export interface WorkflowOutputBinding { module_output_key: string; node_id: string; }

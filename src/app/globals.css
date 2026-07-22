@@ -149,3 +149,11 @@ a {
   background-clip: text;
   color: transparent;
 }
+.gm-input { width: 100%; min-height: 2.75rem; border-radius: .75rem; border: 1px solid rgba(255,255,255,.08); background: rgba(0,0,0,.35); padding-left: .8rem; padding-right: .8rem; color: #fff; font-size: .875rem; outline: none; }
+.gm-input:focus { border-color: rgba(239,68,68,.45); }
+.gm-secondary { display:inline-flex; min-height:2.25rem; align-items:center; gap:.4rem; border-radius:.7rem; border:1px solid rgba(255,255,255,.08); padding:0 .75rem; font-size:.75rem; color:#d4d4d8; }
+.gm-secondary:hover { background:rgba(255,255,255,.05); }
+.gm-icon,.gm-delete { display:inline-flex; height:2.25rem; width:2.25rem; align-items:center; justify-content:center; border-radius:.7rem; border:1px solid rgba(255,255,255,.08); color:#71717a; }
+.gm-icon:hover { color:#fff; background:rgba(255,255,255,.05); }
+.gm-delete { color:#f87171; border-color:rgba(239,68,68,.18); }
+.gm-delete:hover { background:rgba(239,68,68,.08); }

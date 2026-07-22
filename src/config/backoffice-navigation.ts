@@ -91,6 +91,11 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         icon: Boxes,
       },
       {
+        label: "Módulos de generación",
+        href: "/dashboard/tryon/generation-modules",
+        icon: Boxes,
+      },
+      {
         label: "Workflows",
         href: "/dashboard/tryon/workflows",
         icon: ClipboardList,

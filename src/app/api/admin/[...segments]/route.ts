@@ -47,6 +47,17 @@ export async function POST(
   });
 }
 
+export async function PUT(
+  request: NextRequest,
+  context: RouteContext,
+): Promise<NextResponse> {
+  return forwardAdminRequest({
+    backendPath: await createBackendPath(request, context),
+    method: "PUT",
+    request,
+  });
+}
+
 export async function PATCH(
   request: NextRequest,
   context: RouteContext,
