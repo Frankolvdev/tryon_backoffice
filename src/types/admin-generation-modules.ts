@@ -19,10 +19,12 @@ export interface GenerationModuleStep {
   configuration: Record<string, unknown>; input_mapping: Record<string, unknown>;
   output_mapping: Record<string, unknown>; created_at: string; updated_at: string;
 }
+export interface GenerationModulePricing { id:number; required_tokens:number; final_price_usd:number; token_value_usd:number; currency:string; is_active:boolean; }
 export interface GenerationModule {
   id: number; key: string; name: string; description?: string | null; version: number;
   category: string; default_execution_engine: GenerationExecutionEngine;
   metadata: Record<string, unknown>; is_active: boolean; created_by_user_id?: number | null;
+  pricing_rule_id?: number | null; pricing?: GenerationModulePricing | null;
   inputs: GenerationModuleInput[]; outputs: GenerationModuleOutput[]; steps: GenerationModuleStep[];
   created_at: string; updated_at: string;
 }

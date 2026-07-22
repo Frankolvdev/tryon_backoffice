@@ -32,6 +32,7 @@ export interface PricingRuleResponse {
   operation_type: PricingOperationType;
   item_type: TryOnItemType;
   quality_mode: QualityMode;
+  generation_module_id?: number | null;
   average_execution_cost_usd: number;
   desired_profit_percent: number;
   final_price_usd: number;
@@ -48,6 +49,7 @@ export interface PricingRuleCreate {
   operation_type: PricingOperationType;
   item_type: TryOnItemType;
   quality_mode: QualityMode;
+  generation_module_id?: number | null;
   average_execution_cost_usd: number;
   desired_profit_percent: number;
   is_active: boolean;
