@@ -40,3 +40,5 @@ export interface GenerationRuntimeHealth { simulated: GenerationRuntimeHealthIte
 
 export interface PipelinePort { key: string; label: string; type: string; source: string; path: string; }
 export interface PipelineConnectionSuggestion { targetKey: string; sourcePath: string; confidence: "exact" | "type" | "fallback"; }
+
+export interface PythonSourceAnalysis { valid: boolean; entrypoint_found: boolean; input_keys: string[]; output_keys: string[]; warnings: string[]; }
