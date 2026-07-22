@@ -1,13 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Cpu, HelpCircle, LoaderCircle, RefreshCcw, Save, ServerCog, TriangleAlert } from "lucide-react";
+import { CheckCircle2, Cpu, FlaskConical, HelpCircle, LoaderCircle, RefreshCcw, Save, Server, ServerCog, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import { TryOnEmptyState } from "@/components/backoffice/tryon/tryon-empty-state";
 import { TryOnModuleHeader } from "@/components/backoffice/tryon/tryon-module-header";
 import { browserApiRequest } from "@/lib/api/browser-api";
+import { cn } from "@/lib/utils";
 import type { AiEngineSettings, AiEngineSettingsUpdate } from "@/types/admin-ai-engine-settings";
+import type { AiProviderHealth, AiProvidersOverview } from "@/types/admin-ai-providers";
 
 type NumberFieldProps = {
   label: string;
@@ -40,8 +42,55 @@ function NumberField({ label, description, value, min = 1, max, onChange }: Numb
   );
 }
 
+function providerLabel(provider: string): string {
+  const labels: Record<string, string> = {
+    simulated: "Simulado",
+    comfyui_local: "ComfyUI Local",
+    local_docker: "ComfyUI Local",
+    runpod_serverless: "RunPod Serverless",
+  };
+  return labels[provider] ?? provider;
+}
+
+function ProviderIcon({ provider }: { provider: string }) {
+  if (provider === "runpod_serverless") return <Server size={19} />;
+  if (provider === "comfyui_local" || provider === "local_docker") return <Cpu size={19} />;
+  return <FlaskConical size={19} />;
+}
+
+function ConfiguredEngineCard({ provider }: { provider: AiProviderHealth }) {
+  return (
+    <article className="rounded-2xl border border-white/7 bg-white/[0.025] p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex size-10 items-center justify-center rounded-xl border border-white/8 bg-black/30 text-zinc-300">
+            <ProviderIcon provider={provider.provider} />
+          </div>
+          <div>
+            <h3 className="font-medium text-white">{providerLabel(provider.provider)}</h3>
+            <p className="mt-1 text-xs text-zinc-500">Motor configurado</p>
+          </div>
+        </div>
+        <span className={cn(
+          "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs",
+          provider.available
+            ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
+            : "border-amber-500/20 bg-amber-500/10 text-amber-300",
+        )}>
+          {provider.available ? <CheckCircle2 size={13} /> : <TriangleAlert size={13} />}
+          {provider.available ? "Disponible" : "No disponible"}
+        </span>
+      </div>
+      <p className="mt-4 text-sm leading-6 text-zinc-400">
+        {provider.message ?? "Configurado para ser utilizado por los módulos de generación que lo tengan seleccionado."}
+      </p>
+    </article>
+  );
+}
+
 export default function AiEnginePage() {
   const [settings, setSettings] = useState<AiEngineSettings | null>(null);
+  const [overview, setOverview] = useState<AiProvidersOverview | null>(null);
   const [draft, setDraft] = useState<AiEngineSettingsUpdate | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -51,8 +100,12 @@ export default function AiEnginePage() {
     setLoading(true);
     setError(null);
     try {
-      const value = await browserApiRequest<AiEngineSettings>("/api/admin/ai-providers/engine-settings");
+      const [value, providersOverview] = await Promise.all([
+        browserApiRequest<AiEngineSettings>("/api/admin/ai-providers/engine-settings"),
+        browserApiRequest<AiProvidersOverview>("/api/admin/ai-providers/overview"),
+      ]);
       setSettings(value);
+      setOverview(providersOverview);
       setDraft({
         local_parallel_executions: value.local_parallel_executions,
         runpod_min_workers: value.runpod_min_workers,
@@ -126,6 +179,28 @@ export default function AiEnginePage() {
       {!loading && error && <div className="mt-5"><TryOnEmptyState error title="No se pudo cargar la configuración" description={error} /></div>}
 
       {!loading && draft && settings && (
+        <>
+          <section className="luxia-panel mt-5 rounded-3xl p-6">
+            <div>
+              <p className="text-sm font-medium text-red-300">Motores configurados</p>
+              <h2 className="mt-2 text-xl font-semibold text-white">Motores disponibles para los módulos</h2>
+              <p className="mt-2 text-sm leading-6 text-zinc-500">
+                Se muestran únicamente los motores que ya existen y están configurados. La selección del motor se realiza dentro de cada módulo de generación.
+              </p>
+            </div>
+            {overview?.providers.filter((provider) => provider.configured).length ? (
+              <div className="mt-5 grid gap-4 xl:grid-cols-3">
+                {overview.providers.filter((provider) => provider.configured).map((provider) => (
+                  <ConfiguredEngineCard key={provider.provider} provider={provider} />
+                ))}
+              </div>
+            ) : (
+              <div className="mt-5 rounded-2xl border border-white/7 bg-black/20 p-5 text-sm text-zinc-500">
+                No hay motores configurados todavía. Configura la conexión correspondiente antes de asignarla a un módulo.
+              </div>
+            )}
+          </section>
+
         <section className="luxia-panel mt-5 rounded-3xl p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -174,15 +249,8 @@ export default function AiEnginePage() {
               onChange={(value) => update("runpod_max_workers", value)}
             />
             <NumberField
-              label="Dispatcher workers de RunPod"
-              description="Hilos del backend dedicados a tomar trabajos de la cola y despacharlos hacia RunPod. No modifica el escalado de workers dentro de RunPod."
-              value={draft.runpod_dispatch_workers}
-              max={128}
-              onChange={(value) => update("runpod_dispatch_workers", value)}
-            />
-            <NumberField
               label="Máximo de RunPod en vuelo"
-              description="Número máximo de trabajos RunPod que el backend permite mantener activos al mismo tiempo. La concurrencia efectiva será el menor valor entre este límite y los dispatcher workers."
+              description="Número máximo de trabajos RunPod que el backend permite mantener activos al mismo tiempo. Este límite evita que el backend mantenga demasiadas ejecuciones remotas activas al mismo tiempo."
               value={draft.runpod_max_in_flight}
               max={512}
               onChange={(value) => update("runpod_max_in_flight", value)}
@@ -210,7 +278,7 @@ export default function AiEnginePage() {
               <div>
                 <p className="text-sm font-medium text-amber-200">Reinicio requerido</p>
                 <p className="mt-1 text-xs leading-5 text-amber-200/60">Los workers se crean al iniciar el backend. Guarda los cambios y reinicia Uvicorn para aplicarlos.</p>
-                <p className="mt-1 text-xs text-zinc-500">Paralelismo RunPod efectivo actual: {settings.effective_runpod_parallelism}</p>
+                <p className="mt-1 text-xs text-zinc-500">El despachador interno de RunPod permanece administrado por el backend y no requiere configuración manual.</p>
               </div>
             </div>
             <button type="button" disabled={saving} onClick={() => void save()} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-red-600 px-5 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50">
@@ -220,6 +288,7 @@ export default function AiEnginePage() {
 
           <div className="mt-5 flex items-center gap-2 text-xs text-zinc-600"><ServerCog size={14} /> Toda la capacidad y concurrencia de ejecución se administra aquí. RunPod conserva únicamente los datos de conexión y despliegue.</div>
         </section>
+        </>
       )}
     </div>
   );
