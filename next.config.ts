@@ -7,8 +7,20 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
 ];
 
+const backendBaseUrl = (
+  process.env.BACKEND_API_URL ?? "http://127.0.0.1:8001"
+).replace(/\/$/, "");
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  async rewrites() {
+    return [
+      {
+        source: "/local-files/:path*",
+        destination: `${backendBaseUrl}/local-files/:path*`,
+      },
+    ];
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
