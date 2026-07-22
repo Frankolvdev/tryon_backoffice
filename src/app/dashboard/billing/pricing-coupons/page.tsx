@@ -18,6 +18,7 @@ import {
   RefreshCcw,
   Search,
   Tags,
+  Trash2,
   TriangleAlert,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -132,6 +133,30 @@ export default function PricingCouponsPage() {
         : [saved, ...current];
     });
     setEditingRule(undefined);
+  };
+
+  const deleteRule = async (rule: PricingRuleResponse) => {
+    const confirmed = window.confirm(
+      `¿Eliminar la regla "${rule.title}"? El módulo vinculado quedará sin regla e inactivo.`,
+    );
+    if (!confirmed) return;
+
+    setActionId(`delete-rule-${rule.id}`);
+    try {
+      await browserApiRequest<void>(`/api/admin/pricing-rules/${rule.id}`, {
+        method: "DELETE",
+      });
+      setRules((current) => current.filter((item) => item.id !== rule.id));
+      toast.success("Regla eliminada. El módulo vinculado quedó inactivo.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No fue posible eliminar la regla.",
+      );
+    } finally {
+      setActionId(null);
+    }
   };
 
   const saveCoupon = (
@@ -329,10 +354,12 @@ export default function PricingCouponsPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="font-semibold text-white">
-                        {rule.operation_type}
+                        {rule.title}
                       </p>
-                      <p className="mt-1 font-mono text-xs text-zinc-600">
-                        {rule.item_type} · {rule.quality_mode}
+                      <p className="mt-1 text-xs text-zinc-600">
+                        {rule.generation_module_id
+                          ? `Módulo #${rule.generation_module_id}`
+                          : "Sin módulo vinculado"}
                       </p>
                     </div>
 
@@ -387,14 +414,29 @@ export default function PricingCouponsPage() {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setEditingRule(rule)}
-                    className="mt-5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/8 text-sm text-zinc-400 hover:text-white"
-                  >
-                    <Pencil size={15} />
-                    Editar
-                  </button>
+                  <div className="mt-5 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingRule(rule)}
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/8 text-sm text-zinc-400 hover:text-white"
+                    >
+                      <Pencil size={15} />
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={actionId === `delete-rule-${rule.id}`}
+                      onClick={() => void deleteRule(rule)}
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-red-500/15 text-sm text-red-300 disabled:opacity-50"
+                    >
+                      {actionId === `delete-rule-${rule.id}` ? (
+                        <LoaderCircle size={15} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={15} />
+                      )}
+                      Eliminar
+                    </button>
+                  </div>
                 </article>
               ))}
             </div>

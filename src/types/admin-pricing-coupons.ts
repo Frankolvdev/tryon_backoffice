@@ -4,8 +4,7 @@ export type PricingOperationType =
 
 export type TryOnItemType =
   | "clothing"
-  | "shoes"
-  | string;
+  | "footwear";
 
 export type QualityMode =
   | "standard"
@@ -29,6 +28,7 @@ export interface CommercialPricePreviewResponse {
 
 export interface PricingRuleResponse {
   id: number;
+  title: string;
   operation_type: PricingOperationType;
   item_type: TryOnItemType;
   quality_mode: QualityMode;
@@ -46,16 +46,14 @@ export interface PricingRuleResponse {
 }
 
 export interface PricingRuleCreate {
-  operation_type: PricingOperationType;
-  item_type: TryOnItemType;
-  quality_mode: QualityMode;
-  generation_module_id?: number | null;
+  title: string;
   average_execution_cost_usd: number;
   desired_profit_percent: number;
   is_active: boolean;
 }
 
 export interface PricingRuleUpdate {
+  title?: string | null;
   average_execution_cost_usd?: number | null;
   desired_profit_percent?: number | null;
   is_active?: boolean | null;
