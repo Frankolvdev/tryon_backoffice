@@ -1,7 +1,9 @@
 /**
- * La navegación entre módulos de IA se realiza exclusivamente desde el sidebar.
- * Este componente se conserva como compatibilidad para las vistas antiguas que
- * todavía lo importan, pero ya no renderiza botones duplicados.
+ * Compatibilidad para vistas antiguas.
+ *
+ * La navegación del motor IA se realiza exclusivamente desde el sidebar. Las
+ * páginas que todavía importan este componente no deben mostrar barras de
+ * botones duplicadas.
  */
 export function AiEngineTabs() {
   return null;

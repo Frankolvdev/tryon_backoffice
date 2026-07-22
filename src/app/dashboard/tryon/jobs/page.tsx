@@ -1,700 +1,234 @@
 "use client";
 
-import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-
-import {
-  ChevronLeft,
-  ChevronRight,
-  Coins,
-  Cpu,
-  Eye,
-  ImageIcon,
-  LoaderCircle,
-  RefreshCcw,
-  Search,
-  SlidersHorizontal,
-  Sparkles,
-  UserRound,
+  Activity, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Clock3,
+  Coins, Cpu, Eye, FilterX, LoaderCircle, RefreshCcw, RotateCcw, Search,
+  Square, UserRound, XCircle,
 } from "lucide-react";
 
-import { TryOnEmptyState } from "@/components/backoffice/tryon/tryon-empty-state";
-import { TryOnJobStatusBadge } from "@/components/backoffice/tryon/tryon-job-status-badge";
-import { TryOnModuleHeader } from "@/components/backoffice/tryon/tryon-module-header";
 import { browserApiRequest } from "@/lib/api/browser-api";
-import {
-  formatTryOnDate,
-  formatTryOnDuration,
-  formatTryOnMoneyFromCents,
-} from "@/lib/tryon/format";
-
 import type {
-  TryOnJobStatus,
-  TryOnJobSummary,
-} from "@/types/admin-tryon";
+  GenerationExecutionStatus,
+  GenerationModule,
+  GenerationModuleExecution,
+  GenerationModuleListResponse,
+} from "@/types/admin-generation-modules";
 
-const PAGE_SIZE = 50;
+type ExecutionListResponse = {
+  items: GenerationModuleExecution[];
+  total: number;
+  skip: number;
+  limit: number;
+};
 
-function matchesSearch(
-  job: TryOnJobSummary,
-  search: string,
-): boolean {
-  const normalizedSearch =
-    search.trim().toLowerCase();
+const ACTIVE_STATUSES = new Set<GenerationExecutionStatus>(["queued", "running"]);
+const TERMINAL_STATUSES = new Set<GenerationExecutionStatus>(["completed", "failed", "cancelled"]);
 
-  if (!normalizedSearch) {
-    return true;
+function formatDate(value?: string | null) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("es-MX");
+}
+
+function formatDuration(ms?: number | null) {
+  if (ms == null) return "—";
+  if (ms < 1000) return `${ms} ms`;
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds} s`;
+  return `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
+}
+
+function engineLabel(engine: string) {
+  if (engine === "local_docker") return "Local";
+  if (engine === "runpod_serverless") return "RunPod Serverless";
+  if (engine === "simulated") return "Simulado";
+  return engine;
+}
+
+function statusLabel(status: string) {
+  return ({ queued: "En cola", running: "Ejecutando", completed: "Completado", failed: "Fallido", cancelled: "Cancelado" } as Record<string, string>)[status] ?? status;
+}
+
+function statusClass(status: string) {
+  if (status === "completed") return "border-emerald-500/20 bg-emerald-500/10 text-emerald-300";
+  if (status === "running") return "border-blue-500/20 bg-blue-500/10 text-blue-300";
+  if (status === "queued") return "border-amber-500/20 bg-amber-500/10 text-amber-300";
+  return "border-red-500/20 bg-red-500/10 text-red-300";
+}
+
+function resultLinks(value: unknown, prefix = "Resultado"): Array<{ label: string; href: string }> {
+  if (typeof value === "string" && (/^https?:\/\//.test(value) || value.startsWith("/"))) {
+    return [{ label: prefix, href: value }];
+  }
+  if (Array.isArray(value)) return value.flatMap((item, index) => resultLinks(item, `${prefix} ${index + 1}`));
+  if (value && typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>).flatMap(([key, item]) => resultLinks(item, key));
+  }
+  return [];
+}
+
+export default function UnifiedAiJobsPage() {
+  const [modules, setModules] = useState<GenerationModule[]>([]);
+  const [executions, setExecutions] = useState<GenerationModuleExecution[]>([]);
+  const [total, setTotal] = useState(0);
+  const [search, setSearch] = useState("");
+  const [moduleId, setModuleId] = useState("");
+  const [status, setStatus] = useState("");
+  const [engine, setEngine] = useState("");
+  const [userId, setUserId] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [expandedModules, setExpandedModules] = useState<Set<number>>(new Set());
+  const [selected, setSelected] = useState<GenerationModuleExecution | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ limit: "500", skip: "0" });
+      if (search.trim()) params.set("search", search.trim());
+      if (moduleId) params.set("module_id", moduleId);
+      if (status) params.set("status", status);
+      if (engine) params.set("engine", engine);
+      if (userId) params.set("user_id", userId);
+      if (dateFrom) params.set("created_from", new Date(`${dateFrom}T00:00:00`).toISOString());
+      if (dateTo) params.set("created_to", new Date(`${dateTo}T23:59:59`).toISOString());
+
+      const [moduleResponse, executionResponse] = await Promise.all([
+        browserApiRequest<GenerationModuleListResponse>("/api/admin/generation-modules?limit=500"),
+        browserApiRequest<ExecutionListResponse>(`/api/admin/generation-modules/execution-history?${params}`),
+      ]);
+      setModules(moduleResponse.items);
+      setExecutions(executionResponse.items);
+      setTotal(executionResponse.total);
+      setExpandedModules((current) => current.size ? current : new Set(moduleResponse.items.map((item) => item.id)));
+      setSelected((current) => {
+        if (!current) return null;
+        return executionResponse.items.find((item) => item.id === current.id) ?? current;
+      });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible cargar los trabajos de IA.");
+    } finally {
+      if (!silent) setIsLoading(false);
+    }
+  }, [dateFrom, dateTo, engine, moduleId, search, status, userId]);
+
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (!executions.some((item) => ACTIVE_STATUSES.has(item.status))) return;
+    const timer = window.setInterval(() => void load(true), 3000);
+    return () => window.clearInterval(timer);
+  }, [executions, load]);
+
+  const modulesById = useMemo(() => new Map(modules.map((item) => [item.id, item])), [modules]);
+  const grouped = useMemo(() => {
+    const map = new Map<number, GenerationModuleExecution[]>();
+    for (const execution of executions) {
+      const current = map.get(execution.module_id) ?? [];
+      current.push(execution);
+      map.set(execution.module_id, current);
+    }
+    return [...map.entries()].sort((a, b) => {
+      const aName = modulesById.get(a[0])?.name ?? a[1][0]?.module_key ?? "";
+      const bName = modulesById.get(b[0])?.name ?? b[1][0]?.module_key ?? "";
+      return aName.localeCompare(bName, "es");
+    });
+  }, [executions, modulesById]);
+
+  const metrics = useMemo(() => ({
+    total,
+    active: executions.filter((item) => ACTIVE_STATUSES.has(item.status)).length,
+    completed: executions.filter((item) => item.status === "completed").length,
+    failed: executions.filter((item) => item.status === "failed").length,
+    tokens: executions.reduce((sum, item) => sum + (item.tokens_charged ?? 0), 0),
+  }), [executions, total]);
+
+  async function jobAction(execution: GenerationModuleExecution, action: "cancel" | "retry") {
+    setBusyId(execution.id);
+    setError(null);
+    try {
+      await browserApiRequest(`/api/admin/generation-modules/executions/${execution.id}/${action}`, {
+        method: "POST",
+        ...(action === "retry" ? { body: JSON.stringify({}) } : {}),
+      });
+      await load(true);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible completar la operación.");
+    } finally {
+      setBusyId(null);
+    }
   }
 
-  const values = [
-    String(job.id),
-    String(job.user_id),
-    String(job.person_image_file_id),
-    String(job.item_image_file_id),
-    job.result_file_id === null
-      ? ""
-      : String(job.result_file_id),
-    job.status,
-    job.item_type,
-    job.quality_mode,
-    job.runpod_job_id ?? "",
-    job.comfy_workflow_name ?? "",
-    job.prompt ?? "",
-    job.error_message ?? "",
-  ];
+  function clearFilters() {
+    setSearch(""); setModuleId(""); setStatus(""); setEngine(""); setUserId(""); setDateFrom(""); setDateTo("");
+  }
 
-  return values.some((value) =>
-    value
-      .toLowerCase()
-      .includes(normalizedSearch),
-  );
+  function toggleModule(id: number) {
+    setExpandedModules((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  return <div className="space-y-7">
+    <header className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-red-500">Operación centralizada</p>
+        <h1 className="mt-2 text-3xl font-semibold text-white">Trabajos IA</h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">Una sola vista para supervisar todas las ejecuciones de los módulos de generación, con progreso en vivo, usuario, motor, consumo, resultados, errores y acciones.</p>
+      </div>
+      <button onClick={() => void load()} disabled={isLoading} className="flex h-11 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-zinc-300 hover:bg-white/[0.06] disabled:opacity-50">
+        {isLoading ? <LoaderCircle size={16} className="animate-spin" /> : <RefreshCcw size={16} />} Actualizar
+      </button>
+    </header>
+
+    {error && <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-300"><AlertTriangle className="mr-2 inline" size={16}/>{error}</div>}
+
+    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <Metric label="Total encontrado" value={metrics.total} icon={Activity}/>
+      <Metric label="Activos" value={metrics.active} icon={Clock3}/>
+      <Metric label="Completados" value={metrics.completed} icon={CheckCircle2}/>
+      <Metric label="Fallidos" value={metrics.failed} icon={XCircle}/>
+      <Metric label="Tokens cargados" value={metrics.tokens} icon={Coins}/>
+    </section>
+
+    <section className="luxia-panel rounded-3xl p-5">
+      <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
+        <label className="relative xl:col-span-2"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600" size={16}/><input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="ID, módulo, motor, estado o error..." className="h-11 w-full rounded-xl border border-white/10 bg-black/30 pl-11 pr-4 text-sm text-white outline-none focus:border-red-500/40"/></label>
+        <select value={moduleId} onChange={(e)=>setModuleId(e.target.value)} className="h-11 rounded-xl border border-white/10 bg-[#09090a] px-3 text-sm text-zinc-300"><option value="">Todos los módulos</option>{modules.map((item)=><option key={item.id} value={item.id}>{item.name}</option>)}</select>
+        <input type="number" min="1" value={userId} onChange={(e)=>setUserId(e.target.value)} placeholder="ID de usuario" className="h-11 rounded-xl border border-white/10 bg-black/30 px-4 text-sm text-white"/>
+        <select value={status} onChange={(e)=>setStatus(e.target.value)} className="h-11 rounded-xl border border-white/10 bg-[#09090a] px-3 text-sm text-zinc-300"><option value="">Todos los estados</option><option value="queued">En cola</option><option value="running">Ejecutando</option><option value="completed">Completados</option><option value="failed">Fallidos</option><option value="cancelled">Cancelados</option></select>
+        <select value={engine} onChange={(e)=>setEngine(e.target.value)} className="h-11 rounded-xl border border-white/10 bg-[#09090a] px-3 text-sm text-zinc-300"><option value="">Todos los motores</option><option value="simulated">Simulado</option><option value="local_docker">Local</option><option value="runpod_serverless">RunPod Serverless</option></select>
+        <input type="date" value={dateFrom} onChange={(e)=>setDateFrom(e.target.value)} className="h-11 rounded-xl border border-white/10 bg-[#09090a] px-3 text-sm text-zinc-300" title="Desde"/>
+        <div className="flex gap-3"><input type="date" value={dateTo} onChange={(e)=>setDateTo(e.target.value)} className="h-11 min-w-0 flex-1 rounded-xl border border-white/10 bg-[#09090a] px-3 text-sm text-zinc-300" title="Hasta"/><button onClick={clearFilters} title="Limpiar filtros" className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-white/10 text-zinc-400 hover:text-white"><FilterX size={17}/></button></div>
+      </div>
+    </section>
+
+    {isLoading ? <section className="luxia-panel flex min-h-72 items-center justify-center rounded-3xl"><div className="text-center"><LoaderCircle className="mx-auto animate-spin text-red-500"/><p className="mt-4 text-sm text-zinc-500">Consultando trabajos...</p></div></section> : grouped.length === 0 ? <section className="luxia-panel rounded-3xl p-12 text-center"><Activity className="mx-auto text-zinc-700"/><h2 className="mt-4 font-semibold text-white">No hay trabajos que coincidan</h2><p className="mt-2 text-sm text-zinc-500">Ajusta los filtros o ejecuta un módulo de generación.</p></section> : <div className="space-y-4">
+      {grouped.map(([id, jobs]) => {
+        const module = modulesById.get(id);
+        const isExpanded = expandedModules.has(id);
+        const active = jobs.filter((item)=>ACTIVE_STATUSES.has(item.status)).length;
+        return <section key={id} className="luxia-panel overflow-hidden rounded-3xl">
+          <button onClick={()=>toggleModule(id)} className="flex w-full items-center justify-between gap-4 border-b border-white/6 p-5 text-left hover:bg-white/[0.02]">
+            <div className="flex min-w-0 items-center gap-4">{isExpanded?<ChevronDown size={18}/>:<ChevronRight size={18}/>}<div><h2 className="font-semibold text-white">{module?.name ?? jobs[0]?.module_key}</h2><p className="mt-1 text-xs text-zinc-600">{module?.key ?? jobs[0]?.module_key} · {jobs.length} trabajo{jobs.length===1?"":"s"}{active?` · ${active} activo${active===1?"":"s"}`:""}</p></div></div>
+            {active>0&&<span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs text-blue-300">Actualización en vivo</span>}
+          </button>
+          {isExpanded && <div className="overflow-x-auto"><table className="w-full min-w-[1120px] text-left text-sm"><thead className="text-[10px] uppercase tracking-wider text-zinc-600"><tr><th className="p-4">Trabajo</th><th>Usuario</th><th>Motor</th><th>Estado</th><th>Progreso</th><th>Tokens</th><th>Tiempo</th><th>Resultado / error</th><th className="pr-4">Acciones</th></tr></thead><tbody>{jobs.map((job)=>{
+            const links=resultLinks(job.outputs).slice(0,2); const busy=busyId===job.id;
+            return <tr key={job.id} className="border-t border-white/5 align-top"><td className="p-4"><p className="font-medium text-white">{job.module_key}</p><p className="mt-1 max-w-40 truncate font-mono text-[10px] text-zinc-700" title={job.id}>{job.id}</p><p className="mt-1 text-[10px] text-zinc-600">{formatDate(job.created_at)}</p></td><td><div className="flex items-center gap-2 pt-4 text-zinc-400"><UserRound size={14}/>{job.user_id?`#${job.user_id}`:"Administrador"}</div></td><td className="pt-4 text-zinc-400"><Cpu size={14} className="mr-2 inline"/>{engineLabel(job.engine)}</td><td className="pt-4"><span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase ${statusClass(job.status)}`}>{statusLabel(job.status)}</span></td><td className="pt-4"><div className="w-32"><div className="flex justify-between text-[10px] text-zinc-600"><span>{job.progress}%</span><span>{job.steps.filter(s=>s.status==="completed").length}/{job.steps.length}</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full bg-red-600 transition-all" style={{width:`${job.progress}%`}}/></div></div></td><td className="pt-4 text-zinc-400">{job.tokens_charged??0}</td><td className="pt-4 text-zinc-500">{formatDuration(job.duration_ms)}</td><td className="max-w-xs pt-4">{job.error?<p className="line-clamp-2 text-xs text-red-300" title={job.error}>{job.error}</p>:links.length?<div className="flex flex-col gap-1">{links.map((link)=><a key={`${link.label}-${link.href}`} href={link.href} target="_blank" rel="noreferrer" className="truncate text-xs text-blue-300 hover:text-blue-200">{link.label}</a>)}</div>:<span className="text-xs text-zinc-600">{ACTIVE_STATUSES.has(job.status)?"Procesando...":"Sin archivo visible"}</span>}</td><td className="pr-4 pt-3"><div className="flex gap-2"><button onClick={()=>setSelected(job)} className="flex size-9 items-center justify-center rounded-lg border border-white/10 text-zinc-400 hover:text-white" title="Ver detalle"><Eye size={15}/></button>{ACTIVE_STATUSES.has(job.status)&&<button disabled={busy} onClick={()=>void jobAction(job,"cancel")} className="flex size-9 items-center justify-center rounded-lg border border-white/10 text-zinc-400 hover:text-red-300 disabled:opacity-40" title="Cancelar">{busy?<LoaderCircle size={15} className="animate-spin"/>:<Square size={14}/>}</button>}{TERMINAL_STATUSES.has(job.status)&&<button disabled={busy} onClick={()=>void jobAction(job,"retry")} className="flex size-9 items-center justify-center rounded-lg bg-red-600 text-white hover:bg-red-500 disabled:opacity-40" title="Reintentar">{busy?<LoaderCircle size={15} className="animate-spin"/>:<RotateCcw size={15}/>}</button>}</div></td></tr>})}</tbody></table></div>}
+        </section>
+      })}
+    </div>}
+
+    {selected && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" onMouseDown={(e)=>{if(e.target===e.currentTarget)setSelected(null)}}><section className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-white/10 bg-[#0b0b0d] p-6 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] uppercase tracking-[.2em] text-red-500">Detalle de ejecución</p><h2 className="mt-2 text-xl font-semibold text-white">{modulesById.get(selected.module_id)?.name ?? selected.module_key}</h2><p className="mt-1 font-mono text-[11px] text-zinc-600">{selected.id}</p></div><button onClick={()=>setSelected(null)} className="flex size-9 items-center justify-center rounded-xl border border-white/10 text-zinc-400 hover:text-white"><XCircle size={17}/></button></div><div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><Detail label="Estado" value={statusLabel(selected.status)}/><Detail label="Motor" value={engineLabel(selected.engine)}/><Detail label="Usuario" value={selected.user_id?`#${selected.user_id}`:"Administrador"}/><Detail label="Duración" value={formatDuration(selected.duration_ms)}/></div><div className="mt-6"><h3 className="text-sm font-semibold text-white">Pasos</h3><div className="mt-3 space-y-2">{selected.steps.map((step)=><div key={step.step_key} className="rounded-2xl border border-white/6 bg-black/20 p-4"><div className="flex justify-between gap-4"><div><p className="text-sm text-white">{step.step_name}</p><p className="mt-1 text-xs text-zinc-600">{step.step_type} · {step.step_key}</p></div><span className={`h-fit rounded-full border px-2.5 py-1 text-[10px] uppercase ${statusClass(step.status)}`}>{statusLabel(step.status)}</span></div>{step.error&&<p className="mt-3 text-xs text-red-300">{step.error}</p>}</div>)}</div></div><div className="mt-6"><h3 className="text-sm font-semibold text-white">Registro</h3><div className="mt-3 max-h-60 space-y-2 overflow-auto rounded-2xl border border-white/6 bg-black/30 p-4 font-mono text-[11px]">{selected.logs.length?selected.logs.map((log,index)=><p key={`${log.timestamp}-${index}`} className={log.level==="error"?"text-red-300":log.level==="warning"?"text-amber-300":"text-zinc-500"}>[{formatDate(log.timestamp)}] {log.message}</p>):<p className="text-zinc-600">Sin eventos registrados.</p>}</div></div></section></div>}
+  </div>;
 }
 
-export default function TryOnJobsPage() {
-  const [jobs, setJobs] = useState<
-    TryOnJobSummary[]
-  >([]);
-
-  const [page, setPage] = useState(0);
-
-  const [search, setSearch] =
-    useState("");
-
-  const [statusFilter, setStatusFilter] =
-    useState("");
-
-  const [itemTypeFilter, setItemTypeFilter] =
-    useState("");
-
-  const [qualityFilter, setQualityFilter] =
-    useState("");
-
-  const [isLoading, setIsLoading] =
-    useState(true);
-
-  const [errorMessage, setErrorMessage] =
-    useState<string | null>(null);
-
-  const loadJobs = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
-
-    try {
-      const skip = page * PAGE_SIZE;
-
-      const response =
-        await browserApiRequest<
-          TryOnJobSummary[]
-        >(
-          `/api/admin/tryon-jobs?skip=${skip}&limit=${PAGE_SIZE}`,
-        );
-
-      setJobs(response);
-    } catch (error) {
-      setJobs([]);
-
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "No fue posible cargar los trabajos Try-On.",
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, [page]);
-
-  useEffect(() => {
-    void loadJobs();
-  }, [loadJobs]);
-
-  const statuses = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          jobs.map((job) => job.status),
-        ),
-      ).sort(),
-    [jobs],
-  );
-
-  const itemTypes = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          jobs.map((job) => job.item_type),
-        ),
-      ).sort(),
-    [jobs],
-  );
-
-  const qualityModes = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          jobs.map((job) => job.quality_mode),
-        ),
-      ).sort(),
-    [jobs],
-  );
-
-  const visibleJobs = useMemo(
-    () =>
-      jobs.filter((job) => {
-        if (
-          statusFilter &&
-          job.status !== statusFilter
-        ) {
-          return false;
-        }
-
-        if (
-          itemTypeFilter &&
-          job.item_type !== itemTypeFilter
-        ) {
-          return false;
-        }
-
-        if (
-          qualityFilter &&
-          job.quality_mode !== qualityFilter
-        ) {
-          return false;
-        }
-
-        return matchesSearch(job, search);
-      }),
-    [
-      jobs,
-      search,
-      statusFilter,
-      itemTypeFilter,
-      qualityFilter,
-    ],
-  );
-
-  const clearFilters = () => {
-    setSearch("");
-    setStatusFilter("");
-    setItemTypeFilter("");
-    setQualityFilter("");
-  };
-
-  return (
-    <div>
-      <TryOnModuleHeader
-        title="Trabajos Try-On"
-        description="Listado administrativo real de trabajos. El backend actualmente permite paginación mediante skip y limit; la búsqueda y los filtros se aplican sobre la página cargada."
-      />
-
-      <section className="luxia-panel mt-7 overflow-hidden rounded-3xl">
-        <div className="border-b border-white/6 p-5">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div className="relative w-full max-w-xl">
-              <Search
-                size={17}
-                className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-zinc-700"
-              />
-
-              <input
-                type="search"
-                value={search}
-                onChange={(event) =>
-                  setSearch(
-                    event.target.value,
-                  )
-                }
-                placeholder="Buscar por ID, usuario, workflow, RunPod o error..."
-                className="h-11 w-full rounded-xl border border-white/7 bg-black/30 pr-4 pl-11 text-sm text-white outline-none placeholder:text-zinc-700 focus:border-red-500/40"
-              />
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <select
-                value={statusFilter}
-                onChange={(event) =>
-                  setStatusFilter(
-                    event.target.value,
-                  )
-                }
-                className="h-11 rounded-xl border border-white/7 bg-[#09090a] px-3 text-sm text-zinc-300"
-              >
-                <option value="">
-                  Todos los estados
-                </option>
-
-                {statuses.map((status) => (
-                  <option
-                    key={status}
-                    value={status}
-                  >
-                    {status}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={itemTypeFilter}
-                onChange={(event) =>
-                  setItemTypeFilter(
-                    event.target.value,
-                  )
-                }
-                className="h-11 rounded-xl border border-white/7 bg-[#09090a] px-3 text-sm text-zinc-300"
-              >
-                <option value="">
-                  Todos los artículos
-                </option>
-
-                {itemTypes.map((itemType) => (
-                  <option
-                    key={itemType}
-                    value={itemType}
-                  >
-                    {itemType}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={qualityFilter}
-                onChange={(event) =>
-                  setQualityFilter(
-                    event.target.value,
-                  )
-                }
-                className="h-11 rounded-xl border border-white/7 bg-[#09090a] px-3 text-sm text-zinc-300"
-              >
-                <option value="">
-                  Todas las calidades
-                </option>
-
-                {qualityModes.map(
-                  (qualityMode) => (
-                    <option
-                      key={qualityMode}
-                      value={qualityMode}
-                    >
-                      {qualityMode}
-                    </option>
-                  ),
-                )}
-              </select>
-
-              <button
-                type="button"
-                onClick={clearFilters}
-                title="Limpiar filtros"
-                className="flex size-11 items-center justify-center rounded-xl border border-white/7 bg-white/[0.025] text-zinc-500 transition hover:text-white"
-              >
-                <SlidersHorizontal size={17} />
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  void loadJobs()
-                }
-                disabled={isLoading}
-                className="flex h-11 items-center gap-2 rounded-xl border border-white/7 bg-white/[0.025] px-4 text-sm text-zinc-400 transition hover:text-white disabled:opacity-50"
-              >
-                <RefreshCcw
-                  size={16}
-                  className={
-                    isLoading
-                      ? "animate-spin"
-                      : undefined
-                  }
-                />
-
-                Actualizar
-              </button>
-            </div>
-          </div>
-
-          <p className="mt-4 text-xs text-zinc-700">
-            Página {page + 1} ·{" "}
-            {jobs.length} registros cargados ·{" "}
-            {visibleJobs.length} visibles
-          </p>
-        </div>
-
-        {isLoading && (
-          <div className="flex min-h-96 items-center justify-center">
-            <div className="text-center">
-              <LoaderCircle className="mx-auto animate-spin text-red-500" />
-
-              <p className="mt-4 text-sm text-zinc-500">
-                Cargando trabajos Try-On...
-              </p>
-            </div>
-          </div>
-        )}
-
-        {!isLoading && errorMessage && (
-          <div className="p-6">
-            <TryOnEmptyState
-              error
-              title="No se pudo cargar el listado"
-              description={errorMessage}
-            />
-          </div>
-        )}
-
-        {!isLoading &&
-          !errorMessage &&
-          visibleJobs.length === 0 && (
-            <div className="p-6">
-              <TryOnEmptyState
-                title="No hay trabajos para mostrar"
-                description={
-                  jobs.length === 0
-                    ? "El backend respondió correctamente, pero esta página no contiene trabajos Try-On."
-                    : "Ningún trabajo de la página cargada coincide con los filtros actuales."
-                }
-              />
-            </div>
-          )}
-
-        {!isLoading &&
-          !errorMessage &&
-          visibleJobs.length > 0 && (
-            <>
-              <div className="hidden overflow-x-auto xl:block">
-                <table className="w-full min-w-[1480px]">
-                  <thead>
-                    <tr className="border-b border-white/6 text-left">
-                      {[
-                        "Job",
-                        "Usuario",
-                        "Artículo",
-                        "Calidad",
-                        "Estado",
-                        "Archivos",
-                        "Tokens",
-                        "GPU",
-                        "Workflow",
-                        "Creado",
-                        "",
-                      ].map((label) => (
-                        <th
-                          key={label}
-                          className="px-5 py-4 text-[10px] font-semibold tracking-[0.18em] text-zinc-700 uppercase"
-                        >
-                          {label}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {visibleJobs.map((job) => (
-                      <tr
-                        key={job.id}
-                        className="border-b border-white/5 transition hover:bg-white/[0.018]"
-                      >
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-red-500/15 bg-red-950/20 text-red-400">
-                              <Sparkles size={17} />
-                            </div>
-
-                            <div>
-                              <p className="text-sm font-medium text-zinc-200">
-                                #{job.id}
-                              </p>
-
-                              {job.runpod_job_id && (
-                                <p className="mt-1 max-w-40 truncate font-mono text-[10px] text-zinc-700">
-                                  {job.runpod_job_id}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-2 text-sm text-zinc-400">
-                            <UserRound size={15} />
-                            #{job.user_id}
-                          </div>
-                        </td>
-
-                        <td className="px-5 py-4 text-sm text-zinc-400">
-                          {job.item_type}
-                        </td>
-
-                        <td className="px-5 py-4 text-sm text-zinc-400">
-                          {job.quality_mode}
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <TryOnJobStatusBadge
-                            status={job.status}
-                          />
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <div className="space-y-1 text-[11px] text-zinc-600">
-                            <p>
-                              Persona:{" "}
-                              {job.person_image_file_id}
-                            </p>
-
-                            <p>
-                              Artículo:{" "}
-                              {job.item_image_file_id}
-                            </p>
-
-                            <p>
-                              Resultado:{" "}
-                              {job.result_file_id ??
-                                "Pendiente"}
-                            </p>
-                          </div>
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-2 text-sm text-zinc-300">
-                            <Coins
-                              size={15}
-                              className="text-red-400"
-                            />
-                            {job.tokens_cost.toLocaleString(
-                              "es-MX",
-                            )}
-                          </div>
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <div className="space-y-1 text-[11px] text-zinc-600">
-                            <p>
-                              Real:{" "}
-                              {formatTryOnDuration(
-                                job.actual_gpu_seconds,
-                              )}
-                            </p>
-
-                            <p>
-                              {formatTryOnMoneyFromCents(
-                                job.actual_gpu_cost_cents,
-                              )}
-                            </p>
-                          </div>
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <p className="max-w-48 truncate text-xs text-zinc-500">
-                            {job.comfy_workflow_name ??
-                              "No asignado"}
-                          </p>
-                        </td>
-
-                        <td className="px-5 py-4 text-xs text-zinc-600">
-                          {formatTryOnDate(
-                            job.created_at,
-                          )}
-                        </td>
-
-                        <td className="px-5 py-4 text-right">
-                          <Link
-                            href={`/dashboard/tryon/jobs/${job.id}`}
-                            className="inline-flex h-9 items-center gap-2 rounded-xl border border-white/7 bg-white/[0.025] px-3 text-xs text-zinc-400 transition hover:border-red-500/15 hover:bg-red-950/20 hover:text-white"
-                          >
-                            <Eye size={14} />
-                            Ver
-                          </Link>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="divide-y divide-white/6 xl:hidden">
-                {visibleJobs.map((job) => (
-                  <article
-                    key={job.id}
-                    className="p-5"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-red-500/15 bg-red-950/20 text-red-400">
-                        <Sparkles size={18} />
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium text-white">
-                            Job #{job.id}
-                          </p>
-
-                          <TryOnJobStatusBadge
-                            status={job.status}
-                          />
-                        </div>
-
-                        <p className="mt-2 text-xs text-zinc-600">
-                          Usuario #{job.user_id} ·{" "}
-                          {job.item_type} ·{" "}
-                          {job.quality_mode}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
-                      <div className="rounded-xl border border-white/6 bg-black/20 p-3">
-                        <ImageIcon
-                          size={15}
-                          className="text-red-400"
-                        />
-
-                        <p className="mt-3 text-zinc-700">
-                          Resultado
-                        </p>
-
-                        <p className="mt-1 text-zinc-300">
-                          {job.result_file_id ??
-                            "Pendiente"}
-                        </p>
-                      </div>
-
-                      <div className="rounded-xl border border-white/6 bg-black/20 p-3">
-                        <Coins
-                          size={15}
-                          className="text-red-400"
-                        />
-
-                        <p className="mt-3 text-zinc-700">
-                          Tokens
-                        </p>
-
-                        <p className="mt-1 text-zinc-300">
-                          {job.tokens_cost}
-                        </p>
-                      </div>
-
-                      <div className="rounded-xl border border-white/6 bg-black/20 p-3">
-                        <Cpu
-                          size={15}
-                          className="text-red-400"
-                        />
-
-                        <p className="mt-3 text-zinc-700">
-                          GPU
-                        </p>
-
-                        <p className="mt-1 text-zinc-300">
-                          {formatTryOnDuration(
-                            job.actual_gpu_seconds,
-                          )}
-                        </p>
-                      </div>
-
-                      <div className="rounded-xl border border-white/6 bg-black/20 p-3">
-                        <Sparkles
-                          size={15}
-                          className="text-red-400"
-                        />
-
-                        <p className="mt-3 text-zinc-700">
-                          Workflow
-                        </p>
-
-                        <p className="mt-1 truncate text-zinc-300">
-                          {job.comfy_workflow_name ??
-                            "No asignado"}
-                        </p>
-                      </div>
-                    </div>
-
-                    {job.error_message && (
-                      <p className="mt-4 rounded-xl border border-red-500/10 bg-red-950/10 p-3 text-xs leading-5 text-red-300">
-                        {job.error_message}
-                      </p>
-                    )}
-
-                    <Link
-                      href={`/dashboard/tryon/jobs/${job.id}`}
-                      className="mt-4 flex h-10 items-center justify-center gap-2 rounded-xl border border-white/7 bg-white/[0.025] text-sm text-zinc-400"
-                    >
-                      <Eye size={15} />
-                      Abrir detalle
-                    </Link>
-                  </article>
-                ))}
-              </div>
-            </>
-          )}
-
-        <footer className="flex items-center justify-between border-t border-white/6 p-5">
-          <p className="text-xs text-zinc-700">
-            Registros del backend: skip{" "}
-            {page * PAGE_SIZE}, limit{" "}
-            {PAGE_SIZE}
-          </p>
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={
-                page === 0 || isLoading
-              }
-              onClick={() =>
-                setPage((current) =>
-                  Math.max(
-                    current - 1,
-                    0,
-                  ),
-                )
-              }
-              className="flex size-10 items-center justify-center rounded-xl border border-white/7 bg-white/[0.025] text-zinc-500 disabled:opacity-30"
-            >
-              <ChevronLeft size={17} />
-            </button>
-
-            <button
-              type="button"
-              disabled={
-                jobs.length < PAGE_SIZE ||
-                isLoading
-              }
-              onClick={() =>
-                setPage(
-                  (current) =>
-                    current + 1,
-                )
-              }
-              className="flex size-10 items-center justify-center rounded-xl border border-white/7 bg-white/[0.025] text-zinc-500 disabled:opacity-30"
-            >
-              <ChevronRight size={17} />
-            </button>
-          </div>
-        </footer>
-      </section>
-    </div>
-  );
-}
+function Metric({label,value,icon:Icon}:{label:string;value:number;icon:React.ComponentType<{size?:number}>}){return <article className="luxia-panel rounded-2xl p-5"><div className="flex items-start justify-between"><div><p className="text-[10px] font-semibold uppercase tracking-[.18em] text-zinc-600">{label}</p><p className="mt-4 text-2xl font-semibold text-white">{value.toLocaleString("es-MX")}</p></div><div className="flex size-10 items-center justify-center rounded-xl border border-red-500/15 bg-red-950/15 text-red-400"><Icon size={18}/></div></div></article>}
+function Detail({label,value}:{label:string;value:string}){return <div className="rounded-2xl border border-white/6 bg-black/20 p-4"><p className="text-[10px] uppercase tracking-wider text-zinc-600">{label}</p><p className="mt-2 text-sm text-white">{value}</p></div>}

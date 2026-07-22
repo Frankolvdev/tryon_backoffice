@@ -15,14 +15,12 @@ import {
   Languages,
   LayoutDashboard,
   LifeBuoy,
-  ListRestart,
   PackageOpen,
   ReceiptText,
   ServerCog,
   Settings,
   ShieldCheck,
   SlidersHorizontal,
-  Sparkles,
   Users,
   Workflow,
 } from "lucide-react";
@@ -65,19 +63,9 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         icon: Users,
       },
       {
-        label: "Try-On",
-        href: "/dashboard/tryon",
-        icon: Sparkles,
-      },
-      {
-        label: "Trabajos de IA",
+        label: "Trabajos IA",
         href: "/dashboard/tryon/jobs",
         icon: Workflow,
-      },
-      {
-        label: "Procesos en segundo plano",
-        href: "/dashboard/background-processes",
-        icon: ListRestart,
       },
       {
         label: "Motor IA",
