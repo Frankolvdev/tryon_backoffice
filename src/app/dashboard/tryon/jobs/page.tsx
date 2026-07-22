@@ -100,12 +100,17 @@ export default function UnifiedAiJobsPage() {
 
       const [moduleResponse, executionResponse] = await Promise.all([
         browserApiRequest<GenerationModuleListResponse>("/api/admin/generation-modules?limit=500"),
-        browserApiRequest<ExecutionListResponse>(`/api/admin/generation-modules/execution-history?${params}`),
+        browserApiRequest<ExecutionListResponse>(`/api/admin/generation-module-executions?${params}`),
       ]);
-      setModules(moduleResponse.items);
-      setExecutions(executionResponse.items);
-      setTotal(executionResponse.total);
-      setExpandedModules((current) => current.size ? current : new Set(moduleResponse.items.map((item) => item.id)));
+      const moduleItems = Array.isArray(moduleResponse)
+        ? (moduleResponse as unknown as GenerationModule[])
+        : Array.isArray(moduleResponse.items)
+          ? moduleResponse.items
+          : [];
+      setModules(moduleItems);
+      setExecutions(Array.isArray(executionResponse.items) ? executionResponse.items : []);
+      setTotal(Number(executionResponse.total ?? 0));
+      setExpandedModules((current) => current.size ? current : new Set(moduleItems.map((item) => item.id)));
       setSelected((current) => {
         if (!current) return null;
         return executionResponse.items.find((item) => item.id === current.id) ?? current;
