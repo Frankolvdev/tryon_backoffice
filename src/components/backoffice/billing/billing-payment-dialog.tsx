@@ -75,6 +75,7 @@ export function BillingPaymentDialog({
     useState<BillingPaymentRefundRequest["reason"]>(
       "requested_by_customer",
     );
+  const [removeTokens, setRemoveTokens] = useState(true);
   const [isLoading, setIsLoading] =
     useState(true);
   const [action, setAction] =
@@ -148,13 +149,6 @@ export function BillingPaymentDialog({
   const refund = async () => {
     if (!payment) return;
 
-    if (payment.payment_type === "token_purchase") {
-      toast.error(
-        "Las compras de tokens deben reembolsarse desde Comercial → Tokens.",
-      );
-      return;
-    }
-
     const parsedAmount =
       refundAmount.trim()
         ? Number(refundAmount)
@@ -191,6 +185,7 @@ export function BillingPaymentDialog({
     const payload: BillingPaymentRefundRequest = {
       amount: parsedAmount,
       reason: refundReason,
+      remove_tokens: payment.payment_type === "token_purchase" ? removeTokens : undefined,
     };
 
     setAction("refund");

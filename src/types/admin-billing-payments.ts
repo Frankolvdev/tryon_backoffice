@@ -53,6 +53,7 @@ export interface BillingPaymentRefundRequest {
     | "duplicate"
     | "fraudulent"
     | "requested_by_customer";
+  remove_tokens?: boolean;
 }
 
 export interface BillingPaymentRefundResponse {

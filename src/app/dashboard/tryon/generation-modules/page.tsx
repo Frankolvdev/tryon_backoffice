@@ -86,7 +86,7 @@ export default function GenerationModulesPage() {
           const selectedCard = selected?.id === module.id;
           return <button key={module.id} onClick={() => setSelected(module)} className={`mb-2 w-full rounded-2xl border p-4 text-left transition ${active ? "border-emerald-500/25 bg-emerald-500/[.045] hover:border-emerald-400/45" : "border-red-500/25 bg-red-500/[.045] hover:border-red-400/45"} ${selectedCard ? active ? "ring-1 ring-emerald-400/55" : "ring-1 ring-red-400/55" : ""}`}>
             <div className="flex items-start justify-between gap-3"><p className="font-medium text-white">{module.name}</p><span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[.12em] ${active ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-300" : "border-red-500/25 bg-red-500/10 text-red-300"}`}><span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-emerald-400" : "bg-red-400"}`}/>{active ? "Activo" : "Inactivo"}</span></div>
-            <p className="mt-1 font-mono text-xs text-zinc-600">{module.key} · v{module.version}</p><div className="mt-3 flex gap-3 text-xs text-zinc-600"><span>{module.inputs.length} entradas</span><span>{module.steps.length} pasos</span><span>{module.outputs.length} salidas</span></div>
+            <div className="mt-3 flex gap-3 text-xs text-zinc-600"><span>{module.inputs.length} entradas</span><span>{module.steps.length} pasos</span><span>{module.outputs.length} salidas</span></div>
           </button>;
         })}</div>
       </section>
