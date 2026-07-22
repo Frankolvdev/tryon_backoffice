@@ -8,6 +8,9 @@ export type StorageProvider =
 export interface AdminStorageFile {
   id: number;
   user_id: number | null;
+  user_email: string | null;
+  user_full_name: string | null;
+  user_role: string | null;
   provider: StorageProvider;
   bucket: string | null;
   object_key: string;
