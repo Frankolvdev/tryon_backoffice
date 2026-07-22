@@ -27,7 +27,7 @@ export interface GenerationModule {
   created_at: string; updated_at: string;
 }
 export interface GenerationModuleListResponse { items: GenerationModule[]; total: number; skip: number; limit: number; }
-export interface WorkflowInputBinding { module_input_key: string; node_id: string; input_field: string; }
+export interface WorkflowInputBinding { module_input_key?: string | null; source_path?: string | null; node_id: string; input_field: string; }
 export interface WorkflowOutputBinding { module_output_key: string; node_id: string; }
 
 export type GenerationExecutionStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
@@ -40,5 +40,3 @@ export interface GenerationRuntimeHealth { simulated: GenerationRuntimeHealthIte
 
 export interface PipelinePort { key: string; label: string; type: string; source: string; path: string; }
 export interface PipelineConnectionSuggestion { targetKey: string; sourcePath: string; confidence: "exact" | "type" | "fallback"; }
-
-export interface PythonSourceAnalysis { valid: boolean; entrypoint_found: boolean; input_keys: string[]; output_keys: string[]; warnings: string[]; }

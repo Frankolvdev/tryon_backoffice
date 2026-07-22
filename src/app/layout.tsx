@@ -3,6 +3,7 @@ import { AppProviders } from "@/components/providers/app-providers";
 import { appConfig } from "@/config/app";
 
 import "./globals.css";
+import "@xyflow/react/dist/style.css";
 
 export const metadata: Metadata = {
   title: {
