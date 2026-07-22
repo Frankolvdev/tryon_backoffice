@@ -58,6 +58,25 @@ const compatibleTypes = (source: string, target: string) => {
   return false;
 };
 
+const handleId = (nodeId: string, side: "input" | "output", portId: string) =>
+  `handle__${encodeURIComponent(nodeId)}__${side}__${encodeURIComponent(portId)}`;
+
+const edgeId = (
+  source: string,
+  sourceHandle: string,
+  target: string,
+  targetHandle: string,
+) => `edge__${encodeURIComponent(source)}__${encodeURIComponent(sourceHandle)}__${encodeURIComponent(target)}__${encodeURIComponent(targetHandle)}`;
+
+const uniquePorts = (ports: Port[]) => {
+  const seen = new Set<string>();
+  return ports.filter((port) => {
+    if (!port.id || seen.has(port.id)) return false;
+    seen.add(port.id);
+    return true;
+  });
+};
+
 function NodeCard({ id, data, selected }: NodeProps<FlowNode>) {
   const updateNodeInternals = useUpdateNodeInternals();
 
@@ -91,7 +110,7 @@ function NodeCard({ id, data, selected }: NodeProps<FlowNode>) {
           {data.inputs.map((port) => (
             <div key={port.id} className="relative min-h-6 rounded-md bg-white/[.025] py-1 pl-3 pr-1 text-left text-[11px] text-zinc-300">
               <Handle
-                id={`in:${port.id}`}
+                id={handleId(id, "input", port.id)}
                 type="target"
                 position={Position.Left}
                 className="!h-3 !w-3 !border-2 !border-zinc-200 !bg-zinc-900"
@@ -109,7 +128,7 @@ function NodeCard({ id, data, selected }: NodeProps<FlowNode>) {
               <span className="block truncate">{port.label}</span>
               <small className="text-[9px] uppercase text-zinc-600">{port.type}</small>
               <Handle
-                id={`out:${port.id}`}
+                id={handleId(id, "output", port.id)}
                 type="source"
                 position={Position.Right}
                 className="!h-3 !w-3 !border-2 !border-zinc-200 !bg-zinc-900"
@@ -136,19 +155,19 @@ function configuredPorts(step: GenerationModuleStep, side: "input" | "output"): 
   const config = step.configuration ?? {};
   const raw = (config[side === "input" ? "input_ports" : "output_ports"] ?? []) as GenerationNodePort[];
   if (raw.length) {
-    return raw.map((port) => ({
+    return uniquePorts(raw.map((port) => ({
       id: port.id,
       label: port.label || port.id,
       type: port.data_type || "auto",
       path: side === "output" ? `${step.key}.${port.id}` : "",
       nodeId: port.node_id,
       field: port.field,
-    }));
+    })));
   }
 
   if (step.step_type === "workflow") {
     const bindings = (config[side === "input" ? "input_bindings" : "output_bindings"] ?? []) as Array<Record<string, unknown>>;
-    return bindings.map((binding, index) => {
+    return uniquePorts(bindings.map((binding, index) => {
       const id = String(binding.port_id ?? binding.input_field ?? binding.module_output_key ?? `${side}_${index + 1}`);
       return {
         id,
@@ -158,16 +177,16 @@ function configuredPorts(step: GenerationModuleStep, side: "input" | "output"): 
         nodeId: String(binding.node_id ?? ""),
         field: String(binding.input_field ?? ""),
       };
-    });
+    }));
   }
 
   const mapping = side === "input" ? step.input_mapping : step.output_mapping;
-  return Object.keys(mapping ?? {}).map((id) => ({
+  return uniquePorts(Object.keys(mapping ?? {}).map((id) => ({
     id,
     label: id,
     type: "auto",
     path: side === "output" ? `${step.key}.${id}` : "",
-  }));
+  })));
 }
 
 export function GenerationNodeCanvas({
@@ -204,12 +223,12 @@ export function GenerationNodeCanvas({
         kind: "assets",
         enabled: true,
         inputs: [],
-        outputs: module.inputs.map((input) => ({
+        outputs: uniquePorts(module.inputs.map((input) => ({
           id: input.key,
           label: input.name || input.key,
           type: input.input_type,
           path: input.key,
-        })),
+        }))),
       },
     }];
 
@@ -241,7 +260,7 @@ export function GenerationNodeCanvas({
         subtitle: "Resultado final obligatorio",
         kind: "output",
         enabled: true,
-        inputs: (module.outputs.length ? module.outputs : [{
+        inputs: uniquePorts((module.outputs.length ? module.outputs : [{
           key: "output",
           name: "Resultado final",
           output_type: "image",
@@ -252,7 +271,7 @@ export function GenerationNodeCanvas({
           label: output.name || output.key,
           type: output.output_type,
           path: output.source_path ?? "",
-        })),
+        }))),
         outputs: [],
       },
     });
@@ -267,7 +286,13 @@ export function GenerationNodeCanvas({
   }, [module.steps]);
 
   const buildEdges = useCallback((): Edge[] => {
-    const edges: Edge[] = [];
+    // Cada input admite una sola conexión. Usar un Map elimina bindings
+    // históricos duplicados antes de entregar los edges a React Flow.
+    const edgesByTarget = new Map<string, Edge>();
+    const registerEdge = (edge: Edge) => {
+      const key = `${edge.target}::${edge.targetHandle ?? ""}`;
+      edgesByTarget.set(key, edge);
+    };
     for (const step of module.steps) {
       const ports = configuredPorts(step, "input");
       if (step.step_type === "python") {
@@ -275,7 +300,11 @@ export function GenerationNodeCanvas({
           const path = String(step.input_mapping?.[port.id] ?? "");
           const source = sourceForPath(path);
           if (!source) continue;
-          edges.push({ id: `${source.node}-${step.id}-${port.id}`, source: source.node, target: `step:${step.id}`, sourceHandle: `out:${source.handle}`, targetHandle: `in:${port.id}`, animated: true, deletable: true });
+          {
+            const sourceHandle = handleId(source.node, "output", source.handle);
+            const targetHandle = handleId(`step:${step.id}`, "input", port.id);
+            registerEdge({ id: edgeId(source.node, sourceHandle, `step:${step.id}`, targetHandle), source: source.node, target: `step:${step.id}`, sourceHandle, targetHandle, animated: true, deletable: true });
+          }
         }
       } else {
         const bindings = (step.configuration?.input_bindings ?? []) as Array<Record<string, unknown>>;
@@ -284,7 +313,11 @@ export function GenerationNodeCanvas({
           const path = String(binding.source_path ?? binding.module_input_key ?? "");
           const source = sourceForPath(path);
           if (!portId || !source) continue;
-          edges.push({ id: `${source.node}-${step.id}-${portId}`, source: source.node, target: `step:${step.id}`, sourceHandle: `out:${source.handle}`, targetHandle: `in:${portId}`, animated: true, deletable: true });
+          {
+            const sourceHandle = handleId(source.node, "output", source.handle);
+            const targetHandle = handleId(`step:${step.id}`, "input", portId);
+            registerEdge({ id: edgeId(source.node, sourceHandle, `step:${step.id}`, targetHandle), source: source.node, target: `step:${step.id}`, sourceHandle, targetHandle, animated: true, deletable: true });
+          }
         }
       }
     }
@@ -292,9 +325,13 @@ export function GenerationNodeCanvas({
     for (const output of module.outputs) {
       const source = sourceForPath(String(output.source_path ?? ""));
       if (!source || source.node === "assets") continue;
-      edges.push({ id: `output-${output.key}-${source.node}`, source: source.node, target: "output", sourceHandle: `out:${source.handle}`, targetHandle: `in:${output.key}`, animated: true, deletable: true });
+      {
+        const sourceHandle = handleId(source.node, "output", source.handle);
+        const targetHandle = handleId("output", "input", output.key);
+        registerEdge({ id: edgeId(source.node, sourceHandle, "output", targetHandle), source: source.node, target: "output", sourceHandle, targetHandle, animated: true, deletable: true });
+      }
     }
-    return edges;
+    return [...edgesByTarget.values()];
   }, [module.outputs, module.steps, sourceForPath]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(buildNodes());
@@ -305,11 +342,15 @@ export function GenerationNodeCanvas({
     setEdges(buildEdges());
   }, [buildEdges, buildNodes, setEdges, setNodes]);
 
-  const findPort = useCallback((nodeId: string | null, handleId: string | null, side: "input" | "output") => {
+  const findPort = useCallback((nodeId: string | null, candidateHandleId: string | null, side: "input" | "output") => {
+    if (!nodeId || !candidateHandleId) return undefined;
     const node = nodes.find((item) => item.id === nodeId);
-    const id = handleId?.replace(side === "input" ? "in:" : "out:", "") ?? "";
-    return (side === "input" ? node?.data.inputs : node?.data.outputs)?.find((port) => port.id === id);
+    const ports = side === "input" ? node?.data.inputs : node?.data.outputs;
+    return ports?.find((port) => handleId(nodeId, side, port.id) === candidateHandleId);
   }, [nodes]);
+
+  const findPortId = useCallback((nodeId: string, candidateHandleId: string | null, side: "input" | "output") =>
+    findPort(nodeId, candidateHandleId, side)?.id ?? "", [findPort]);
 
   const outputsPayload = useCallback((override: Record<string, string | null>) => {
     const definitions = module.outputs.length ? module.outputs : [{
@@ -326,14 +367,14 @@ export function GenerationNodeCanvas({
     try {
       let updated: GenerationModule;
       if (edge.target === "output") {
-        const key = edge.targetHandle?.replace("in:", "") ?? "";
+        const key = findPortId("output", edge.targetHandle ?? null, "input");
         updated = await browserApiRequest<GenerationModule>(`/api/admin/generation-modules/${module.id}`, {
           method: "PATCH",
           body: JSON.stringify({ outputs: outputsPayload({ [key]: null }) }),
         });
       } else {
         const target = module.steps.find((step) => `step:${step.id}` === edge.target);
-        const portId = edge.targetHandle?.replace("in:", "") ?? "";
+        const portId = findPortId(edge.target, edge.targetHandle ?? null, "input");
         if (!target) return;
         if (target.step_type === "python") {
           const mapping = { ...(target.input_mapping ?? {}) };
@@ -356,7 +397,7 @@ export function GenerationNodeCanvas({
       setEdges(buildEdges());
       toast.error(error instanceof Error ? error.message : "No se pudo desconectar.");
     }
-  }, [buildEdges, module.id, module.steps, onModule, outputsPayload, setEdges]);
+  }, [buildEdges, findPortId, module.id, module.steps, onModule, outputsPayload, setEdges]);
 
   const onConnect = useCallback(async (connection: Connection) => {
     const sourcePort = findPort(connection.source, connection.sourceHandle, "output");
@@ -404,7 +445,16 @@ export function GenerationNodeCanvas({
           });
         }
       }
-      setEdges((current) => addEdge({ ...connection, animated: true, deletable: true }, current.filter((edge) => !(edge.target === connection.target && edge.targetHandle === connection.targetHandle))));
+      setEdges((current) => {
+        if (!connection.source || !connection.target || !connection.sourceHandle || !connection.targetHandle) return current;
+        const next = current.filter((edge) => !(edge.target === connection.target && edge.targetHandle === connection.targetHandle));
+        return addEdge({
+          ...connection,
+          id: edgeId(connection.source, connection.sourceHandle, connection.target, connection.targetHandle),
+          animated: true,
+          deletable: true,
+        }, next);
+      });
       onModule(updated);
       toast.success("Conexión guardada.");
     } catch (error) {
