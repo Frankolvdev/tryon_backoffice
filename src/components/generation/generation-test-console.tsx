@@ -112,20 +112,21 @@ export function GenerationTestConsole({ module }: { module: GenerationModule }) 
         </aside>
       </div>
 
-      {execution && terminal && (
-        <section className="overflow-hidden rounded-2xl border border-emerald-500/20 bg-emerald-500/[.035]">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-500/15 px-5 py-4">
-            <div className="flex items-center gap-3">
-              <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-300"><CheckCircle2 size={18} /></div>
-              <div><h3 className="font-semibold text-white">Resultados de la prueba</h3><p className="mt-0.5 text-xs text-zinc-500">Salidas finales entregadas por el nodo Output.</p></div>
-            </div>
-            {execution.duration_ms != null && <span className="text-xs text-zinc-500">Duración: {(execution.duration_ms / 1000).toFixed(2)} s</span>}
+      <section className="overflow-hidden rounded-2xl border border-white/8 bg-black/20">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/7 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-300"><CheckCircle2 size={18} /></div>
+            <div><h3 className="font-semibold text-white">Resultados de la prueba</h3><p className="mt-0.5 text-xs text-zinc-500">Las salidas finales del nodo Output aparecerán aquí.</p></div>
           </div>
-          <div className="p-5">
-            {hasOutputs ? <GenerationResults outputs={visibleOutputs} /> : <p className="rounded-xl border border-amber-500/15 bg-amber-500/[.04] p-4 text-sm text-amber-200">La ejecución terminó, pero el nodo Output no devolvió resultados visibles. Revisa sus conexiones y los logs del monitor.</p>}
-          </div>
-        </section>
-      )}
+          {execution?.duration_ms != null && <span className="text-xs text-zinc-500">Duración: {(execution.duration_ms / 1000).toFixed(2)} s</span>}
+        </div>
+        <div className="p-5">
+          {!execution && <p className="rounded-xl border border-white/7 bg-white/[.02] p-4 text-sm text-zinc-500">Ejecuta una prueba para visualizar aquí sus imágenes, archivos y demás resultados.</p>}
+          {execution && !terminal && <p className="rounded-xl border border-blue-500/15 bg-blue-500/[.04] p-4 text-sm text-blue-200">La ejecución sigue en proceso. Los resultados se mostrarán automáticamente al finalizar.</p>}
+          {execution && terminal && hasOutputs && <GenerationResults outputs={visibleOutputs} />}
+          {execution && terminal && !hasOutputs && <p className="rounded-xl border border-amber-500/15 bg-amber-500/[.04] p-4 text-sm text-amber-200">La ejecución terminó, pero el nodo Output no devolvió resultados visibles. Revisa sus conexiones y los logs del monitor.</p>}
+        </div>
+      </section>
     </section>
   );
 }

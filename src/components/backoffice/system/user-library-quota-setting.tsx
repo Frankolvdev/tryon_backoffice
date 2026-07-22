@@ -43,7 +43,7 @@ export function UserLibraryQuotaSetting() {
   }
 
   return (
-    <section className="luxia-panel mb-6 rounded-3xl p-6">
+    <article className="rounded-2xl border border-white/7 bg-white/[0.025] p-5 lg:col-span-2 2xl:col-span-3">
       <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
         <div className="flex gap-4">
           <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-red-500/15 bg-red-950/25 text-red-300"><Database size={19}/></div>
@@ -62,6 +62,6 @@ export function UserLibraryQuotaSetting() {
           </button>
         </div>
       </div>
-    </section>
+    </article>
   );
 }

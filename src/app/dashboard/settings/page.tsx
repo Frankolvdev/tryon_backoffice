@@ -230,7 +230,6 @@ export default function SystemSettingsPage() {
 
   return (
     <div>
-      <UserLibraryQuotaSetting />
       <section className="luxia-panel overflow-hidden rounded-3xl">
         <div className="border-b border-white/6 p-6">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
@@ -442,6 +441,9 @@ export default function SystemSettingsPage() {
                         }
                       />
                     ),
+                  )}
+                  {(category === "all" || category === "storage") && !search.trim() && (
+                    <UserLibraryQuotaSetting />
                   )}
                 </div>
               ) : (
