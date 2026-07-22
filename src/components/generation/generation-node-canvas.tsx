@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   Background,
   Controls,
@@ -73,6 +73,9 @@ const handleId = (side: "input" | "output", portId: string) =>
 // estable y única del wire. Esto también evita keys duplicadas en React.
 const edgeId = (target: string, targetHandle: string) =>
   `edge__${safePortToken(target)}__${safePortToken(targetHandle)}`;
+
+const edgeTargetKey = (target: string, targetHandle: string | null | undefined) =>
+  `${target}::${targetHandle ?? ""}`;
 
 const uniquePorts = (ports: Port[]) => {
   const seen = new Set<string>();
@@ -353,13 +356,27 @@ export function GenerationNodeCanvas({
 
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(buildNodes());
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const pendingEdgesRef = useRef<Map<string, Edge>>(new Map());
 
   useEffect(() => {
     // Primero se renderizan los nodos y sus Handles. Los edges se incorporan
     // en el siguiente frame, cuando React Flow ya registró los puertos.
     setNodes(buildNodes());
     const frame = requestAnimationFrame(() => {
-      setEdges(buildEdges());
+      const persistedEdges = buildEdges();
+      const persistedTargets = new Set(
+        persistedEdges.map((edge) => edgeTargetKey(edge.target, edge.targetHandle)),
+      );
+
+      // Una conexión recién guardada puede tardar un render en aparecer en el
+      // modelo recibido por el padre. La conservamos visualmente hasta que la
+      // respuesta persistida ya la contenga, evitando que el efecto la borre.
+      for (const key of persistedTargets) pendingEdgesRef.current.delete(key);
+      const pendingEdges = [...pendingEdgesRef.current.entries()]
+        .filter(([key]) => !persistedTargets.has(key))
+        .map(([, edge]) => edge);
+
+      setEdges([...persistedEdges, ...pendingEdges]);
     });
     return () => cancelAnimationFrame(frame);
   }, [buildEdges, buildNodes, setEdges, setNodes]);
@@ -413,6 +430,7 @@ export function GenerationNodeCanvas({
           });
         }
       }
+      pendingEdgesRef.current.delete(edgeTargetKey(edge.target, edge.targetHandle));
       onModule(updated);
       toast.success("Conexión eliminada.");
     } catch (error) {
@@ -467,16 +485,25 @@ export function GenerationNodeCanvas({
           });
         }
       }
-      setEdges((current) => {
-        if (!connection.source || !connection.target || !connection.sourceHandle || !connection.targetHandle) return current;
-        const next = current.filter((edge) => !(edge.target === connection.target && edge.targetHandle === connection.targetHandle));
-        return addEdge({
-          ...connection,
+      if (connection.source && connection.target && connection.sourceHandle && connection.targetHandle) {
+        const optimisticEdge: Edge = {
           id: edgeId(connection.target, connection.targetHandle),
+          source: connection.source,
+          target: connection.target,
+          sourceHandle: connection.sourceHandle,
+          targetHandle: connection.targetHandle,
           animated: true,
           deletable: true,
-        }, next);
-      });
+        };
+        const targetKey = edgeTargetKey(connection.target, connection.targetHandle);
+        pendingEdgesRef.current.set(targetKey, optimisticEdge);
+        setEdges((current) => {
+          const next = current.filter(
+            (edge) => edgeTargetKey(edge.target, edge.targetHandle) !== targetKey,
+          );
+          return addEdge(optimisticEdge, next);
+        });
+      }
       onModule(updated);
       toast.success("Conexión guardada.");
     } catch (error) {
