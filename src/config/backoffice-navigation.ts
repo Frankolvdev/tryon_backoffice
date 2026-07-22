@@ -90,11 +90,6 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         icon: ServerCog,
       },
       {
-        label: "ComfyUI",
-        href: "/dashboard/tryon/integrations",
-        icon: Boxes,
-      },
-      {
         label: "Módulos de generación",
         href: "/dashboard/tryon/generation-modules",
         icon: Boxes,

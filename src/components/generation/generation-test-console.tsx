@@ -66,8 +66,14 @@ export function GenerationTestConsole({ module }: { module: GenerationModule }) 
   };
 
   const lastLog = useMemo(() => execution?.logs?.at(-1)?.message ?? "Sin eventos todavía.", [execution]);
-  const completed = execution?.status === "completed";
-  const hasOutputs = completed && execution.outputs && Object.keys(execution.outputs).length > 0;
+  const terminal = execution ? ["completed", "failed", "cancelled"].includes(execution.status) : false;
+  const visibleOutputs = useMemo(() => {
+    if (!execution) return {};
+    if (execution.outputs && Object.keys(execution.outputs).length > 0) return execution.outputs;
+    const finalStep = [...(execution.steps ?? [])].reverse().find((step) => step.outputs && Object.keys(step.outputs).length > 0);
+    return finalStep?.outputs ?? {};
+  }, [execution]);
+  const hasOutputs = Object.keys(visibleOutputs).length > 0;
 
   return (
     <section className="space-y-5">
@@ -106,7 +112,7 @@ export function GenerationTestConsole({ module }: { module: GenerationModule }) 
         </aside>
       </div>
 
-      {completed && (
+      {execution && terminal && (
         <section className="overflow-hidden rounded-2xl border border-emerald-500/20 bg-emerald-500/[.035]">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-500/15 px-5 py-4">
             <div className="flex items-center gap-3">
@@ -116,7 +122,7 @@ export function GenerationTestConsole({ module }: { module: GenerationModule }) 
             {execution.duration_ms != null && <span className="text-xs text-zinc-500">Duración: {(execution.duration_ms / 1000).toFixed(2)} s</span>}
           </div>
           <div className="p-5">
-            {hasOutputs ? <GenerationResults outputs={execution.outputs} /> : <p className="rounded-xl border border-amber-500/15 bg-amber-500/[.04] p-4 text-sm text-amber-200">La ejecución terminó, pero el nodo Output no devolvió resultados visibles.</p>}
+            {hasOutputs ? <GenerationResults outputs={visibleOutputs} /> : <p className="rounded-xl border border-amber-500/15 bg-amber-500/[.04] p-4 text-sm text-amber-200">La ejecución terminó, pero el nodo Output no devolvió resultados visibles. Revisa sus conexiones y los logs del monitor.</p>}
           </div>
         </section>
       )}

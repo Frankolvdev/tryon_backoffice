@@ -24,6 +24,8 @@ import { SystemSettingCard } from "@/components/backoffice/system/system-setting
 import { SystemStatusEditor } from "@/components/backoffice/system/system-status-editor";
 import { browserApiRequest } from "@/lib/api/browser-api";
 
+import { UserLibraryQuotaSetting } from "@/components/backoffice/system/user-library-quota-setting";
+
 import type {
   ConfigurationValidationResponse,
   SeedDefaultSettingsResponse,
@@ -228,6 +230,7 @@ export default function SystemSettingsPage() {
 
   return (
     <div>
+      <UserLibraryQuotaSetting />
       <section className="luxia-panel overflow-hidden rounded-3xl">
         <div className="border-b border-white/6 p-6">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
