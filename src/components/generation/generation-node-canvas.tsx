@@ -468,8 +468,16 @@ export function GenerationNodeCanvas({
             body: JSON.stringify({ input_mapping: { ...(target.input_mapping ?? {}), [targetPort.id]: sourcePath } }),
           });
         } else {
+          const targetNodeId = targetPort.nodeId ?? "";
+          const targetField = targetPort.field ?? targetPort.id;
           const current = ((target.configuration?.input_bindings ?? []) as Array<Record<string, unknown>>)
-            .filter((binding) => String(binding.port_id ?? binding.input_field ?? "") !== targetPort.id);
+            .filter((binding) => {
+              const samePort = String(binding.port_id ?? "") === targetPort.id;
+              const sameLegacyTarget =
+                String(binding.node_id ?? "") === targetNodeId &&
+                String(binding.input_field ?? "") === targetField;
+              return !samePort && !sameLegacyTarget;
+            });
           updated = await browserApiRequest<GenerationModule>(`/api/admin/generation-modules/${module.id}/steps/${target.id}/workflow-bindings`, {
             method: "PATCH",
             body: JSON.stringify({
@@ -477,8 +485,8 @@ export function GenerationNodeCanvas({
                 port_id: targetPort.id,
                 module_input_key: sourceStep ? null : sourcePort.id,
                 source_path: sourcePath,
-                node_id: targetPort.nodeId ?? "",
-                input_field: targetPort.field ?? targetPort.id,
+                node_id: targetNodeId,
+                input_field: targetField,
               }],
               output_bindings: target.configuration?.output_bindings ?? [],
             }),
