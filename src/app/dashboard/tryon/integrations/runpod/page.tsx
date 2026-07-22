@@ -23,7 +23,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { AiEngineTabs } from "@/components/backoffice/tryon/ai-engine-tabs";
 import { ComfyUIJsonResult } from "@/components/backoffice/tryon/comfyui-json-result";
 import { RunPodConfigEditor } from "@/components/backoffice/tryon/runpod-config-editor";
 import { TryOnEmptyState } from "@/components/backoffice/tryon/tryon-empty-state";
@@ -347,7 +346,6 @@ export default function RunPodDashboardPage() {
         description="Configuración Serverless, ejecuciones externas, envío manual, actualización de estado y cancelación."
       />
 
-      <AiEngineTabs />
 
       <div className="mt-6 flex flex-wrap justify-end gap-3">
         <button

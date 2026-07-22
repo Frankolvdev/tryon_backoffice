@@ -1,5 +1,4 @@
 import {
-  Boxes,
   Cpu,
   LayoutDashboard,
   Workflow,
@@ -31,19 +30,11 @@ export const tryOnSections: Array<
     icon: Workflow,
   },
   {
-    key: "workflows",
-    label: "Workflows",
-    description:
-      "Definiciones, versiones, validación y administración de workflows.",
-    href: "/dashboard/tryon/workflows",
-    icon: Boxes,
-  },
-  {
     key: "integrations",
     label: "Motor IA",
     description:
-      "ComfyUI, RunPod, Storage y monitoreo operativo del motor.",
-    href: "/dashboard/tryon/integrations",
+      "Proveedores disponibles y orden de respaldo del motor de inteligencia artificial.",
+    href: "/dashboard/tryon/integrations/providers",
     icon: Cpu,
   },
 ];

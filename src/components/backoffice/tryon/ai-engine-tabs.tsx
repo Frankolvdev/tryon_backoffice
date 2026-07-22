@@ -2,16 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-import {
-  Cpu,
-  Database,
-  Gauge,
-  Network,
-  FlaskConical,
-  Server,
-} from "lucide-react";
-
+import { Cpu, Database, Gauge, Network, FlaskConical } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const tabs = [
@@ -29,11 +20,6 @@ const tabs = [
     label: "ComfyUI",
     href: "/dashboard/tryon/integrations",
     icon: Cpu,
-  },
-  {
-    label: "RunPod",
-    href: "/dashboard/tryon/integrations/runpod",
-    icon: Server,
   },
   {
     label: "Storage",
@@ -54,8 +40,7 @@ export function AiEngineTabs() {
     <nav className="mt-6 flex flex-wrap gap-2">
       {tabs.map((tab) => {
         const Icon = tab.icon;
-        const active =
-          pathname === tab.href;
+        const active = pathname === tab.href;
 
         return (
           <Link

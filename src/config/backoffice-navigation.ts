@@ -6,7 +6,6 @@ import {
   Boxes,
   ChartNoAxesCombined,
   CircleDollarSign,
-  ClipboardList,
   Cpu,
   CreditCard,
   Database,
@@ -81,9 +80,14 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         icon: ListRestart,
       },
       {
+        label: "Motor IA",
+        href: "/dashboard/tryon/integrations/providers",
+        icon: Cpu,
+      },
+      {
         label: "RunPod",
         href: "/dashboard/tryon/integrations/runpod",
-        icon: Cpu,
+        icon: ServerCog,
       },
       {
         label: "ComfyUI",
@@ -94,11 +98,6 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         label: "Módulos de generación",
         href: "/dashboard/tryon/generation-modules",
         icon: Boxes,
-      },
-      {
-        label: "Workflows",
-        href: "/dashboard/tryon/workflows",
-        icon: ClipboardList,
       },
     ],
   },

@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { AiEngineTabs } from "@/components/backoffice/tryon/ai-engine-tabs";
 import { TryOnEmptyState } from "@/components/backoffice/tryon/tryon-empty-state";
 import { TryOnModuleHeader } from "@/components/backoffice/tryon/tryon-module-header";
 import { browserApiRequest } from "@/lib/api/browser-api";
@@ -187,7 +186,6 @@ export default function AiProvidersPage() {
         title="Proveedores de IA"
         description="Estado real, selección del motor y orden de respaldo para Simulado, ComfyUI Local y RunPod Serverless."
       />
-      <AiEngineTabs />
 
       {isLoading && (
         <section className="luxia-panel mt-5 flex min-h-72 items-center justify-center rounded-3xl">
