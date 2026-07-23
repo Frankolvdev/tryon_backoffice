@@ -1,6 +1,6 @@
 export interface RuntimeCustomNode { name: string; repository: string; commit: string | null; enabled: boolean; install_requirements: boolean; }
 export interface RuntimePythonDependency { package: string; version: string | null; enabled: boolean; }
-export interface RuntimeModelAsset { resolver?: {class_type:string;field:string;folders:string}; name: string; model_type: "checkpoint"|"vae"|"lora"|"controlnet"|"clip"|"upscaler"|"other"; source_url: string | null; target_path: string; sha256: string | null; strategy: "image"|"volume"|"startup-download"; enabled: boolean; }
+export interface RuntimeModelAsset { resolver?: {class_type:string;field:string;folders:string}; name: string; model_type: "checkpoint"|"vae"|"lora"|"controlnet"|"clip"|"upscaler"|"diffusion_model"|"embedding"|"detector"|"sam"|"ipadapter"|"video_model"|"other"; source_url: string | null; target_path: string; sha256: string | null; strategy: "image"|"volume"|"startup-download"; enabled: boolean; }
 export interface RuntimeEnvironmentVariable { key: string; value: string | null; secret: boolean; required: boolean; }
 export interface RuntimeVolume { name: string; mount_path: string; read_only: boolean; }
 export interface RuntimeBuilderConfig {
@@ -105,4 +105,8 @@ export interface RuntimeIntelligenceIndex {
   source_type:string; selected_path:string; comfyui_path:string; custom_node_roots:string[]; providers:RuntimeIntelligenceProvider[];
   classes:RuntimeIntelligenceClass[]; loaders:RuntimeIntelligenceClass[]; duplicate_classes:Record<string,string[]>;
   summary:{custom_node_roots:number;providers:number;repositories:number;classes:number;loaders:number;dependencies:number;parse_errors:number;duplicates:number};
+}
+
+export interface RuntimeContextGenerateResponse {
+  success: boolean; output_directory: string; archive_path: string; models_copied: number; custom_nodes_copied: number; bytes_copied: number; files_generated: string[]; warnings: string[]; manifest: Record<string, unknown>;
 }
