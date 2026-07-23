@@ -75,3 +75,16 @@ export interface RuntimeWorkflowAnalysis {
   node_count:number; class_types:string[]; custom_node_classes:string[]; referenced_models:string[]; potentially_missing_nodes:string[];
   summary:{nodes:number;unique_classes:number;referenced_models:number};
 }
+
+export interface RuntimeWorkflowResolution extends RuntimeImportReport {
+  python_candidates: string[];
+  workflow: { node_count:number; class_types:string[]; referenced_models:string[] };
+  unresolved_classes: string[];
+  missing_models: string[];
+  ambiguous_models: string[];
+  summary: RuntimeImportReport["summary"] & {
+    workflow_nodes:number; unique_classes:number; required_custom_nodes:number; required_models:number;
+    referenced_models:number; missing_models:number; installed_custom_nodes:number; installed_models:number;
+    compatibility_score:number;
+  };
+}
