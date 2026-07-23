@@ -1,6 +1,6 @@
 export interface RuntimeCustomNode { name: string; repository: string; commit: string | null; enabled: boolean; install_requirements: boolean; }
 export interface RuntimePythonDependency { package: string; version: string | null; enabled: boolean; }
-export interface RuntimeModelAsset { name: string; model_type: "checkpoint"|"vae"|"lora"|"controlnet"|"clip"|"upscaler"|"other"; source_url: string | null; target_path: string; sha256: string | null; strategy: "image"|"volume"|"startup-download"; enabled: boolean; }
+export interface RuntimeModelAsset { resolver?: {class_type:string;field:string;folders:string}; name: string; model_type: "checkpoint"|"vae"|"lora"|"controlnet"|"clip"|"upscaler"|"other"; source_url: string | null; target_path: string; sha256: string | null; strategy: "image"|"volume"|"startup-download"; enabled: boolean; }
 export interface RuntimeEnvironmentVariable { key: string; value: string | null; secret: boolean; required: boolean; }
 export interface RuntimeVolume { name: string; mount_path: string; read_only: boolean; }
 export interface RuntimeBuilderConfig {
@@ -79,11 +79,13 @@ export interface RuntimeWorkflowAnalysis {
 export interface RuntimeWorkflowResolution extends RuntimeImportReport {
   python_candidates: string[];
   workflow: { node_count:number; class_types:string[]; referenced_models:string[] };
+  resolved_classes: Array<{class_type:string;provider:'core'|'custom';provider_name:string;confidence:string}>;
+  core_classes: string[];
   unresolved_classes: string[];
   missing_models: string[];
   ambiguous_models: string[];
   summary: RuntimeImportReport["summary"] & {
-    workflow_nodes:number; unique_classes:number; required_custom_nodes:number; required_models:number;
+    workflow_nodes:number; unique_classes:number; core_classes:number; resolved_custom_classes:number; runtime_catalog_classes:number; knowledge_base_rules:number; required_custom_nodes:number; required_models:number;
     referenced_models:number; missing_models:number; installed_custom_nodes:number; installed_models:number;
     compatibility_score:number;
   };
