@@ -36,6 +36,7 @@ export interface RuntimeBuild {
   progress: number;
   logs: string;
   error_message: string | null;
+  context_path?: string | null;
   image_id: string | null;
   image_size_bytes: number | null;
   manifest: Record<string, unknown>;
