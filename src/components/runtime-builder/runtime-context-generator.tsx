@@ -11,6 +11,7 @@ const inputClass = "h-11 w-full rounded-xl border border-white/10 bg-black/25 px
 export function RuntimeContextGenerator() {
   const [comfyuiPath, setComfyuiPath] = useState("");
   const [outputDirectory, setOutputDirectory] = useState("");
+  const [containerWorkdir, setContainerWorkdir] = useState("/app");
   const [copyModels, setCopyModels] = useState(true);
   const [copyNodes, setCopyNodes] = useState(true);
   const [sha256, setSha256] = useState(true);
@@ -22,7 +23,8 @@ export function RuntimeContextGenerator() {
     void browserApiRequest<RuntimeBuilderConfig>("/api/admin/runtime-builder/config")
       .then(config => {
         setComfyuiPath(config.source_comfyui_path || "");
-        setOutputDirectory(config.export_directory || "");
+        setOutputDirectory(config.export_root_directory || "");
+        setContainerWorkdir(config.container_workdir || "/app");
         if (config.export_directory) {
           setResult({
             success: true,
@@ -38,15 +40,23 @@ export function RuntimeContextGenerator() {
       .catch(() => undefined);
   }, []);
 
+  const saveWorkspace = async () => {
+    await browserApiRequest<RuntimeBuilderConfig>("/api/admin/runtime-builder/workspace", {
+      method: "PATCH",
+      body: JSON.stringify({ source_comfyui_path: comfyuiPath.trim() || null, export_root_directory: outputDirectory.trim() || null, container_workdir: containerWorkdir.trim() || "/app" }),
+    });
+  };
+
   const generate = async () => {
     if (!comfyuiPath.trim()) { toast.error("Indica la ruta local de ComfyUI."); return; }
     setLoading(true); setResult(null);
     try {
+      await saveWorkspace();
       const value = await browserApiRequest<RuntimeContextGenerateResponse>("/api/admin/runtime-builder/context/generate", {
         method: "POST",
         body: JSON.stringify({ comfyui_path: comfyuiPath.trim(), output_directory: outputDirectory.trim() || null, copy_models: copyModels, copy_custom_nodes: copyNodes, calculate_sha256: sha256, overwrite }),
       });
-      setResult(value); setOutputDirectory(value.output_directory); toast.success("Contexto Docker autocontenido generado y ruta guardada.");
+      setResult(value); toast.success("Contexto Docker autocontenido generado y ruta guardada.");
     } catch (error) { toast.error(error instanceof Error ? error.message : "No fue posible generar el contexto Docker."); }
     finally { setLoading(false); }
   };
@@ -54,9 +64,9 @@ export function RuntimeContextGenerator() {
   return <div className="space-y-5">
     <section className="luxia-panel rounded-3xl p-5">
       <div className="mb-5 flex items-start gap-4"><div className="flex size-12 items-center justify-center rounded-2xl border border-red-500/20 bg-red-950/25 text-red-400"><Archive /></div><div><h2 className="font-semibold text-white">Generar runtime autocontenido</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-500">Copia únicamente los modelos y Custom Nodes seleccionados por el workflow y crea un contexto Docker listo para construir.</p></div></div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <label><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Ruta local de ComfyUI</span><input className={inputClass} placeholder="F:\\ComfyUI o carpeta Pinokio" value={comfyuiPath} onChange={e=>setComfyuiPath(e.target.value)} /></label>
-        <label><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Directorio de salida (opcional)</span><input className={inputClass} placeholder="F:\\runtime_exports" value={outputDirectory} onChange={e=>setOutputDirectory(e.target.value)} /></label>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <label><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Ruta local de ComfyUI</span><input className={inputClass} placeholder="F:\\ComfyUI o carpeta Pinokio" value={comfyuiPath} onChange={e=>setComfyuiPath(e.target.value)} onBlur={()=>void saveWorkspace()} /></label>
+        <label><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Directorio raíz de exportación</span><input className={inputClass} placeholder="F:\\runtime_exports" value={outputDirectory} onChange={e=>setOutputDirectory(e.target.value)} onBlur={()=>void saveWorkspace()} /></label><label><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Ruta interna del contenedor</span><input className={inputClass} placeholder="/app" value={containerWorkdir} onChange={e=>setContainerWorkdir(e.target.value)} onBlur={()=>void saveWorkspace()} /></label>
       </div>
       <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Toggle label="Copiar modelos locales" checked={copyModels} onChange={setCopyModels} />
