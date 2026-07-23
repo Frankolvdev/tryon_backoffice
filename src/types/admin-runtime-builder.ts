@@ -9,7 +9,7 @@ export interface RuntimeBuilderConfig {
   target_platform: string; registry_image: string; include_comfyui_manager: boolean;
   custom_nodes: RuntimeCustomNode[]; python_dependencies: RuntimePythonDependency[];
   models: RuntimeModelAsset[]; environment_variables: RuntimeEnvironmentVariable[];
-  volumes: RuntimeVolume[]; notes: string | null; is_active: boolean; created_at: string; updated_at: string;
+  volumes: RuntimeVolume[]; notes: string | null; source_comfyui_path: string | null; workflow_filename: string | null; workflow_json: Record<string, unknown> | null; last_index_summary: Record<string, unknown> | null; export_directory: string | null; last_export_archive: string | null; last_export_manifest: Record<string, unknown> | null; last_exported_at: string | null; is_active: boolean; created_at: string; updated_at: string;
 }
 export interface RuntimeValidationIssue { level: "error"|"warning"|"info"; field: string; message: string; }
 export interface RuntimeValidationResponse { valid: boolean; issues: RuntimeValidationIssue[]; summary: Record<string, string|number|boolean>; }

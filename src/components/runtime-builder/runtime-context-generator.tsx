@@ -1,10 +1,10 @@
 "use client";
 
 import { Archive, CheckCircle2, Copy, HardDrive, LoaderCircle, TriangleAlert } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { browserApiRequest } from "@/lib/api/browser-api";
-import type { RuntimeContextGenerateResponse } from "@/types/admin-runtime-builder";
+import type { RuntimeBuilderConfig, RuntimeContextGenerateResponse } from "@/types/admin-runtime-builder";
 
 const inputClass = "h-11 w-full rounded-xl border border-white/10 bg-black/25 px-3 text-sm text-white outline-none transition focus:border-red-500/50";
 
@@ -18,6 +18,26 @@ export function RuntimeContextGenerator() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<RuntimeContextGenerateResponse | null>(null);
 
+  useEffect(() => {
+    void browserApiRequest<RuntimeBuilderConfig>("/api/admin/runtime-builder/config")
+      .then(config => {
+        setComfyuiPath(config.source_comfyui_path || "");
+        setOutputDirectory(config.export_directory || "");
+        if (config.export_directory) {
+          setResult({
+            success: true,
+            output_directory: config.export_directory,
+            archive_path: config.last_export_archive || "",
+            models_copied: Number((config.last_export_manifest?.summary as Record<string, unknown> | undefined)?.models_copied || 0),
+            custom_nodes_copied: Number((config.last_export_manifest?.summary as Record<string, unknown> | undefined)?.custom_nodes_copied || 0),
+            bytes_copied: Number((config.last_export_manifest?.summary as Record<string, unknown> | undefined)?.bytes_copied || 0),
+            files_generated: [], warnings: [], manifest: config.last_export_manifest || {},
+          });
+        }
+      })
+      .catch(() => undefined);
+  }, []);
+
   const generate = async () => {
     if (!comfyuiPath.trim()) { toast.error("Indica la ruta local de ComfyUI."); return; }
     setLoading(true); setResult(null);
@@ -26,7 +46,7 @@ export function RuntimeContextGenerator() {
         method: "POST",
         body: JSON.stringify({ comfyui_path: comfyuiPath.trim(), output_directory: outputDirectory.trim() || null, copy_models: copyModels, copy_custom_nodes: copyNodes, calculate_sha256: sha256, overwrite }),
       });
-      setResult(value); toast.success("Contexto Docker autocontenido generado.");
+      setResult(value); setOutputDirectory(value.output_directory); toast.success("Contexto Docker autocontenido generado y ruta guardada.");
     } catch (error) { toast.error(error instanceof Error ? error.message : "No fue posible generar el contexto Docker."); }
     finally { setLoading(false); }
   };
