@@ -6,11 +6,12 @@ import { toast } from "sonner";
 import { browserApiRequest } from "@/lib/api/browser-api";
 import type { RuntimeBuilderConfig, RuntimeGeneratedFiles, RuntimeValidationResponse } from "@/types/admin-runtime-builder";
 import { RuntimeBuildPanel } from "@/components/runtime-builder/runtime-build-panel";
+import { RuntimeImportWizard } from "@/components/runtime-builder/runtime-import-wizard";
 
 const inputClass = "h-11 w-full rounded-xl border border-white/10 bg-black/25 px-3 text-sm text-white outline-none transition focus:border-red-500/50";
 const cardClass = "luxia-panel rounded-3xl p-5";
 
-type Tab = "base" | "nodes" | "models" | "dependencies" | "environment" | "preview" | "builds";
+type Tab = "import" | "base" | "nodes" | "models" | "dependencies" | "environment" | "preview" | "builds";
 
 export default function RuntimeBuilderPage() {
   const [config, setConfig] = useState<RuntimeBuilderConfig | null>(null);
@@ -53,7 +54,7 @@ export default function RuntimeBuilderPage() {
   if (loading || !config) return <div className="flex min-h-80 items-center justify-center"><LoaderCircle className="animate-spin text-red-500" /></div>;
 
   const tabs: {id: Tab; label: string}[] = [
-    {id:"base",label:"Base"},{id:"nodes",label:`Custom Nodes (${config.custom_nodes.length})`},{id:"models",label:`Modelos (${config.models.length})`},
+    {id:"import",label:"Importar ComfyUI"},{id:"base",label:"Base"},{id:"nodes",label:`Custom Nodes (${config.custom_nodes.length})`},{id:"models",label:`Modelos (${config.models.length})`},
     {id:"dependencies",label:"Dependencias"},{id:"environment",label:"Variables y volúmenes"},{id:"preview",label:"Archivos generados"},{id:"builds",label:"Build & Deploy"},
   ];
 
@@ -75,6 +76,8 @@ export default function RuntimeBuilderPage() {
     {validation && <section className={`${cardClass} border ${validation.valid ? "border-emerald-500/20" : "border-red-500/20"}`}><div className="flex items-center gap-3">{validation.valid ? <CheckCircle2 className="text-emerald-400"/> : <TriangleAlert className="text-red-400"/>}<div><h2 className="font-semibold text-white">{validation.valid ? "Runtime listo para generar" : "Hay errores por corregir"}</h2><p className="text-sm text-zinc-500">{validation.issues.length} observaciones · reproducible: {String(validation.summary.reproducible)}</p></div></div>{validation.issues.length > 0 && <div className="mt-4 space-y-2">{validation.issues.map((issue,index)=><div key={`${issue.field}-${index}`} className="rounded-xl border border-white/7 bg-black/20 px-4 py-3 text-sm"><span className={issue.level === "error" ? "text-red-400" : "text-amber-300"}>{issue.level.toUpperCase()}</span><span className="ml-3 text-zinc-400">{issue.message}</span></div>)}</div>}</section>}
 
     <div className="flex flex-wrap gap-2">{tabs.map(item=><button key={item.id} onClick={()=>setTab(item.id)} className={`rounded-xl px-4 py-2.5 text-sm transition ${tab===item.id?"bg-red-700 text-white":"border border-white/8 text-zinc-500 hover:text-white"}`}>{item.label}</button>)}</div>
+
+    {tab === "import" && <RuntimeImportWizard onApplied={(value)=>{setConfig(value);setTab("base")}} />}
 
     {tab === "base" && <section className={`${cardClass} grid gap-4 md:grid-cols-2 xl:grid-cols-3`}>
       <Field label="Nombre"><input className={inputClass} value={config.name} onChange={e=>patch({name:e.target.value})}/></Field><Field label="Versión"><input className={inputClass} value={config.runtime_version} onChange={e=>patch({runtime_version:e.target.value})}/></Field><Field label="Plataforma"><select className={inputClass} value={config.target_platform} onChange={e=>patch({target_platform:e.target.value})}><option>linux/amd64</option><option>linux/arm64</option></select></Field>

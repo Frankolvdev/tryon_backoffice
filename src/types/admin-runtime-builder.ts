@@ -61,3 +61,17 @@ export interface RuntimeDockerDiagnostic {
   active_image: string | null;
   message: string;
 }
+
+export interface RuntimeImportReport {
+  source_type: string; selected_path: string | null; comfyui_path: string | null;
+  comfyui_repository: string; comfyui_commit: string | null; python_executable: string | null;
+  python_version: string | null; torch_version: string | null; torch_cuda_version: string | null; gpu_name: string | null;
+  custom_nodes: Array<RuntimeCustomNode & {source_path?: string}>;
+  models: Array<RuntimeModelAsset & {size_bytes: number}>;
+  python_dependencies: RuntimePythonDependency[]; environment_variables: RuntimeEnvironmentVariable[]; volumes: RuntimeVolume[];
+  warnings: string[]; summary: {custom_nodes:number;models:number;model_size_bytes:number;python_dependencies:number;git_nodes:number};
+}
+export interface RuntimeWorkflowAnalysis {
+  node_count:number; class_types:string[]; custom_node_classes:string[]; referenced_models:string[]; potentially_missing_nodes:string[];
+  summary:{nodes:number;unique_classes:number;referenced_models:number};
+}
