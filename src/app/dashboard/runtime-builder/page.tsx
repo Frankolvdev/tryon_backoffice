@@ -5,11 +5,12 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { browserApiRequest } from "@/lib/api/browser-api";
 import type { RuntimeBuilderConfig, RuntimeGeneratedFiles, RuntimeValidationResponse } from "@/types/admin-runtime-builder";
+import { RuntimeBuildPanel } from "@/components/runtime-builder/runtime-build-panel";
 
 const inputClass = "h-11 w-full rounded-xl border border-white/10 bg-black/25 px-3 text-sm text-white outline-none transition focus:border-red-500/50";
 const cardClass = "luxia-panel rounded-3xl p-5";
 
-type Tab = "base" | "nodes" | "models" | "dependencies" | "environment" | "preview";
+type Tab = "base" | "nodes" | "models" | "dependencies" | "environment" | "preview" | "builds";
 
 export default function RuntimeBuilderPage() {
   const [config, setConfig] = useState<RuntimeBuilderConfig | null>(null);
@@ -53,7 +54,7 @@ export default function RuntimeBuilderPage() {
 
   const tabs: {id: Tab; label: string}[] = [
     {id:"base",label:"Base"},{id:"nodes",label:`Custom Nodes (${config.custom_nodes.length})`},{id:"models",label:`Modelos (${config.models.length})`},
-    {id:"dependencies",label:"Dependencias"},{id:"environment",label:"Variables y volúmenes"},{id:"preview",label:"Archivos generados"},
+    {id:"dependencies",label:"Dependencias"},{id:"environment",label:"Variables y volúmenes"},{id:"preview",label:"Archivos generados"},{id:"builds",label:"Build & Deploy"},
   ];
 
   return <div className="space-y-5">
@@ -94,6 +95,7 @@ export default function RuntimeBuilderPage() {
     {tab === "environment" && <div className="grid gap-5 xl:grid-cols-2"><ListEditor title="Variables de entorno" onAdd={()=>patch({environment_variables:[...config.environment_variables,{key:"",value:null,secret:false,required:false}]})}>{config.environment_variables.map((env,index)=><div key={index} className="grid gap-3 rounded-2xl border border-white/8 bg-black/20 p-4 md:grid-cols-[1fr_1fr_auto]"><input placeholder="CLAVE" className={inputClass} value={env.key} onChange={e=>patch({environment_variables:config.environment_variables.map((v,i)=>i===index?{...v,key:e.target.value.toUpperCase()}:v)})}/><input placeholder={env.secret?"Secreto no almacenado":"Valor"} className={inputClass} value={env.value ?? ""} onChange={e=>patch({environment_variables:config.environment_variables.map((v,i)=>i===index?{...v,value:e.target.value||null}:v)})}/><Delete onClick={()=>patch({environment_variables:config.environment_variables.filter((_,i)=>i!==index)})}/></div>)}</ListEditor><ListEditor title="Volúmenes" onAdd={()=>patch({volumes:[...config.volumes,{name:"models",mount_path:"/opt/ComfyUI/models",read_only:false}]})}>{config.volumes.map((volume,index)=><div key={index} className="grid gap-3 rounded-2xl border border-white/8 bg-black/20 p-4 md:grid-cols-[1fr_2fr_auto]"><input placeholder="Nombre" className={inputClass} value={volume.name} onChange={e=>patch({volumes:config.volumes.map((v,i)=>i===index?{...v,name:e.target.value}:v)})}/><input placeholder="Ruta de montaje" className={inputClass} value={volume.mount_path} onChange={e=>patch({volumes:config.volumes.map((v,i)=>i===index?{...v,mount_path:e.target.value}:v)})}/><Delete onClick={()=>patch({volumes:config.volumes.filter((_,i)=>i!==index)})}/></div>)}</ListEditor></div>}
 
     {tab === "preview" && <section className={cardClass}>{!generated ? <div className="py-16 text-center text-zinc-500"><FileJson2 className="mx-auto mb-3"/>Pulsa “Generar archivos” para crear el Dockerfile y los manifiestos.</div> : <div className="space-y-5"><CodeBlock title="Dockerfile" value={generated.dockerfile}/><CodeBlock title="entrypoint.sh" value={generated.entrypoint}/><CodeBlock title="runtime-manifest.json" value={JSON.stringify(generated.runtime_manifest,null,2)}/><CodeBlock title="custom-nodes.lock.json" value={JSON.stringify(generated.custom_nodes_lock,null,2)}/><CodeBlock title="models-manifest.json" value={JSON.stringify(generated.models_manifest,null,2)}/></div>}</section>}
+    {tab === "builds" && <RuntimeBuildPanel />}
   </div>;
 }
 

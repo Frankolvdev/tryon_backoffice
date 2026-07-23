@@ -14,3 +14,50 @@ export interface RuntimeBuilderConfig {
 export interface RuntimeValidationIssue { level: "error"|"warning"|"info"; field: string; message: string; }
 export interface RuntimeValidationResponse { valid: boolean; issues: RuntimeValidationIssue[]; summary: Record<string, string|number|boolean>; }
 export interface RuntimeGeneratedFiles { dockerfile: string; entrypoint: string; runtime_manifest: Record<string, unknown>; custom_nodes_lock: Record<string, unknown>; models_manifest: Record<string, unknown>; env_example: string; }
+
+export type RuntimeBuildStatus =
+  | "pending"
+  | "building"
+  | "validating"
+  | "succeeded"
+  | "failed"
+  | "publishing"
+  | "published"
+  | "active"
+  | "cancelled";
+
+export interface RuntimeBuild {
+  id: number;
+  runtime_config_id: number;
+  version: string;
+  image_tag: string;
+  status: RuntimeBuildStatus;
+  phase: string;
+  progress: number;
+  logs: string;
+  error_message: string | null;
+  image_id: string | null;
+  image_size_bytes: number | null;
+  manifest: Record<string, unknown>;
+  validation_result: Record<string, unknown>;
+  published: boolean;
+  active: boolean;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RuntimeBuildList {
+  items: RuntimeBuild[];
+  total: number;
+}
+
+export interface RuntimeDockerDiagnostic {
+  docker_available: boolean;
+  docker_version: string | null;
+  buildx_available: boolean;
+  registry_image: string;
+  active_image: string | null;
+  message: string;
+}
