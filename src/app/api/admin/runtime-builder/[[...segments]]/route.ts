@@ -21,7 +21,7 @@ async function backendPath(
 async function proxy(
   request: NextRequest,
   context: RouteContext,
-  method: "GET" | "POST" | "PUT",
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
 ): Promise<NextResponse> {
   return forwardAdminRequest({
     backendPath: await backendPath(request, context),
@@ -40,4 +40,12 @@ export function POST(request: NextRequest, context: RouteContext) {
 
 export function PUT(request: NextRequest, context: RouteContext) {
   return proxy(request, context, "PUT");
+}
+
+export function PATCH(request: NextRequest, context: RouteContext) {
+  return proxy(request, context, "PATCH");
+}
+
+export function DELETE(request: NextRequest, context: RouteContext) {
+  return proxy(request, context, "DELETE");
 }
