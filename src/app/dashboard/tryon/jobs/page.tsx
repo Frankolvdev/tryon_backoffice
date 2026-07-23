@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Clock3,
   Coins, Cpu, Eye, FilterX, LoaderCircle, RefreshCcw, RotateCcw, Search,
-  Square, UserRound, XCircle,
+  Square, Trash2, UserRound, XCircle,
 } from "lucide-react";
 
 import { browserApiRequest } from "@/lib/api/browser-api";
@@ -121,6 +121,8 @@ export default function UnifiedAiJobsPage() {
   const [selected, setSelected] = useState<GenerationModuleExecution | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (silent = false) => {
@@ -146,7 +148,9 @@ export default function UnifiedAiJobsPage() {
           ? moduleResponse.items
           : [];
       setModules(moduleItems);
-      setExecutions(Array.isArray(executionResponse.items) ? executionResponse.items : []);
+      const executionItems = Array.isArray(executionResponse.items) ? executionResponse.items : [];
+      setExecutions(executionItems);
+      setSelectedIds((current) => new Set([...current].filter((id) => executionItems.some((item) => item.id === id))));
       setTotal(Number(executionResponse.total ?? 0));
       setExpandedModules((current) => current.size ? current : new Set(moduleItems.map((item) => item.id)));
       setSelected((current) => {
@@ -209,6 +213,35 @@ export default function UnifiedAiJobsPage() {
     }
   }
 
+
+  async function bulkAction(action: "bulk-cancel" | "bulk-delete") {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    if (action === "bulk-delete" && !window.confirm(`¿Eliminar ${ids.length} ejecución(es) seleccionada(s)? Las activas se omitirán.`)) return;
+    setBulkBusy(true);
+    setError(null);
+    try {
+      await browserApiRequest(`/api/admin/generation-modules/executions/${action}`, {
+        method: "POST",
+        body: JSON.stringify({ ids }),
+      });
+      setSelectedIds(new Set());
+      await load(true);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible completar la operación masiva.");
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  function toggleExecution(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
   function clearFilters() {
     setSearch(""); setModuleId(""); setStatus(""); setEngine(""); setUserId(""); setDateFrom(""); setDateTo("");
   }
@@ -256,6 +289,11 @@ export default function UnifiedAiJobsPage() {
       </div>
     </section>
 
+    <section className="luxia-panel flex flex-wrap items-center justify-between gap-3 rounded-3xl p-4">
+      <label className="flex items-center gap-3 text-sm text-zinc-300"><input type="checkbox" checked={executions.length > 0 && executions.every((item) => selectedIds.has(item.id))} onChange={() => setSelectedIds(executions.length > 0 && executions.every((item) => selectedIds.has(item.id)) ? new Set() : new Set(executions.map((item) => item.id)))} className="size-4 accent-red-600"/>Seleccionar todo <span className="text-zinc-600">({selectedIds.size})</span></label>
+      <div className="flex flex-wrap gap-2"><button disabled={bulkBusy || !executions.some((item) => selectedIds.has(item.id) && ACTIVE_STATUSES.has(item.status))} onClick={() => void bulkAction("bulk-cancel")} className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 px-3 text-sm text-zinc-300 disabled:opacity-40"><Square size={14}/>Cancelar seleccionadas</button><button disabled={bulkBusy || selectedIds.size === 0} onClick={() => void bulkAction("bulk-delete")} className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 px-3 text-sm text-zinc-300 disabled:opacity-40"><Trash2 size={15}/>Eliminar seleccionadas</button></div>
+    </section>
+
     {isLoading ? <section className="luxia-panel flex min-h-72 items-center justify-center rounded-3xl"><div className="text-center"><LoaderCircle className="mx-auto animate-spin text-red-500"/><p className="mt-4 text-sm text-zinc-500">Consultando trabajos...</p></div></section> : grouped.length === 0 ? <section className="luxia-panel rounded-3xl p-12 text-center"><Activity className="mx-auto text-zinc-700"/><h2 className="mt-4 font-semibold text-white">No hay trabajos que coincidan</h2><p className="mt-2 text-sm text-zinc-500">Ajusta los filtros o ejecuta un módulo de generación.</p></section> : <div className="space-y-4">
       {grouped.map(([id, jobs]) => {
         const module = modulesById.get(id);
@@ -266,9 +304,9 @@ export default function UnifiedAiJobsPage() {
             <div className="flex min-w-0 items-center gap-4">{isExpanded?<ChevronDown size={18}/>:<ChevronRight size={18}/>}<div><h2 className="font-semibold text-white">{module?.name ?? jobs[0]?.module_key}</h2><p className="mt-1 text-xs text-zinc-600">{module?.key ?? jobs[0]?.module_key} · {jobs.length} trabajo{jobs.length===1?"":"s"}{active?` · ${active} activo${active===1?"":"s"}`:""}</p></div></div>
             {active>0&&<span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs text-blue-300">Actualización en vivo</span>}
           </button>
-          {isExpanded && <div className="overflow-x-auto"><table className="w-full min-w-[1120px] text-left text-sm"><thead className="text-[10px] uppercase tracking-wider text-zinc-600"><tr><th className="p-4">Trabajo</th><th>Usuario</th><th>Motor</th><th>Estado</th><th>Progreso</th><th>Tokens</th><th>Tiempo</th><th>Resultado / error</th><th className="pr-4">Acciones</th></tr></thead><tbody>{jobs.map((job)=>{
+          {isExpanded && <div className="overflow-x-auto"><table className="w-full min-w-[1120px] text-left text-sm"><thead className="text-[10px] uppercase tracking-wider text-zinc-600"><tr><th className="p-4">Seleccionar</th><th>Trabajo</th><th>Usuario</th><th>Motor</th><th>Estado</th><th>Progreso</th><th>Tokens</th><th>Tiempo</th><th>Resultado / error</th><th className="pr-4">Acciones</th></tr></thead><tbody>{jobs.map((job)=>{
             const links=resultLinks(job.outputs).slice(0,2); const busy=busyId===job.id;
-            return <tr key={job.id} className="border-t border-white/5 align-top"><td className="p-4"><p className="font-medium text-white">{job.module_key}</p><p className="mt-1 max-w-40 truncate font-mono text-[10px] text-zinc-700" title={job.id}>{job.id}</p><p className="mt-1 text-[10px] text-zinc-600">{formatDate(job.created_at)}</p></td><td><div className="pt-4"><div className="flex items-center gap-2 text-zinc-300"><UserRound size={14}/>{originLabel(job)}</div><p className="mt-1 text-[10px] text-zinc-600">{job.user_id?`Usuario #${job.user_id}`:"Administrador"}</p></div></td><td className="pt-4 text-zinc-400"><Cpu size={14} className="mr-2 inline"/>{engineLabel(job.engine)}<p className="mt-1 text-[10px] text-zinc-600">{job.queue_name || queueLabel(job)}{job.queue_position ? ` · #${job.queue_position}` : ""}</p></td><td className="pt-4"><span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase ${statusClass(job.status)}`}>{statusLabel(job.status)}</span></td><td className="pt-4"><div className="w-32"><div className="flex justify-between text-[10px] text-zinc-600"><span>{job.progress}%</span><span>{safeSteps(job).filter(s=>s.status==="completed").length}/{safeSteps(job).length}</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full bg-red-600 transition-all" style={{width:`${job.progress}%`}}/></div></div></td><td className="pt-4 text-zinc-400">{job.tokens_charged??0}</td><td className="pt-4 text-zinc-500">{formatDuration(job.duration_ms)}</td><td className="max-w-xs pt-4">{job.error?<p className="line-clamp-2 text-xs text-red-300" title={job.error}>{job.error}</p>:links.length?<div className="flex flex-col gap-1">{links.map((link)=><a key={`${link.label}-${link.href}`} href={link.href} target="_blank" rel="noreferrer" className="truncate text-xs text-blue-300 hover:text-blue-200">{link.label}</a>)}</div>:<span className="text-xs text-zinc-600">{ACTIVE_STATUSES.has(job.status)?"Procesando...":"Sin archivo visible"}</span>}</td><td className="pr-4 pt-3"><div className="flex gap-2"><button onClick={()=>setSelected(job)} className="flex size-9 items-center justify-center rounded-lg border border-white/10 text-zinc-400 hover:text-white" title="Ver detalle"><Eye size={15}/></button>{ACTIVE_STATUSES.has(job.status)&&<button disabled={busy} onClick={()=>void jobAction(job,"cancel")} className="flex size-9 items-center justify-center rounded-lg border border-white/10 text-zinc-400 hover:text-red-300 disabled:opacity-40" title="Cancelar">{busy?<LoaderCircle size={15} className="animate-spin"/>:<Square size={14}/>}</button>}{TERMINAL_STATUSES.has(job.status)&&<button disabled={busy} onClick={()=>void jobAction(job,"retry")} className="flex size-9 items-center justify-center rounded-lg bg-red-600 text-white hover:bg-red-500 disabled:opacity-40" title="Reintentar">{busy?<LoaderCircle size={15} className="animate-spin"/>:<RotateCcw size={15}/>}</button>}</div></td></tr>})}</tbody></table></div>}
+            return <tr key={job.id} className="border-t border-white/5 align-top"><td className="p-4"><input type="checkbox" checked={selectedIds.has(job.id)} onChange={()=>toggleExecution(job.id)} className="size-4 accent-red-600"/></td><td className="pt-4"><p className="font-medium text-white">{job.module_key}</p><p className="mt-1 max-w-40 truncate font-mono text-[10px] text-zinc-700" title={job.id}>{job.id}</p><p className="mt-1 text-[10px] text-zinc-600">{formatDate(job.created_at)}</p></td><td><div className="pt-4"><div className="flex items-center gap-2 text-zinc-300"><UserRound size={14}/>{originLabel(job)}</div><p className="mt-1 text-[10px] text-zinc-600">{job.user_id?`Usuario #${job.user_id}`:"Administrador"}</p></div></td><td className="pt-4 text-zinc-400"><Cpu size={14} className="mr-2 inline"/>{engineLabel(job.engine)}<p className="mt-1 text-[10px] text-zinc-600">{job.queue_name || queueLabel(job)}{job.queue_position ? ` · #${job.queue_position}` : ""}</p></td><td className="pt-4"><span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase ${statusClass(job.status)}`}>{statusLabel(job.status)}</span></td><td className="pt-4"><div className="w-32"><div className="flex justify-between text-[10px] text-zinc-600"><span>{job.progress}%</span><span>{safeSteps(job).filter(s=>s.status==="completed").length}/{safeSteps(job).length}</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full bg-red-600 transition-all" style={{width:`${job.progress}%`}}/></div></div></td><td className="pt-4 text-zinc-400">{job.tokens_charged??0}</td><td className="pt-4 text-zinc-500">{formatDuration(job.duration_ms)}</td><td className="max-w-xs pt-4">{job.error?<p className="line-clamp-2 text-xs text-red-300" title={job.error}>{job.error}</p>:links.length?<div className="flex flex-col gap-1">{links.map((link)=><a key={`${link.label}-${link.href}`} href={link.href} target="_blank" rel="noreferrer" className="truncate text-xs text-blue-300 hover:text-blue-200">{link.label}</a>)}</div>:<span className="text-xs text-zinc-600">{ACTIVE_STATUSES.has(job.status)?"Procesando...":"Sin archivo visible"}</span>}</td><td className="pr-4 pt-3"><div className="flex gap-2"><button onClick={()=>setSelected(job)} className="flex size-9 items-center justify-center rounded-lg border border-white/10 text-zinc-400 hover:text-white" title="Ver detalle"><Eye size={15}/></button>{ACTIVE_STATUSES.has(job.status)&&<button disabled={busy} onClick={()=>void jobAction(job,"cancel")} className="flex size-9 items-center justify-center rounded-lg border border-white/10 text-zinc-400 hover:text-red-300 disabled:opacity-40" title="Cancelar">{busy?<LoaderCircle size={15} className="animate-spin"/>:<Square size={14}/>}</button>}{TERMINAL_STATUSES.has(job.status)&&<button disabled={busy} onClick={()=>void jobAction(job,"retry")} className="flex size-9 items-center justify-center rounded-lg bg-red-600 text-white hover:bg-red-500 disabled:opacity-40" title="Reintentar">{busy?<LoaderCircle size={15} className="animate-spin"/>:<RotateCcw size={15}/>}</button>}</div></td></tr>})}</tbody></table></div>}
         </section>
       })}
     </div>}
