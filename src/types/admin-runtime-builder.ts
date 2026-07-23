@@ -90,3 +90,19 @@ export interface RuntimeWorkflowResolution extends RuntimeImportReport {
     compatibility_score:number;
   };
 }
+
+
+export interface RuntimeIntelligenceClass {
+  class_type:string; python_class:string; display_name:string; provider:string; repository:string|null; commit:string|null;
+  source_file:string; relative_file:string; category:string|null; return_types:string[];
+  input_fields:Array<{name:string;section:string;model_hint:boolean;spec:string}>; is_loader:boolean;
+}
+export interface RuntimeIntelligenceProvider {
+  provider:string; source_path:string; repository:string|null; commit:string|null; manifests:string[];
+  dependencies:Array<{package:string;version:string|null;enabled:boolean;source?:string}>; files_scanned:number; class_count:number; loader_count:number; parse_errors:string[]; classes:RuntimeIntelligenceClass[];
+}
+export interface RuntimeIntelligenceIndex {
+  source_type:string; selected_path:string; comfyui_path:string; custom_node_roots:string[]; providers:RuntimeIntelligenceProvider[];
+  classes:RuntimeIntelligenceClass[]; loaders:RuntimeIntelligenceClass[]; duplicate_classes:Record<string,string[]>;
+  summary:{custom_node_roots:number;providers:number;repositories:number;classes:number;loaders:number;dependencies:number;parse_errors:number;duplicates:number};
+}
