@@ -4,7 +4,7 @@ import { Archive, CheckCircle2, Copy, HardDrive, LoaderCircle, TriangleAlert } f
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { browserApiRequest } from "@/lib/api/browser-api";
-import type { RuntimeBuilderConfig, RuntimeContextGenerateResponse } from "@/types/admin-runtime-builder";
+import type { RuntimeContextGenerateResponse, RuntimeProject } from "@/types/admin-runtime-builder";
 
 const inputClass = "h-11 w-full rounded-xl border border-white/10 bg-black/25 px-3 text-sm text-white outline-none transition focus:border-red-500/50";
 
@@ -20,7 +20,7 @@ export function RuntimeContextGenerator() {
   const [result, setResult] = useState<RuntimeContextGenerateResponse | null>(null);
 
   useEffect(() => {
-    void browserApiRequest<RuntimeBuilderConfig>("/api/admin/runtime-builder/config")
+    void browserApiRequest<RuntimeProject>("/api/admin/runtime-builder/project")
       .then(config => {
         setComfyuiPath(config.source_comfyui_path || "");
         setOutputDirectory(config.export_root_directory || "");
@@ -41,7 +41,7 @@ export function RuntimeContextGenerator() {
   }, []);
 
   const saveWorkspace = async () => {
-    await browserApiRequest<RuntimeBuilderConfig>("/api/admin/runtime-builder/workspace", {
+    await browserApiRequest<RuntimeProject>("/api/admin/runtime-builder/project", {
       method: "PATCH",
       body: JSON.stringify({ source_comfyui_path: comfyuiPath.trim() || null, export_root_directory: outputDirectory.trim() || null, container_workdir: containerWorkdir.trim() || "/app" }),
     });
@@ -63,7 +63,7 @@ export function RuntimeContextGenerator() {
 
   return <div className="space-y-5">
     <section className="luxia-panel rounded-3xl p-5">
-      <div className="mb-5 flex items-start gap-4"><div className="flex size-12 items-center justify-center rounded-2xl border border-red-500/20 bg-red-950/25 text-red-400"><Archive /></div><div><h2 className="font-semibold text-white">Generar runtime autocontenido</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-500">Copia únicamente los modelos y Custom Nodes seleccionados por el workflow y crea un contexto Docker listo para construir.</p></div></div>
+      <div className="mb-5 flex items-start gap-4"><div className="flex size-12 items-center justify-center rounded-2xl border border-red-500/20 bg-red-950/25 text-red-400"><Archive /></div><div><h2 className="font-semibold text-white">6. Generar runtime autocontenido</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-500">Copia únicamente los modelos y Custom Nodes seleccionados por el workflow y crea un contexto Docker listo para construir.</p></div></div>
       <div className="grid gap-4 lg:grid-cols-3">
         <label><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Ruta local de ComfyUI</span><input className={inputClass} placeholder="F:\\ComfyUI o carpeta Pinokio" value={comfyuiPath} onChange={e=>setComfyuiPath(e.target.value)} onBlur={()=>void saveWorkspace()} /></label>
         <label><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Directorio raíz de exportación</span><input className={inputClass} placeholder="F:\\runtime_exports" value={outputDirectory} onChange={e=>setOutputDirectory(e.target.value)} onBlur={()=>void saveWorkspace()} /></label><label><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Ruta interna del contenedor</span><input className={inputClass} placeholder="/app" value={containerWorkdir} onChange={e=>setContainerWorkdir(e.target.value)} onBlur={()=>void saveWorkspace()} /></label>
@@ -74,7 +74,7 @@ export function RuntimeContextGenerator() {
         <Toggle label="Calcular SHA-256" checked={sha256} onChange={setSha256} />
         <Toggle label="Sobrescribir salida" checked={overwrite} onChange={setOverwrite} />
       </div>
-      <button onClick={()=>void generate()} disabled={loading} className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl bg-red-700 px-5 text-sm font-semibold text-white disabled:opacity-60">{loading?<LoaderCircle size={16} className="animate-spin"/>:<HardDrive size={16}/>} {loading?"Copiando archivos…":"Generar contexto Docker"}</button>
+      <button onClick={()=>void generate()} disabled={loading} className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl bg-red-700 px-5 text-sm font-semibold text-white disabled:opacity-60">{loading?<LoaderCircle size={16} className="animate-spin"/>:<HardDrive size={16}/>} {loading?"Copiando archivos…":"6. Generar contexto Docker"}</button>
     </section>
     {result && <section className="luxia-panel rounded-3xl p-5">
       <div className="flex items-center gap-3"><CheckCircle2 className="text-emerald-400"/><div><h3 className="font-semibold text-white">Runtime generado correctamente</h3><p className="text-sm text-zinc-500">{result.models_copied} modelos · {result.custom_nodes_copied} Custom Nodes · {formatBytes(result.bytes_copied)}</p></div></div>

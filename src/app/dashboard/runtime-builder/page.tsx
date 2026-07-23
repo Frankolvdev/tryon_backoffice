@@ -55,8 +55,8 @@ export default function RuntimeBuilderPage() {
   if (loading || !config) return <div className="flex min-h-80 items-center justify-center"><LoaderCircle className="animate-spin text-red-500" /></div>;
 
   const tabs: {id: Tab; label: string}[] = [
-    {id:"import",label:"Importar ComfyUI"},{id:"base",label:"Base"},{id:"nodes",label:`Custom Nodes (${config.custom_nodes.length})`},{id:"models",label:`Modelos (${config.models.length})`},
-    {id:"dependencies",label:"Dependencias"},{id:"environment",label:"Variables y volúmenes"},{id:"preview",label:"Archivos generados"},{id:"generator",label:"Generar Runtime"},{id:"builds",label:"Build & Deploy"},
+    {id:"import",label:"1–3. Preparar Runtime"},{id:"base",label:"4. Configuración base"},{id:"nodes",label:`4. Custom Nodes (${config.custom_nodes.length})`},{id:"models",label:`4. Modelos (${config.models.length})`},
+    {id:"dependencies",label:"4. Dependencias"},{id:"environment",label:"4. Variables y volúmenes"},{id:"preview",label:"5. Validar y generar archivos"},{id:"generator",label:"6. Generar Runtime"},{id:"builds",label:"7–9. Build & Deploy"},
   ];
 
   return <div className="space-y-5">
@@ -67,9 +67,9 @@ export default function RuntimeBuilderPage() {
           <p className="mt-3 max-w-3xl text-sm leading-7 text-zinc-500">Configura ComfyUI, nodos, modelos y dependencias; valida y genera el contexto Docker sin editar archivos manualmente.</p>
         </div></div>
         <div className="flex flex-wrap gap-2"><button onClick={() => void load()} className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/10 px-4 text-sm text-zinc-300"><RefreshCcw size={16}/>Recargar</button>
-          <button onClick={() => void validate()} className="inline-flex h-11 items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-950/20 px-4 text-sm text-amber-300"><CheckCircle2 size={16}/>Validar</button>
-          <button onClick={() => void generate()} className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/10 px-4 text-sm text-zinc-200"><Code2 size={16}/>Generar archivos</button>
-          <button onClick={() => void save()} disabled={saving} className="luxia-red-glow inline-flex h-11 items-center gap-2 rounded-xl bg-red-700 px-4 text-sm font-semibold text-white"><Save size={16}/>{saving ? "Guardando…" : "Guardar"}</button>
+          <button onClick={() => void validate()} className="inline-flex h-11 items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-950/20 px-4 text-sm text-amber-300"><CheckCircle2 size={16}/>5. Validar</button>
+          <button onClick={() => void generate()} className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/10 px-4 text-sm text-zinc-200"><Code2 size={16}/>5. Generar archivos</button>
+          <button onClick={() => void save()} disabled={saving} className="luxia-red-glow inline-flex h-11 items-center gap-2 rounded-xl bg-red-700 px-4 text-sm font-semibold text-white"><Save size={16}/>{saving ? "Guardando…" : "4. Guardar configuración"}</button>
         </div>
       </div>
     </section>

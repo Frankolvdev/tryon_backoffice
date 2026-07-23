@@ -110,3 +110,12 @@ export interface RuntimeIntelligenceIndex {
 export interface RuntimeContextGenerateResponse {
   success: boolean; output_directory: string; archive_path: string; models_copied: number; custom_nodes_copied: number; bytes_copied: number; files_generated: string[]; warnings: string[]; manifest: Record<string, unknown>;
 }
+
+export interface RuntimeProject {
+  id: number; runtime_config_id: number | null; project_key: string; module_type: string;
+  source_comfyui_path: string | null; workflow_filename: string | null; workflow_json: Record<string, unknown> | null;
+  container_workdir: string; export_root_directory: string | null; export_directory: string | null;
+  last_index_summary: Record<string, unknown> | null; workspace_status: string; last_export_archive: string | null;
+  last_export_manifest: Record<string, unknown> | null; last_exported_at: string | null; notes: string | null;
+  created_at: string; updated_at: string;
+}
