@@ -4,7 +4,7 @@ import { Archive, CheckCircle2, Copy, HardDrive, LoaderCircle, TriangleAlert } f
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { browserApiRequest } from "@/lib/api/browser-api";
-import type { RuntimeContextGenerateResponse, RuntimeProject } from "@/types/admin-runtime-builder";
+import type { RuntimeContextGenerateResponse, RuntimeContextJob, RuntimeProject } from "@/types/admin-runtime-builder";
 
 const inputClass = "h-11 w-full rounded-xl border border-white/10 bg-black/25 px-3 text-sm text-white outline-none transition focus:border-red-500/50";
 
@@ -18,6 +18,7 @@ export function RuntimeContextGenerator() {
   const [overwrite, setOverwrite] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<RuntimeContextGenerateResponse | null>(null);
+  const [job, setJob] = useState<RuntimeContextJob | null>(null);
 
   useEffect(() => {
     void browserApiRequest<RuntimeProject>("/api/admin/runtime-builder/project")
@@ -52,11 +53,28 @@ export function RuntimeContextGenerator() {
     setLoading(true); setResult(null);
     try {
       await saveWorkspace();
-      const value = await browserApiRequest<RuntimeContextGenerateResponse>("/api/admin/runtime-builder/context/generate", {
+      const created = await browserApiRequest<RuntimeContextJob>("/api/admin/runtime-builder/context/generate", {
         method: "POST",
         body: JSON.stringify({ comfyui_path: comfyuiPath.trim(), output_directory: outputDirectory.trim() || null, copy_models: copyModels, copy_custom_nodes: copyNodes, calculate_sha256: sha256, overwrite }),
       });
-      setResult(value); toast.success("Contexto Docker autocontenido generado y ruta guardada.");
+      setJob(created);
+
+      let current = created;
+      while (current.status === "queued" || current.status === "running") {
+        await new Promise(resolve => window.setTimeout(resolve, 2000));
+        current = await browserApiRequest<RuntimeContextJob>(`/api/admin/runtime-builder/context/jobs/${created.job_id}`);
+        setJob(current);
+      }
+
+      if (current.status === "failed") {
+        throw new Error(current.error || "La exportación no pudo completarse.");
+      }
+      if (!current.result) {
+        throw new Error("El backend terminó el trabajo sin devolver el resultado de la exportación.");
+      }
+
+      setResult(current.result);
+      toast.success("Contexto Docker autocontenido generado y ruta guardada.");
     } catch (error) { toast.error(error instanceof Error ? error.message : "No fue posible generar el contexto Docker."); }
     finally { setLoading(false); }
   };
@@ -74,8 +92,21 @@ export function RuntimeContextGenerator() {
         <Toggle label="Calcular SHA-256" checked={sha256} onChange={setSha256} />
         <Toggle label="Sobrescribir salida" checked={overwrite} onChange={setOverwrite} />
       </div>
-      <button onClick={()=>void generate()} disabled={loading} className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl bg-red-700 px-5 text-sm font-semibold text-white disabled:opacity-60">{loading?<LoaderCircle size={16} className="animate-spin"/>:<HardDrive size={16}/>} {loading?"Copiando archivos…":"6. Generar contexto Docker"}</button>
+      <button onClick={()=>void generate()} disabled={loading} className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl bg-red-700 px-5 text-sm font-semibold text-white disabled:opacity-60">{loading?<LoaderCircle size={16} className="animate-spin"/>:<HardDrive size={16}/>} {loading ? `${job?.progress ?? 0}% · ${job?.message ?? "Iniciando…"}` : "6. Generar contexto Docker"}</button>
     </section>
+    {loading && job && <section className="luxia-panel rounded-3xl p-5">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-white">Exportación en segundo plano</p>
+          <p className="mt-1 text-sm text-zinc-500">{job.message}</p>
+        </div>
+        <span className="text-sm font-semibold text-red-300">{job.progress}%</span>
+      </div>
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/5">
+        <div className="h-full rounded-full bg-red-700 transition-all duration-500" style={{ width: `${job.progress}%` }} />
+      </div>
+      <p className="mt-3 text-xs uppercase tracking-wide text-zinc-600">Fase: {job.phase}</p>
+    </section>}
     {result && <section className="luxia-panel rounded-3xl p-5">
       <div className="flex items-center gap-3"><CheckCircle2 className="text-emerald-400"/><div><h3 className="font-semibold text-white">Runtime generado correctamente</h3><p className="text-sm text-zinc-500">{result.models_copied} modelos · {result.custom_nodes_copied} Custom Nodes · {formatBytes(result.bytes_copied)}</p></div></div>
       <div className="mt-4 grid gap-3 lg:grid-cols-2"><PathBox label="Directorio" value={result.output_directory}/><PathBox label="Archivo ZIP" value={result.archive_path}/></div>

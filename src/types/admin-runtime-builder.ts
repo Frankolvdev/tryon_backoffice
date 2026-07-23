@@ -36,7 +36,6 @@ export interface RuntimeBuild {
   progress: number;
   logs: string;
   error_message: string | null;
-  context_path?: string | null;
   image_id: string | null;
   image_size_bytes: number | null;
   manifest: Record<string, unknown>;
@@ -119,4 +118,19 @@ export interface RuntimeProject {
   last_index_summary: Record<string, unknown> | null; workspace_status: string; last_export_archive: string | null;
   last_export_manifest: Record<string, unknown> | null; last_exported_at: string | null; notes: string | null;
   created_at: string; updated_at: string;
+}
+
+export type RuntimeContextJobStatus = "queued" | "running" | "completed" | "failed";
+
+export interface RuntimeContextJob {
+  job_id: string;
+  status: RuntimeContextJobStatus;
+  phase: string;
+  progress: number;
+  message: string;
+  error: string | null;
+  result: RuntimeContextGenerateResponse | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
 }
