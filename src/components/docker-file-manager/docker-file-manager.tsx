@@ -12,6 +12,7 @@ import {
   HardDrive,
   Move,
   Pencil,
+  LoaderCircle,
   Plus,
   RefreshCcw,
   Trash2,
@@ -94,11 +95,13 @@ export function DockerFileManager() {
   const [entries, setEntries] = useState<DockerEntry[]>([]);
   const [selected, setSelected] = useState<DockerEntry | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
   const [uploadProgress, setUploadProgress] =
     useState<UploadProgressState | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const loadVolumes = useCallback(async () => {
+    setLoadingMessage("Cargando volúmenes Docker…");
     const response = await browserApiRequest<{ items: DockerVolume[] }>(
       "/api/admin/docker-file-manager/volumes",
     );
@@ -108,20 +111,24 @@ export function DockerFileManager() {
         ? current
         : response.items[0]?.name || "",
     );
+    setLoadingMessage("");
     return response.items;
   }, []);
 
   const browse = useCallback(async (selectedVolume = volume, selectedPath = path) => {
     if (!selectedVolume) {
+      setLoadingMessage("");
       setEntries([]);
       setSelected(null);
       return;
     }
+    setLoadingMessage(selectedPath ? `Abriendo ${selectedPath}…` : `Abriendo ${selectedVolume}…`);
     const response = await browserApiRequest<DockerBrowse>(
       `/api/admin/docker-file-manager/browse?volume=${encodeURIComponent(selectedVolume)}&path=${encodeURIComponent(selectedPath)}`,
     );
     setEntries(response.items);
     setSelected(null);
+    setLoadingMessage("");
   }, [path, volume]);
 
   useEffect(() => {
@@ -137,8 +144,13 @@ export function DockerFileManager() {
     [path],
   );
 
-  const action = async (fn: () => Promise<unknown>, message: string) => {
+  const action = async (
+    fn: () => Promise<unknown>,
+    message: string,
+    pendingMessage = "Procesando operación…",
+  ) => {
     setBusy(true);
+    setLoadingMessage(pendingMessage);
     try {
       await fn();
       toast.success(message);
@@ -148,6 +160,7 @@ export function DockerFileManager() {
       toast.error(error instanceof Error ? error.message : "Operación fallida");
     } finally {
       setBusy(false);
+      setLoadingMessage("");
     }
   };
 
@@ -165,6 +178,7 @@ export function DockerFileManager() {
           }),
         }),
       "Volumen creado.",
+      "Creando volumen Docker…",
     );
   };
 
@@ -175,6 +189,7 @@ export function DockerFileManager() {
 
     const volumeToDelete = volume;
     setBusy(true);
+    setLoadingMessage(`Eliminando volumen ${volumeToDelete}…`);
     try {
       await browserApiRequest(
         `/api/admin/docker-file-manager/volumes/${encodeURIComponent(volumeToDelete)}?force=true`,
@@ -201,6 +216,7 @@ export function DockerFileManager() {
       );
     } finally {
       setBusy(false);
+      setLoadingMessage("");
     }
   };
 
@@ -218,6 +234,7 @@ export function DockerFileManager() {
           }),
         }),
       "Carpeta creada.",
+      "Creando carpeta…",
     );
   };
 
@@ -230,6 +247,7 @@ export function DockerFileManager() {
           { method: "DELETE" },
         ),
       "Elemento eliminado.",
+      `Eliminando ${selected.name}…`,
     );
   };
 
@@ -240,6 +258,7 @@ export function DockerFileManager() {
     const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
     let completedBytes = 0;
     setBusy(true);
+    setLoadingMessage("Preparando subida…");
 
     try {
       for (const [index, file] of files.entries()) {
@@ -249,6 +268,7 @@ export function DockerFileManager() {
         form.set("overwrite", "true");
         form.set("file", file);
 
+        setLoadingMessage(`Subiendo ${file.name}…`);
         setUploadProgress({
           currentFile: file.name,
           currentFileIndex: index + 1,
@@ -301,6 +321,7 @@ export function DockerFileManager() {
       toast.error(error instanceof Error ? error.message : "No fue posible subir el archivo.");
     } finally {
       setBusy(false);
+      setLoadingMessage("");
       window.setTimeout(() => setUploadProgress(null), 1200);
       if (fileRef.current) fileRef.current.value = "";
     }
@@ -322,6 +343,7 @@ export function DockerFileManager() {
           body: JSON.stringify({ volume, path: selected.path, new_name: name }),
         }),
       "Elemento renombrado.",
+      `Renombrando ${selected.name}…`,
     );
   };
 
@@ -357,6 +379,7 @@ export function DockerFileManager() {
           }),
         }),
       operation === "copy" ? "Elemento copiado." : "Elemento movido.",
+      operation === "copy" ? `Copiando ${selected.name}…` : `Moviendo ${selected.name}…`,
     );
   };
 
@@ -381,7 +404,9 @@ export function DockerFileManager() {
           <div className="flex gap-2">
             <button
               className={btn}
-              onClick={() =>
+              disabled={busy || Boolean(loadingMessage)}
+              onClick={() => {
+                setLoadingMessage("Actualizando volúmenes y carpeta…");
                 void loadVolumes()
                   .then((items) => {
                     const current = items.some((item) => item.name === volume)
@@ -390,12 +415,14 @@ export function DockerFileManager() {
                     return browse(current, current === volume ? path : "");
                   })
                   .catch((error: Error) => toast.error(error.message))
-              }
+                  .finally(() => setLoadingMessage(""));
+              }}
             >
-              <RefreshCcw size={15} />Actualizar
+              {loadingMessage ? <LoaderCircle size={15} className="animate-spin" /> : <RefreshCcw size={15} />}Actualizar
             </button>
             <button
               className="luxia-red-glow inline-flex h-10 items-center gap-2 rounded-xl bg-red-700 px-3 text-sm font-semibold text-white"
+              disabled={busy || Boolean(loadingMessage)}
               onClick={createVolume}
             >
               <Plus size={15} />Crear volumen
@@ -403,6 +430,13 @@ export function DockerFileManager() {
           </div>
         </div>
       </section>
+
+      {loadingMessage && (
+        <div className="flex items-center gap-3 rounded-2xl border border-red-500/20 bg-red-950/15 px-4 py-3 text-sm text-zinc-200" role="status" aria-live="polite">
+          <LoaderCircle size={17} className="animate-spin text-red-400" />
+          <span>{loadingMessage}</span>
+        </div>
+      )}
 
       <section className="grid gap-5 xl:grid-cols-[300px_1fr]">
         <aside className="luxia-panel rounded-3xl p-4">
@@ -529,7 +563,12 @@ export function DockerFileManager() {
             <div className="grid grid-cols-[1fr_120px_150px] bg-white/[.03] px-4 py-3 text-xs uppercase tracking-wide text-zinc-600">
               <span>Nombre</span><span>Tipo</span><span>Tamaño</span>
             </div>
-            {entries.length === 0 ? (
+            {loadingMessage && volume ? (
+              <div className="flex items-center justify-center gap-3 py-16 text-zinc-500">
+                <LoaderCircle size={18} className="animate-spin" />
+                Cargando contenido…
+              </div>
+            ) : entries.length === 0 ? (
               <div className="py-16 text-center text-zinc-600">Carpeta vacía</div>
             ) : (
               entries.map((item) => (
