@@ -145,3 +145,15 @@ export interface RuntimeContextJob {
   started_at: string | null;
   finished_at: string | null;
 }
+
+export interface RuntimeModelExportSettings {
+  comfyui_path:string; output_directory:string; destination_type:"local"|"docker_volume";
+  docker_volume:string; docker_path:string; calculate_sha256:boolean; overwrite:boolean; skip_identical:boolean;
+}
+export interface RuntimeLaunchSettings {
+  build_name:string; image_name:string; container_name:string; host_port:number; container_port:number;
+  models_volume:string; workflows_volume:string; output_volume:string;
+  models_mount_path:string; workflows_mount_path:string; output_mount_path:string;
+  gpu_mode:"auto"|"nvidia"|"none"; restart_policy:"no"|"always"|"unless-stopped"|"on-failure"; extra_arguments:string[];
+}
+export interface RuntimeLaunchPreview { command:string; lines:string[] }
