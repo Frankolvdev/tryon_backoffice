@@ -27,6 +27,15 @@ import type {
 const input =
   "h-11 w-full rounded-xl border border-white/10 bg-black/25 px-3 text-sm text-white outline-none focus:border-red-500/50";
 
+type TerminalFormat = "powershell" | "cmd" | "bash" | "single-line";
+
+const terminalLabels: Record<TerminalFormat, string> = {
+  powershell: "PowerShell",
+  cmd: "CMD",
+  bash: "Bash / Zsh",
+  "single-line": "Una sola línea",
+};
+
 const defaults: RuntimeLaunchSettings = {
   build_name: "tryon-runtime",
   image_name: "tryon-runtime:latest",
@@ -50,6 +59,7 @@ export function RuntimeMega3Panel() {
     useState<RuntimeModelExportSettings | null>(null);
   const [launch, setLaunch] = useState(defaults);
   const [preview, setPreview] = useState<RuntimeLaunchPreview | null>(null);
+  const [terminalFormat, setTerminalFormat] = useState<TerminalFormat>("powershell");
   const [analysis, setAnalysis] =
     useState<RuntimeModelVolumeAnalysis | null>(null);
   const [result, setResult] =
@@ -264,6 +274,11 @@ export function RuntimeMega3Panel() {
       setBusy(false);
     }
   };
+
+  const formattedCommand = formatDockerCommand(
+    preview?.lines || [],
+    terminalFormat,
+  );
 
   if (!settings) {
     return (
@@ -526,24 +541,69 @@ export function RuntimeMega3Panel() {
         </div>
 
         <div className="mt-5 rounded-2xl border border-white/10 bg-black/40 p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              Docker Run Preview
-            </span>
-            <button
-              onClick={() => {
-                void navigator.clipboard.writeText(preview?.command || "");
-                toast.success("Comando copiado.");
-              }}
-              className="inline-flex items-center gap-2 text-sm text-zinc-300"
-            >
-              <Clipboard size={15} />
-              Copiar
-            </button>
+          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                Docker Run Preview
+              </span>
+              <p className="mt-1 text-xs text-zinc-600">
+                Selecciona el formato compatible con tu terminal.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                className="h-9 rounded-lg border border-white/10 bg-zinc-950 px-3 text-xs text-zinc-200 outline-none focus:border-red-500/50"
+                value={terminalFormat}
+                onChange={(event) =>
+                  setTerminalFormat(event.target.value as TerminalFormat)
+                }
+              >
+                {(
+                  Object.entries(terminalLabels) as Array<
+                    [TerminalFormat, string]
+                  >
+                ).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => {
+                  void navigator.clipboard.writeText(formattedCommand);
+                  toast.success(
+                    `Comando ${terminalLabels[terminalFormat]} copiado.`,
+                  );
+                }}
+                disabled={!formattedCommand}
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 px-3 text-xs text-zinc-300 disabled:opacity-50"
+              >
+                <Clipboard size={15} />
+                Copiar
+              </button>
+            </div>
           </div>
           <pre className="overflow-x-auto whitespace-pre-wrap text-sm leading-7 text-emerald-300">
-            {preview?.command || "Generando comando…"}
+            {formattedCommand || "Generando comando…"}
           </pre>
+          {terminalFormat === "powershell" && (
+            <p className="mt-3 text-xs text-zinc-600">
+              PowerShell utiliza el acento grave (`) para continuar el comando.
+              No debe haber espacios después de ese carácter.
+            </p>
+          )}
+          {terminalFormat === "cmd" && (
+            <p className="mt-3 text-xs text-zinc-600">
+              CMD utiliza el símbolo ^ para continuar el comando en la línea
+              siguiente.
+            </p>
+          )}
+          {terminalFormat === "bash" && (
+            <p className="mt-3 text-xs text-zinc-600">
+              Bash y Zsh utilizan la barra invertida \ para continuar el
+              comando.
+            </p>
+          )}
         </div>
       </section>
 
@@ -762,6 +822,27 @@ function Summary({ result }: { result: RuntimeModelVolumeExportResponse }) {
       )}
     </section>
   );
+}
+
+function formatDockerCommand(
+  lines: string[],
+  terminal: TerminalFormat,
+): string {
+  const clean = lines.map((line) => line.trim()).filter(Boolean);
+  if (clean.length === 0) return "";
+
+  if (terminal === "single-line") {
+    return clean.join(" ");
+  }
+
+  const continuation =
+    terminal === "powershell" ? "`" : terminal === "cmd" ? "^" : "\\";
+
+  return clean
+    .map((line, index) =>
+      index < clean.length - 1 ? `${line} ${continuation}` : line,
+    )
+    .join("\n");
 }
 
 function bytes(value: number) {
