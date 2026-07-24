@@ -4,7 +4,7 @@ import { Archive, CheckCircle2, Copy, Database, HardDrive, LoaderCircle, Search,
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { browserApiRequest } from "@/lib/api/browser-api";
-import type { RuntimeContextGenerateResponse, RuntimeContextJob, RuntimeModelVolumeAnalysis, RuntimeModelVolumeExportResponse, RuntimeProject } from "@/types/admin-runtime-builder";
+import type { RuntimeContextGenerateResponse, RuntimeContextJob, RuntimeModelExportSettings, RuntimeModelVolumeAnalysis, RuntimeModelVolumeExportResponse, RuntimeProject } from "@/types/admin-runtime-builder";
 
 const inputClass = "h-11 w-full rounded-xl border border-white/10 bg-black/25 px-3 text-sm text-white outline-none transition focus:border-red-500/50";
 
@@ -17,6 +17,10 @@ export function RuntimeContextGenerator() {
   const [sha256, setSha256] = useState(true);
   const [overwrite, setOverwrite] = useState(false);
   const [skipIdentical, setSkipIdentical] = useState(true);
+  const [modelDestination, setModelDestination] = useState<RuntimeModelExportSettings["destination_type"]>("local");
+  const [dockerVolume, setDockerVolume] = useState("");
+  const [dockerPath, setDockerPath] = useState("");
+  const [dockerVolumes, setDockerVolumes] = useState<Array<{name:string}>>([]);
   const [loading, setLoading] = useState(false);
   const [volumeLoading, setVolumeLoading] = useState(false);
   const [result, setResult] = useState<RuntimeContextGenerateResponse | null>(null);
@@ -25,10 +29,21 @@ export function RuntimeContextGenerator() {
   const [job, setJob] = useState<RuntimeContextJob | null>(null);
 
   useEffect(() => {
-    void browserApiRequest<RuntimeProject>("/api/admin/runtime-builder/project").then(config => {
-      setComfyuiPath(config.source_comfyui_path || "");
-      setOutputDirectory(config.export_root_directory || "");
+    void Promise.all([
+      browserApiRequest<RuntimeProject>("/api/admin/runtime-builder/project"),
+      browserApiRequest<RuntimeModelExportSettings>("/api/admin/runtime-builder/models-volume/settings"),
+      browserApiRequest<{items:Array<{name:string}>}>("/api/admin/docker-file-manager/volumes"),
+    ]).then(([config, modelSettings, volumesResponse]) => {
+      setComfyuiPath(modelSettings.comfyui_path || config.source_comfyui_path || "");
+      setOutputDirectory(modelSettings.output_directory || config.export_root_directory || "");
       setContainerWorkdir(config.container_workdir || "/app");
+      setModelDestination(modelSettings.destination_type || "local");
+      setDockerVolume(modelSettings.docker_volume || "");
+      setDockerPath(modelSettings.docker_path === "models" ? "" : (modelSettings.docker_path || ""));
+      setSha256(modelSettings.calculate_sha256);
+      setOverwrite(modelSettings.overwrite);
+      setSkipIdentical(modelSettings.skip_identical);
+      setDockerVolumes(volumesResponse.items || []);
       if (config.export_directory) setResult({success:true,output_directory:config.export_directory,archive_path:config.last_export_archive||"",models_copied:Number((config.last_export_manifest?.summary as Record<string,unknown>|undefined)?.models_copied||0),custom_nodes_copied:Number((config.last_export_manifest?.summary as Record<string,unknown>|undefined)?.custom_nodes_copied||0),bytes_copied:Number((config.last_export_manifest?.summary as Record<string,unknown>|undefined)?.bytes_copied||0),files_generated:[],warnings:[],manifest:config.last_export_manifest||{}});
     }).catch(()=>undefined);
   }, []);
@@ -70,13 +85,24 @@ export function RuntimeContextGenerator() {
 
   const exportVolume = async () => {
     if (!comfyuiPath.trim()) return toast.error("Indica la ruta local de ComfyUI.");
+    if (modelDestination === "local" && !outputDirectory.trim()) return toast.error("Indica el directorio local de salida.");
+    if (modelDestination === "docker_volume" && !dockerVolume) return toast.error("Selecciona el volumen Docker de destino.");
+    const payload: RuntimeModelExportSettings = {
+      comfyui_path: comfyuiPath.trim(),
+      output_directory: outputDirectory.trim(),
+      destination_type: modelDestination,
+      docker_volume: modelDestination === "docker_volume" ? dockerVolume : "",
+      docker_path: modelDestination === "docker_volume" ? dockerPath.trim().replace(/^\/+|\/+$/g, "") : "",
+      calculate_sha256: sha256, overwrite, skip_identical: skipIdentical,
+    };
     setVolumeLoading(true); setVolumeResult(null);
     try {
       await saveWorkspace();
-      const created=await browserApiRequest<RuntimeContextJob>("/api/admin/runtime-builder/models-volume/export",{method:"POST",body:JSON.stringify({comfyui_path:comfyuiPath.trim(),output_directory:outputDirectory.trim()||null,calculate_sha256:sha256,overwrite,skip_identical:skipIdentical})});
+      await browserApiRequest<RuntimeModelExportSettings>("/api/admin/runtime-builder/models-volume/settings",{method:"PUT",body:JSON.stringify(payload)});
+      const created=await browserApiRequest<RuntimeContextJob>("/api/admin/runtime-builder/models-volume/export",{method:"POST",body:JSON.stringify(payload)});
       setJob(created);
       const response=await waitForJob(created) as RuntimeModelVolumeExportResponse;
-      setVolumeResult(response); toast.success("Modelos organizados para uso local y Modal Volume.");
+      setVolumeResult(response); toast.success(modelDestination === "docker_volume" ? `Modelos exportados al volumen ${dockerVolume}.` : "Modelos exportados a la carpeta local.");
     } catch(error){toast.error(error instanceof Error?error.message:"No fue posible exportar los modelos.");}
     finally{setVolumeLoading(false);}
   };
@@ -91,7 +117,12 @@ export function RuntimeContextGenerator() {
 
     <section className="luxia-panel rounded-3xl p-5">
       <div className="mb-5 flex items-start gap-4"><div className="flex size-12 items-center justify-center rounded-2xl border border-blue-500/20 bg-blue-950/25 text-blue-300"><Database /></div><div><h2 className="font-semibold text-white">Exportar modelos para Volume</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-500">Copia únicamente los modelos detectados y conserva la estructura de ComfyUI para montarla localmente o subirla a Modal Volume en <code>/app/ComfyUI/models</code>.</p></div></div>
-      <div className="grid gap-3 md:grid-cols-3"><Toggle label="Omitir archivos idénticos" checked={skipIdentical} onChange={setSkipIdentical}/><Toggle label="Verificar con SHA-256" checked={sha256} onChange={setSha256}/><Toggle label="Sobrescribir diferentes" checked={overwrite} onChange={setOverwrite}/></div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Field label="Destino de exportación"><select className={inputClass} value={modelDestination} onChange={e=>setModelDestination(e.target.value as RuntimeModelExportSettings["destination_type"])}><option value="local">Carpeta local</option><option value="docker_volume">Volumen Docker</option></select></Field>
+        {modelDestination === "local" ? <Field label="Directorio local de salida"><input className={inputClass} placeholder="C:\\exports\\models" value={outputDirectory} onChange={e=>setOutputDirectory(e.target.value)} onBlur={()=>void saveWorkspace()}/></Field> : <Field label="Volumen Docker"><select className={inputClass} value={dockerVolume} onChange={e=>setDockerVolume(e.target.value)}><option value="">Selecciona un volumen…</option>{dockerVolumes.map(volume=><option key={volume.name} value={volume.name}>{volume.name}</option>)}</select></Field>}
+      </div>
+      {modelDestination === "docker_volume" && <div className="mt-4"><Field label="Subcarpeta opcional dentro del volumen"><input className={inputClass} placeholder="Vacío = raíz del volumen" value={dockerPath} onChange={e=>setDockerPath(e.target.value)}/><span className="mt-2 block text-xs leading-5 text-zinc-600">Déjalo vacío para que unet/, vae/, loras/, checkpoints/ y las demás categorías queden directamente en la raíz del volumen, sin una carpeta models adicional.</span></Field></div>}
+      <div className="mt-4 grid gap-3 md:grid-cols-3"><Toggle label="Omitir archivos idénticos" checked={skipIdentical} onChange={setSkipIdentical}/><Toggle label="Verificar con SHA-256" checked={sha256} onChange={setSha256}/><Toggle label="Sobrescribir diferentes" checked={overwrite} onChange={setOverwrite}/></div>
       <div className="mt-5 flex flex-wrap gap-3"><button onClick={()=>void analyzeVolume()} disabled={loading||volumeLoading} className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/10 px-5 text-sm font-semibold text-zinc-200 disabled:opacity-60"><Search size={16}/>Analizar exportación</button><button onClick={()=>void exportVolume()} disabled={loading||volumeLoading} className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-700 px-5 text-sm font-semibold text-white disabled:opacity-60">{volumeLoading?<LoaderCircle size={16} className="animate-spin"/>:<Database size={16}/>} {volumeLoading?`${job?.progress??0}% · ${job?.message??"Procesando…"}`:"Exportar modelos para Volume"}</button></div>
       {analysis&&<div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Detectados" value={analysis.models_detected}/><Metric label="Encontrados" value={analysis.models_found}/><Metric label="Faltantes" value={analysis.models_missing}/><Metric label="Tamaño total" value={formatBytes(analysis.bytes_total)}/></div>}
     </section>
