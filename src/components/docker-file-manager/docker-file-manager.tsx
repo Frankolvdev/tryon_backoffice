@@ -52,16 +52,29 @@ function formatBytes(bytes: number): string {
 }
 
 function uploadFileWithProgress(
-  form: FormData,
+  file: File,
+  volume: string,
+  destinationPath: string,
   onProgress: (loaded: number, total: number) => void,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
-    request.open("POST", "/api/admin/docker-file-manager/upload");
+    const query = new URLSearchParams({
+      volume,
+      path: destinationPath,
+      overwrite: "true",
+    });
+    request.open(
+      "POST",
+      `/api/admin/docker-file-manager/upload-stream?${query.toString()}`,
+    );
     request.withCredentials = true;
+    request.setRequestHeader("Content-Type", "application/octet-stream");
+    request.setRequestHeader("X-Upload-Filename", encodeURIComponent(file.name));
 
     request.upload.onprogress = (event) => {
-      if (event.lengthComputable) onProgress(event.loaded, event.total);
+      const total = event.lengthComputable ? event.total : file.size;
+      onProgress(event.loaded, total);
     };
 
     request.onerror = () => reject(new Error("La conexión se interrumpió durante la subida."));
@@ -85,7 +98,7 @@ function uploadFileWithProgress(
       reject(new Error(message));
     };
 
-    request.send(form);
+    request.send(file);
   });
 }
 
@@ -263,11 +276,7 @@ export function DockerFileManager() {
 
     try {
       for (const [index, file] of files.entries()) {
-        const form = new FormData();
-        form.set("volume", volume);
-        form.set("path", [path, file.name].filter(Boolean).join("/"));
-        form.set("overwrite", "true");
-        form.set("file", file);
+        const destinationPath = [path, file.name].filter(Boolean).join("/");
 
         setLoadingMessage(`Subiendo ${file.name}…`);
         setUploadProgress({
@@ -282,7 +291,7 @@ export function DockerFileManager() {
           totalBytes,
         });
 
-        await uploadFileWithProgress(form, (loaded, requestTotal) => {
+        await uploadFileWithProgress(file, volume, destinationPath, (loaded, requestTotal) => {
           const fileTotal = requestTotal || file.size;
           const overallLoaded = completedBytes + Math.min(loaded, file.size);
           const sent = fileTotal > 0 && loaded >= fileTotal;

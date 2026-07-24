@@ -82,7 +82,7 @@ async function proxy(
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
 ): Promise<NextResponse> {
   const { segments = [] } = await context.params;
-  if (method === "POST" && segments[0] === "upload") {
+  if (method === "POST" && (segments[0] === "upload" || segments[0] === "upload-stream")) {
     return streamUpload(request, context);
   }
 
