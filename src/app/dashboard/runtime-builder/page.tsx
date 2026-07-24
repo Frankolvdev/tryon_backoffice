@@ -11,8 +11,9 @@ import { RuntimeContextGenerator } from "@/components/runtime-builder/runtime-co
 
 const inputClass = "h-11 w-full rounded-xl border border-white/10 bg-black/25 px-3 text-sm text-white outline-none transition focus:border-red-500/50";
 const cardClass = "luxia-panel rounded-3xl p-5";
-const safeRuntimeName = (value: string) => {
-  const normalized = value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 120).replace(/-$/g, "");
+const safeRuntimeName = (value?: string | null) => {
+  const source = typeof value === "string" ? value : "";
+  const normalized = source.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 120).replace(/-$/g, "");
   if (!normalized) return "generation-runtime";
   return /^[a-z]/.test(normalized) ? normalized : `runtime-${normalized}`;
 };
@@ -31,7 +32,10 @@ export default function RuntimeBuilderPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setConfig(await browserApiRequest<RuntimeBuilderConfig>("/api/admin/runtime-builder/config")); }
+    try {
+      const loaded = await browserApiRequest<RuntimeBuilderConfig>("/api/admin/runtime-builder/config");
+      setConfig({ ...loaded, runtime_name: safeRuntimeName(loaded.runtime_name) });
+    }
     catch (error) { toast.error(error instanceof Error ? error.message : "No fue posible cargar Runtime Builder."); }
     finally { setLoading(false); }
   }, []);
@@ -88,7 +92,7 @@ export default function RuntimeBuilderPage() {
     {tab === "import" && <RuntimeImportWizard onApplied={(value)=>{setConfig(value);setTab("base")}} />}
 
     {tab === "base" && <section className={`${cardClass} grid gap-4 md:grid-cols-2 xl:grid-cols-3`}>
-      <Field label="Nombre visible"><input className={inputClass} value={config.name} onChange={e=>patch({name:e.target.value})}/></Field><Field label="Nombre técnico del runtime"><input className={inputClass} value={config.runtime_name} onChange={e=>patch({runtime_name:safeRuntimeName(e.target.value)})}/><span className="mt-2 block text-xs text-zinc-500">Docker/Modal: {safeRuntimeName(config.runtime_name)}</span></Field><Field label="Versión"><input className={inputClass} value={config.runtime_version} onChange={e=>patch({runtime_version:e.target.value})}/></Field><Field label="Plataforma"><select className={inputClass} value={config.target_platform} onChange={e=>patch({target_platform:e.target.value})}><option>linux/amd64</option><option>linux/arm64</option></select></Field>
+      <Field label="Nombre visible"><input className={inputClass} value={config.name} onChange={e=>patch({name:e.target.value})}/></Field><Field label="Nombre técnico del runtime"><input className={inputClass} value={config.runtime_name ?? ""} onChange={e=>patch({runtime_name:safeRuntimeName(e.target.value)})}/><span className="mt-2 block text-xs text-zinc-500">Docker/Modal: {safeRuntimeName(config.runtime_name)}</span></Field><Field label="Versión"><input className={inputClass} value={config.runtime_version} onChange={e=>patch({runtime_version:e.target.value})}/></Field><Field label="Plataforma"><select className={inputClass} value={config.target_platform} onChange={e=>patch({target_platform:e.target.value})}><option>linux/amd64</option><option>linux/arm64</option></select></Field>
       <Field label="CUDA"><input className={inputClass} value={config.cuda_version} onChange={e=>patch({cuda_version:e.target.value})}/></Field><Field label="Python"><input className={inputClass} value={config.python_version} onChange={e=>patch({python_version:e.target.value})}/></Field><Field label="PyTorch index URL"><input className={inputClass} value={config.pytorch_index_url} onChange={e=>patch({pytorch_index_url:e.target.value})}/></Field>
       <Field label="Repositorio ComfyUI" wide><input className={inputClass} value={config.comfyui_repository} onChange={e=>patch({comfyui_repository:e.target.value})}/></Field><Field label="Commit ComfyUI"><input className={inputClass} value={config.comfyui_commit ?? ""} onChange={e=>patch({comfyui_commit:e.target.value || null})}/></Field>
       <Field label="Imagen del registro" wide><input className={inputClass} value={config.registry_image} onChange={e=>patch({registry_image:e.target.value})}/></Field><Field label="Notas" wide><textarea className="min-h-24 w-full rounded-xl border border-white/10 bg-black/25 p-3 text-sm text-white" value={config.notes ?? ""} onChange={e=>patch({notes:e.target.value || null})}/></Field>
