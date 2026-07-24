@@ -7,6 +7,7 @@ import { browserApiRequest } from "@/lib/api/browser-api";
 import type { RuntimeBuilderConfig, RuntimeGeneratedFiles, RuntimeValidationResponse } from "@/types/admin-runtime-builder";
 import { RuntimeBuildPanel } from "@/components/runtime-builder/runtime-build-panel";
 import { RuntimeImportWizard } from "@/components/runtime-builder/runtime-import-wizard";
+import { RuntimeContextGenerator } from "@/components/runtime-builder/runtime-context-generator";
 import { RuntimeMega3Panel } from "@/components/runtime-builder/runtime-mega3-panel";
 
 const inputClass = "h-11 w-full rounded-xl border border-white/10 bg-black/25 px-3 text-sm text-white outline-none transition focus:border-red-500/50";
@@ -21,7 +22,7 @@ const REQUIRED_NODE_NAMES = ["ComfyUI-Manager", "rgthree-comfy", "ComfyUI-Easy-U
 const UNIVERSAL_PROFILE = { python_version:"3.11", cuda_version:"12.8.1", pytorch_index_url:"https://download.pytorch.org/whl/cu128", comfyui_commit:"3dd10a59c00248d00f0cb0ab794ff1bb9fb00a5f", target_platform:"linux/amd64" };
 
 
-type Tab = "import" | "base" | "nodes" | "models" | "dependencies" | "environment" | "preview" | "generator" | "builds";
+type Tab = "import" | "base" | "nodes" | "models" | "dependencies" | "environment" | "preview" | "generator" | "model-export" | "builds";
 
 export default function RuntimeBuilderPage() {
   const [config, setConfig] = useState<RuntimeBuilderConfig | null>(null);
@@ -69,7 +70,7 @@ export default function RuntimeBuilderPage() {
 
   const tabs: {id: Tab; label: string}[] = [
     {id:"import",label:"1–3. Preparar Runtime"},{id:"base",label:"4. Configuración base"},{id:"nodes",label:`4. Custom Nodes (${config.custom_nodes.length})`},{id:"models",label:`4. Modelos (${config.models.length})`},
-    {id:"dependencies",label:"4. Dependencias"},{id:"environment",label:"4. Variables y volúmenes"},{id:"preview",label:"5. Validar y generar archivos"},{id:"generator",label:"6. Generar Runtime"},{id:"builds",label:"7–9. Build & Deploy"},
+    {id:"dependencies",label:"4. Dependencias"},{id:"environment",label:"4. Variables y volúmenes"},{id:"preview",label:"5. Validar y generar archivos"},{id:"generator",label:"6. Generar Runtime"},{id:"model-export",label:"Modelos y Docker"},{id:"builds",label:"7–9. Build & Deploy"},
   ];
 
   return <div className="space-y-5">
@@ -112,7 +113,8 @@ export default function RuntimeBuilderPage() {
     {tab === "environment" && <div className="grid gap-5 xl:grid-cols-2"><ListEditor title="Variables de entorno" onAdd={()=>patch({environment_variables:[...config.environment_variables,{key:"",value:null,secret:false,required:false}]})}>{config.environment_variables.map((env,index)=><div key={index} className="grid gap-3 rounded-2xl border border-white/8 bg-black/20 p-4 md:grid-cols-[1fr_1fr_auto]"><input placeholder="CLAVE" className={inputClass} value={env.key} onChange={e=>patch({environment_variables:config.environment_variables.map((v,i)=>i===index?{...v,key:e.target.value.toUpperCase()}:v)})}/><input placeholder={env.secret?"Secreto no almacenado":"Valor"} className={inputClass} value={env.value ?? ""} onChange={e=>patch({environment_variables:config.environment_variables.map((v,i)=>i===index?{...v,value:e.target.value||null}:v)})}/><Delete onClick={()=>patch({environment_variables:config.environment_variables.filter((_,i)=>i!==index)})}/></div>)}</ListEditor><ListEditor title="Volúmenes" onAdd={()=>patch({volumes:[...config.volumes,{name:"models",mount_path:"/opt/ComfyUI/models",read_only:false}]})}>{config.volumes.map((volume,index)=><div key={index} className="grid gap-3 rounded-2xl border border-white/8 bg-black/20 p-4 md:grid-cols-[1fr_2fr_auto]"><input placeholder="Nombre" className={inputClass} value={volume.name} onChange={e=>patch({volumes:config.volumes.map((v,i)=>i===index?{...v,name:e.target.value}:v)})}/><input placeholder="Ruta de montaje" className={inputClass} value={volume.mount_path} onChange={e=>patch({volumes:config.volumes.map((v,i)=>i===index?{...v,mount_path:e.target.value}:v)})}/><Delete onClick={()=>patch({volumes:config.volumes.filter((_,i)=>i!==index)})}/></div>)}</ListEditor></div>}
 
     {tab === "preview" && <section className={cardClass}>{!generated ? <div className="py-16 text-center text-zinc-500"><FileJson2 className="mx-auto mb-3"/>Pulsa “Generar archivos” para crear el Dockerfile y los manifiestos.</div> : <div className="space-y-5"><CodeBlock title="Dockerfile" value={generated.dockerfile}/><CodeBlock title="entrypoint.sh" value={generated.entrypoint}/><CodeBlock title="runtime-manifest.json" value={JSON.stringify(generated.runtime_manifest,null,2)}/><CodeBlock title="custom-nodes.lock.json" value={JSON.stringify(generated.custom_nodes_lock,null,2)}/><CodeBlock title="models-manifest.json" value={JSON.stringify(generated.models_manifest,null,2)}/></div>}</section>}
-    {tab === "generator" && <RuntimeMega3Panel />}
+    {tab === "generator" && <RuntimeContextGenerator />}
+    {tab === "model-export" && <RuntimeMega3Panel />}
     {tab === "builds" && <RuntimeBuildPanel />}
   </div>;
 }
