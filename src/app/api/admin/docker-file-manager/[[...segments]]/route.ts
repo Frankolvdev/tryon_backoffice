@@ -64,7 +64,10 @@ async function streamUpload(
       responseHeaders.set("Content-Type", responseContentType);
     }
 
-    return new NextResponse(response.body, {
+    // The backend response is a tiny JSON document. Buffering it here guarantees
+    // the browser receives a closed response and XMLHttpRequest fires `load`.
+    const responseBody = await response.arrayBuffer();
+    return new NextResponse(responseBody, {
       status: response.status,
       headers: responseHeaders,
     });

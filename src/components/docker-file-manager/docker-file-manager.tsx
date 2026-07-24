@@ -31,6 +31,7 @@ const btn =
   "inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 px-3 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-40";
 
 type UploadProgressState = {
+  phase: "uploading" | "processing" | "completed";
   currentFile: string;
   currentFileIndex: number;
   totalFiles: number;
@@ -270,6 +271,7 @@ export function DockerFileManager() {
 
         setLoadingMessage(`Subiendo ${file.name}…`);
         setUploadProgress({
+          phase: "uploading",
           currentFile: file.name,
           currentFileIndex: index + 1,
           totalFiles: files.length,
@@ -283,7 +285,12 @@ export function DockerFileManager() {
         await uploadFileWithProgress(form, (loaded, requestTotal) => {
           const fileTotal = requestTotal || file.size;
           const overallLoaded = completedBytes + Math.min(loaded, file.size);
+          const sent = fileTotal > 0 && loaded >= fileTotal;
+          if (sent) {
+            setLoadingMessage(`Guardando ${file.name} en el volumen Docker…`);
+          }
           setUploadProgress({
+            phase: sent ? "processing" : "uploading",
             currentFile: file.name,
             currentFileIndex: index + 1,
             totalFiles: files.length,
@@ -305,6 +312,7 @@ export function DockerFileManager() {
         current
           ? {
               ...current,
+              phase: "completed",
               filePercent: 100,
               totalPercent: 100,
               uploadedBytes: totalBytes,
@@ -534,14 +542,20 @@ export function DockerFileManager() {
               <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                 <div>
                   <p className="font-medium text-white">
-                    Subiendo {uploadProgress.currentFileIndex} de {uploadProgress.totalFiles}
+                    {uploadProgress.phase === "processing"
+                      ? `Procesando ${uploadProgress.currentFileIndex} de ${uploadProgress.totalFiles}`
+                      : uploadProgress.phase === "completed"
+                        ? `Completado ${uploadProgress.currentFileIndex} de ${uploadProgress.totalFiles}`
+                        : `Subiendo ${uploadProgress.currentFileIndex} de ${uploadProgress.totalFiles}`}
                   </p>
                   <p className="mt-1 break-all text-xs text-zinc-400">
                     {uploadProgress.currentFile}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold text-red-300">{uploadProgress.totalPercent}%</p>
+                  <p className="font-semibold text-red-300">
+                    {uploadProgress.phase === "processing" ? "Guardando…" : `${uploadProgress.totalPercent}%`}
+                  </p>
                   <p className="text-xs text-zinc-500">
                     {formatBytes(uploadProgress.uploadedBytes)} de {formatBytes(uploadProgress.totalBytes)}
                   </p>
@@ -549,12 +563,16 @@ export function DockerFileManager() {
               </div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
                 <div
-                  className="h-full rounded-full bg-red-600 transition-[width] duration-150"
+                  className={`h-full rounded-full bg-red-600 ${uploadProgress.phase === "processing" ? "animate-pulse" : "transition-[width] duration-150"}`}
                   style={{ width: `${uploadProgress.totalPercent}%` }}
                 />
               </div>
               <p className="mt-2 text-xs text-zinc-500">
-                Progreso del archivo actual: {uploadProgress.filePercent}%
+                {uploadProgress.phase === "processing"
+                  ? "El navegador ya terminó de enviar el archivo. El backend lo está escribiendo y verificando dentro del volumen; no cierres esta página."
+                  : uploadProgress.phase === "completed"
+                    ? "El backend confirmó que el archivo quedó guardado en el volumen."
+                    : `Progreso del archivo actual: ${uploadProgress.filePercent}%`}
               </p>
             </div>
           )}
