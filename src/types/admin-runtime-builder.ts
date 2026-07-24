@@ -111,6 +111,17 @@ export interface RuntimeContextGenerateResponse {
   success: boolean; output_directory: string; archive_path: string; models_copied: number; custom_nodes_copied: number; bytes_copied: number; files_generated: string[]; warnings: string[]; manifest: Record<string, unknown>;
 }
 
+export interface RuntimeModelVolumeAnalysis {
+  source_comfyui: string; models_detected: number; models_found: number; models_missing: number; bytes_total: number;
+  items: Array<RuntimeModelAsset & {found:boolean; source_path:string|null; relative_path:string|null; size_bytes:number}>;
+}
+
+export interface RuntimeModelVolumeExportResponse {
+  success:boolean; output_directory:string; models_directory:string; manifest_path:string;
+  models_detected:number; models_found:number; models_missing:number; models_copied:number; models_skipped:number; bytes_copied:number;
+  warnings:string[]; manifest:Record<string, unknown>;
+}
+
 export interface RuntimeProject {
   id: number; runtime_config_id: number | null; project_key: string; module_type: string;
   source_comfyui_path: string | null; workflow_filename: string | null; workflow_json: Record<string, unknown> | null;
@@ -129,7 +140,7 @@ export interface RuntimeContextJob {
   progress: number;
   message: string;
   error: string | null;
-  result: RuntimeContextGenerateResponse | null;
+  result: RuntimeContextGenerateResponse | RuntimeModelVolumeExportResponse | null;
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
