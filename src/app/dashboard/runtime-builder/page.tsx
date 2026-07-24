@@ -11,6 +11,13 @@ import { RuntimeContextGenerator } from "@/components/runtime-builder/runtime-co
 
 const inputClass = "h-11 w-full rounded-xl border border-white/10 bg-black/25 px-3 text-sm text-white outline-none transition focus:border-red-500/50";
 const cardClass = "luxia-panel rounded-3xl p-5";
+const safeRuntimeName = (value: string) => {
+  const normalized = value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 120).replace(/-$/g, "");
+  if (!normalized) return "generation-runtime";
+  return /^[a-z]/.test(normalized) ? normalized : `runtime-${normalized}`;
+};
+const REQUIRED_NODE_NAMES = ["rgthree-comfy", "ComfyUI-KJNodes", "comfyui-essentials", "was-node-suite-comfyui", "ComfyLiterals", "Anomalous_Model_Browser"];
+
 
 type Tab = "import" | "base" | "nodes" | "models" | "dependencies" | "environment" | "preview" | "generator" | "builds";
 
@@ -81,13 +88,13 @@ export default function RuntimeBuilderPage() {
     {tab === "import" && <RuntimeImportWizard onApplied={(value)=>{setConfig(value);setTab("base")}} />}
 
     {tab === "base" && <section className={`${cardClass} grid gap-4 md:grid-cols-2 xl:grid-cols-3`}>
-      <Field label="Nombre"><input className={inputClass} value={config.name} onChange={e=>patch({name:e.target.value})}/></Field><Field label="Versión"><input className={inputClass} value={config.runtime_version} onChange={e=>patch({runtime_version:e.target.value})}/></Field><Field label="Plataforma"><select className={inputClass} value={config.target_platform} onChange={e=>patch({target_platform:e.target.value})}><option>linux/amd64</option><option>linux/arm64</option></select></Field>
+      <Field label="Nombre visible"><input className={inputClass} value={config.name} onChange={e=>patch({name:e.target.value})}/></Field><Field label="Nombre técnico del runtime"><input className={inputClass} value={config.runtime_name} onChange={e=>patch({runtime_name:safeRuntimeName(e.target.value)})}/><span className="mt-2 block text-xs text-zinc-500">Docker/Modal: {safeRuntimeName(config.runtime_name)}</span></Field><Field label="Versión"><input className={inputClass} value={config.runtime_version} onChange={e=>patch({runtime_version:e.target.value})}/></Field><Field label="Plataforma"><select className={inputClass} value={config.target_platform} onChange={e=>patch({target_platform:e.target.value})}><option>linux/amd64</option><option>linux/arm64</option></select></Field>
       <Field label="CUDA"><input className={inputClass} value={config.cuda_version} onChange={e=>patch({cuda_version:e.target.value})}/></Field><Field label="Python"><input className={inputClass} value={config.python_version} onChange={e=>patch({python_version:e.target.value})}/></Field><Field label="PyTorch index URL"><input className={inputClass} value={config.pytorch_index_url} onChange={e=>patch({pytorch_index_url:e.target.value})}/></Field>
       <Field label="Repositorio ComfyUI" wide><input className={inputClass} value={config.comfyui_repository} onChange={e=>patch({comfyui_repository:e.target.value})}/></Field><Field label="Commit ComfyUI"><input className={inputClass} value={config.comfyui_commit ?? ""} onChange={e=>patch({comfyui_commit:e.target.value || null})}/></Field>
       <Field label="Imagen del registro" wide><input className={inputClass} value={config.registry_image} onChange={e=>patch({registry_image:e.target.value})}/></Field><Field label="Notas" wide><textarea className="min-h-24 w-full rounded-xl border border-white/10 bg-black/25 p-3 text-sm text-white" value={config.notes ?? ""} onChange={e=>patch({notes:e.target.value || null})}/></Field>
     </section>}
 
-    {tab === "nodes" && <ListEditor title="Custom Nodes" onAdd={()=>patch({custom_nodes:[...config.custom_nodes,{name:"",repository:"",commit:null,enabled:true,install_requirements:true}]})}>{config.custom_nodes.map((node,index)=><div key={index} className="grid gap-3 rounded-2xl border border-white/8 bg-black/20 p-4 lg:grid-cols-[1fr_2fr_1fr_auto]">
+    {tab === "nodes" && <ListEditor title="Custom Nodes" onAdd={()=>patch({custom_nodes:[...config.custom_nodes,{name:"",repository:"",commit:null,enabled:true,install_requirements:true}]})}><div className="mb-4 rounded-2xl border border-emerald-500/15 bg-emerald-950/10 p-4"><p className="text-sm font-semibold text-emerald-300">Paquetes base obligatorios</p><div className="mt-3 flex flex-wrap gap-2">{REQUIRED_NODE_NAMES.map(name=><span key={name} className="rounded-lg border border-emerald-500/15 px-2.5 py-1 text-xs text-emerald-200">✓ {name}</span>)}</div><p className="mt-3 text-xs text-zinc-500">Se incorporan siempre a la imagen, incluso cuando el workflow los usa dentro de subgrafos.</p></div>{config.custom_nodes.map((node,index)=><div key={index} className="grid gap-3 rounded-2xl border border-white/8 bg-black/20 p-4 lg:grid-cols-[1fr_2fr_1fr_auto]">
       <input placeholder="Nombre" className={inputClass} value={node.name} onChange={e=>patch({custom_nodes:config.custom_nodes.map((n,i)=>i===index?{...n,name:e.target.value}:n)})}/><input placeholder="Repositorio Git" className={inputClass} value={node.repository} onChange={e=>patch({custom_nodes:config.custom_nodes.map((n,i)=>i===index?{...n,repository:e.target.value}:n)})}/><input placeholder="Commit fijo" className={inputClass} value={node.commit ?? ""} onChange={e=>patch({custom_nodes:config.custom_nodes.map((n,i)=>i===index?{...n,commit:e.target.value||null}:n)})}/><Delete onClick={()=>patch({custom_nodes:config.custom_nodes.filter((_,i)=>i!==index)})}/></div>)}</ListEditor>}
 
     {tab === "models" && <ListEditor title="Catálogo de modelos" onAdd={()=>patch({models:[...config.models,{name:"",model_type:"other",source_url:null,target_path:"",sha256:null,strategy:"volume",enabled:true}]})}>{config.models.map((model,index)=><div key={index} className="grid gap-3 rounded-2xl border border-white/8 bg-black/20 p-4 lg:grid-cols-3">
