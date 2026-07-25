@@ -467,9 +467,9 @@ export function RuntimeMega3Panel() {
           <div className="md:col-span-2 xl:col-span-3 rounded-xl border border-white/8 bg-black/20 px-4 py-3 text-xs text-zinc-500">
             Imagen que ejecutará Docker:{" "}
             <strong className="text-zinc-300">
-              {runtimeImageReference(launch.build_name)}
+              {runtimeImageReference(launch)}
             </strong>
-            . El campo “Nombre de imagen” se conserva como metadato de publicación y no reemplaza el build local.
+            . Se usa “Nombre de imagen” cuando está configurado; de lo contrario se utiliza el nombre del build local.
           </div>
           <NumberField
             label="Puerto host"
@@ -816,11 +816,15 @@ function Summary({ result }: { result: RuntimeModelVolumeExportResponse }) {
 }
 
 
+function asTrimmedString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 function runtimeImageReference(launch: RuntimeLaunchSettings): string {
-  const configuredImage = launch.image_name.trim();
+  const configuredImage = asTrimmedString(launch?.image_name);
   if (configuredImage) return configuredImage;
 
-  const buildName = launch.build_name.trim();
+  const buildName = asTrimmedString(launch?.build_name);
   if (!buildName) return "tryon-runtime:latest";
 
   const lastSlash = buildName.lastIndexOf("/");
@@ -833,39 +837,50 @@ function buildInteractiveDockerRunLines(
 ): string[] {
   const lines = ["docker run -it"];
 
+  const restartPolicy =
+    asTrimmedString(launch?.restart_policy) || "no";
+
   // Docker no permite --rm junto con una política de reinicio.
-  if (launch.restart_policy === "no") {
+  if (restartPolicy === "no") {
     lines.push("  --rm");
   } else {
-    lines.push(`  --restart ${launch.restart_policy}`);
+    lines.push(`  --restart ${restartPolicy}`);
   }
 
-  if (launch.gpu_mode === "nvidia" || launch.gpu_mode === "auto") {
+  const gpuMode = asTrimmedString(launch?.gpu_mode);
+  if (gpuMode === "nvidia" || gpuMode === "auto") {
     lines.push("  --gpus all");
   }
 
-  if (launch.container_name.trim()) {
-    lines.push(`  --name ${launch.container_name.trim()}`);
+  const containerName = asTrimmedString(launch?.container_name);
+  if (containerName) {
+    lines.push(`  --name ${containerName}`);
   }
 
-  lines.push(`  -p ${launch.host_port}:${launch.container_port}`);
+  const hostPort = Number(launch?.host_port) || 8190;
+  const containerPort = Number(launch?.container_port) || 8188;
+  lines.push(`  -p ${hostPort}:${containerPort}`);
 
-  const mounts = [
-    [launch.models_volume, launch.models_mount_path],
-    [launch.workflows_volume, launch.workflows_mount_path],
-    [launch.output_volume, launch.output_mount_path],
-  ] as const;
+  const mounts: Array<[unknown, unknown]> = [
+    [launch?.models_volume, launch?.models_mount_path],
+    [launch?.workflows_volume, launch?.workflows_mount_path],
+    [launch?.output_volume, launch?.output_mount_path],
+  ];
 
   for (const [volume, destination] of mounts) {
-    const normalizedVolume = volume.trim();
-    const normalizedDestination = destination.trim();
+    const normalizedVolume = asTrimmedString(volume);
+    const normalizedDestination = asTrimmedString(destination);
     if (normalizedVolume && normalizedDestination) {
       lines.push(`  -v ${normalizedVolume}:${normalizedDestination}`);
     }
   }
 
-  for (const argument of launch.extra_arguments || []) {
-    const normalized = argument.trim();
+  const extraArguments = Array.isArray(launch?.extra_arguments)
+    ? launch.extra_arguments
+    : [];
+
+  for (const argument of extraArguments) {
+    const normalized = asTrimmedString(argument);
     if (normalized) lines.push(`  ${normalized}`);
   }
 
