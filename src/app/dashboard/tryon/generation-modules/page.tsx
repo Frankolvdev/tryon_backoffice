@@ -21,6 +21,7 @@ const engines: { value: GenerationExecutionEngine; label: string }[] = [
   { value: "simulated", label: "Simulado" },
   { value: "local_docker", label: "Docker local" },
   { value: "runpod_serverless", label: "RunPod Serverless" },
+  { value: "modal", label: "Modal" },
 ];
 const inputTypes = ["image", "file", "text", "integer", "float", "boolean", "json"] as const;
 const outputTypes = ["image", "images", "file", "json", "metadata"] as const;

@@ -20,6 +20,7 @@ const modalDefaults: ModalProviderConfig = {
   token_secret_configured: false,
   environment: "main",
   app_name: "tryon-generation-runtime",
+  runtime_url: "",
   volume_name: "tryon-models",
   gpu: "L40S",
   timeout_seconds: 900,
@@ -141,6 +142,7 @@ export default function InfrastructureProvidersPage() {
             <label className="space-y-2 text-sm text-zinc-300">Token Secret<input type="password" className={inputClass} value={modal.token_secret} placeholder={modal.token_secret_configured ? "Configurado; deja vacío para conservarlo" : "Introduce el Token Secret"} onChange={(e) => setModal({ ...modal, token_secret: e.target.value })} /></label>
             <label className="space-y-2 text-sm text-zinc-300">Environment<input className={inputClass} value={modal.environment} onChange={(e) => setModal({ ...modal, environment: e.target.value })} /></label>
             <label className="space-y-2 text-sm text-zinc-300">Nombre de aplicación<input className={inputClass} value={modal.app_name} onChange={(e) => setModal({ ...modal, app_name: e.target.value })} /></label>
+            <label className="space-y-2 text-sm text-zinc-300 lg:col-span-2">URL pública del runtime Modal<input className={inputClass} placeholder="https://...modal.run" value={modal.runtime_url} onChange={(e) => setModal({ ...modal, runtime_url: e.target.value })} /><span className="block text-xs text-zinc-500">Es la URL desplegada de ComfyUI. El backend usará <code>/api/tryon/pipeline</code> para enviar el pipeline completo.</span></label>
             <label className="space-y-2 text-sm text-zinc-300">Nombre de volumen<input className={inputClass} value={modal.volume_name} onChange={(e) => setModal({ ...modal, volume_name: e.target.value })} /></label>
             <label className="space-y-2 text-sm text-zinc-300">GPU<select className={inputClass} value={modal.gpu} onChange={(e) => setModal({ ...modal, gpu: e.target.value })}><option value="L40S">L40S</option><option value="A100-80GB">A100 80 GB</option><option value="H100">H100</option><option value="B200">B200</option></select></label>
             <label className="space-y-2 text-sm text-zinc-300">Timeout (segundos)<input type="number" min={60} max={86400} className={inputClass} value={modal.timeout_seconds} onChange={(e) => setModal({ ...modal, timeout_seconds: Number(e.target.value) })} /></label>

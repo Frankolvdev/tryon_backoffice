@@ -1,4 +1,4 @@
-export type GenerationExecutionEngine = "simulated" | "local_docker" | "runpod_serverless";
+export type GenerationExecutionEngine = "simulated" | "local_docker" | "runpod_serverless" | "modal";
 export type GenerationModuleInputType = "image" | "file" | "text" | "integer" | "float" | "boolean" | "json";
 export type GenerationModuleOutputType = "image" | "images" | "file" | "json" | "metadata";
 export type GenerationModuleStepType = "workflow" | "python";
@@ -47,7 +47,7 @@ export type GenerationExecutionOrigin = "appweb" | "backoffice" | "admin" | "api
 export interface GenerationModuleExecution { id: string; module_id: number; module_key: string; user_id?: number | null; engine: GenerationExecutionEngine; status: GenerationExecutionStatus; progress: number; inputs: Record<string, unknown>; context: Record<string, unknown>; outputs: Record<string, unknown>; steps: GenerationStepExecution[]; logs: GenerationExecutionLog[]; error?: string | null; created_at: string; started_at?: string | null; finished_at?: string | null; duration_ms?: number | null; cancel_requested: boolean; pricing_rule_id?: number | null; tokens_charged?: number; tokens_refunded?: boolean; currency?: string | null; commercial_price?: number | null; queue_name?: string | null; queue_position?: number | null; provider_status?: string | null; provider_job_id?: string | null; provider_endpoint_id?: string | null; dispatch_attempts?: number; heartbeat_at?: string | null; }
 
 export interface GenerationRuntimeHealthItem { available: boolean; base_url?: string; endpoint_id?: string; error?: string; mode?: string; supports_cancel?: boolean; supports_progress?: boolean; }
-export interface GenerationRuntimeHealth { simulated: GenerationRuntimeHealthItem; local_docker: GenerationRuntimeHealthItem; runpod_serverless: GenerationRuntimeHealthItem; }
+export interface GenerationRuntimeHealth { simulated: GenerationRuntimeHealthItem; local_docker: GenerationRuntimeHealthItem; runpod_serverless: GenerationRuntimeHealthItem; modal: GenerationRuntimeHealthItem; }
 
 export interface PipelinePort { key: string; label: string; type: string; source: string; path: string; }
 export interface PipelineConnectionSuggestion { targetKey: string; sourcePath: string; confidence: "exact" | "type" | "fallback"; }

@@ -5,6 +5,7 @@ export interface ModalProviderConfig {
   token_secret_configured: boolean;
   environment: string;
   app_name: string;
+  runtime_url: string;
   volume_name: string;
   gpu: string;
   timeout_seconds: number;
