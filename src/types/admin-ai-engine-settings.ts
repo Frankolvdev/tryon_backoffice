@@ -10,6 +10,7 @@ export interface AiEngineSettings {
   modal_min_containers: number;
   modal_max_containers: number;
   modal_concurrency: number;
+  modal_input_concurrency: number;
   modal_scaledown_window_seconds: number;
   modal_execution_timeout_seconds: number;
   queue_block_seconds: number;
