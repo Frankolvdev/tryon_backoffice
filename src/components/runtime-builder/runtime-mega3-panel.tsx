@@ -17,7 +17,6 @@ import { toast } from "sonner";
 import { browserApiRequest } from "@/lib/api/browser-api";
 import type {
   RuntimeContextJob,
-  RuntimeLaunchPreview,
   RuntimeLaunchSettings,
   RuntimeModelExportSettings,
   RuntimeModelVolumeAnalysis,
@@ -37,9 +36,9 @@ const terminalLabels: Record<TerminalFormat, string> = {
 };
 
 const defaults: RuntimeLaunchSettings = {
-  build_name: "tryon-runtime",
-  image_name: "tryon-runtime:latest",
-  container_name: "tryon-comfyui",
+  build_name: "ia-comfyui-python-build",
+  image_name: "ia-comfyui-python",
+  container_name: "ia-comfyui-python-container",
   host_port: 8190,
   container_port: 8188,
   models_volume: "",
@@ -58,7 +57,6 @@ export function RuntimeMega3Panel() {
   const [settings, setSettings] =
     useState<RuntimeModelExportSettings | null>(null);
   const [launch, setLaunch] = useState(defaults);
-  const [preview, setPreview] = useState<RuntimeLaunchPreview | null>(null);
   const [terminalFormat, setTerminalFormat] = useState<TerminalFormat>("powershell");
   const [analysis, setAnalysis] =
     useState<RuntimeModelVolumeAnalysis | null>(null);
@@ -96,20 +94,6 @@ export function RuntimeMega3Panel() {
       ),
     );
   }, [load]);
-
-  useEffect(() => {
-    const id = setTimeout(
-      () =>
-        void browserApiRequest<RuntimeLaunchPreview>(
-          "/api/admin/runtime-builder/runtime-launch/preview",
-          { method: "POST", body: JSON.stringify(launch) },
-        )
-          .then(setPreview)
-          .catch(() => undefined),
-      250,
-    );
-    return () => clearTimeout(id);
-  }, [launch]);
 
   const patch = <K extends keyof RuntimeModelExportSettings>(
     key: K,
@@ -276,7 +260,7 @@ export function RuntimeMega3Panel() {
   };
 
   const formattedCommand = formatDockerCommand(
-    preview?.lines || [],
+    buildInteractiveDockerRunLines(launch),
     terminalFormat,
   );
 
@@ -462,7 +446,7 @@ export function RuntimeMega3Panel() {
           icon={<Container />}
           eyebrow="Runtime Configuration"
           title="Configuración de ejecución Docker"
-          text="Define nombres, puertos, GPU y volúmenes. El comando se regenera automáticamente."
+          text="El comando usa el build real con su tag 1.0.0, se ejecuta en modo interactivo y se elimina al salir."
         />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <Text
@@ -480,6 +464,13 @@ export function RuntimeMega3Panel() {
             value={launch.container_name}
             set={(value) => patchLaunch("container_name", value)}
           />
+          <div className="md:col-span-2 xl:col-span-3 rounded-xl border border-white/8 bg-black/20 px-4 py-3 text-xs text-zinc-500">
+            Imagen que ejecutará Docker:{" "}
+            <strong className="text-zinc-300">
+              {runtimeImageReference(launch.build_name)}
+            </strong>
+            . El campo “Nombre de imagen” se conserva como metadato de publicación y no reemplaza el build local.
+          </div>
           <NumberField
             label="Puerto host"
             value={launch.host_port}
@@ -544,10 +535,10 @@ export function RuntimeMega3Panel() {
           <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                Docker Run Preview
+                Docker Run interactivo
               </span>
               <p className="mt-1 text-xs text-zinc-600">
-                Selecciona el formato compatible con tu terminal.
+                Comando real con --rm -it, GPU, puertos, volúmenes y el build local.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -822,6 +813,52 @@ function Summary({ result }: { result: RuntimeModelVolumeExportResponse }) {
       )}
     </section>
   );
+}
+
+
+function runtimeImageReference(buildName: string): string {
+  const trimmed = buildName.trim();
+  if (!trimmed) return "ia-comfyui-python-build:1.0.0";
+
+  const lastSlash = trimmed.lastIndexOf("/");
+  const lastColon = trimmed.lastIndexOf(":");
+  return lastColon > lastSlash ? trimmed : `${trimmed}:1.0.0`;
+}
+
+function buildInteractiveDockerRunLines(
+  launch: RuntimeLaunchSettings,
+): string[] {
+  const lines = ["docker run --rm -it"];
+
+  if (launch.gpu_mode === "nvidia" || launch.gpu_mode === "auto") {
+    lines.push("  --gpus all");
+  }
+
+  if (launch.container_name.trim()) {
+    lines.push(`  --name ${launch.container_name.trim()}`);
+  }
+
+  lines.push(`  -p ${launch.host_port}:${launch.container_port}`);
+
+  const mounts = [
+    [launch.models_volume, launch.models_mount_path],
+    [launch.workflows_volume, launch.workflows_mount_path],
+    [launch.output_volume, launch.output_mount_path],
+  ] as const;
+
+  for (const [volume, destination] of mounts) {
+    if (volume.trim() && destination.trim()) {
+      lines.push(`  -v ${volume.trim()}:${destination.trim()}`);
+    }
+  }
+
+  for (const argument of launch.extra_arguments || []) {
+    const normalized = argument.trim();
+    if (normalized) lines.push(`  ${normalized}`);
+  }
+
+  lines.push(`  ${runtimeImageReference(launch.build_name)}`);
+  return lines;
 }
 
 function formatDockerCommand(
