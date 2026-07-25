@@ -331,7 +331,6 @@ export function RuntimeMega3Panel() {
             >
               <option value="local">Carpeta local</option>
               <option value="docker_volume">Volumen Docker</option>
-              <option value="modal">Volumen Modal</option>
             </select>
           </Field>
         </div>
@@ -362,27 +361,6 @@ export function RuntimeMega3Panel() {
               <span className="mt-2 block text-xs text-zinc-600">
                 Déjalo vacío para exportar directamente unet/, vae/, loras/ y
                 las demás categorías en la raíz.
-              </span>
-            </Field>
-          </div>
-        )}
-
-
-
-        {settings.destination_type === "modal" && (
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <Field label="Proveedor">
-              <div className="flex h-11 items-center rounded-xl border border-white/10 bg-black/25 px-3 text-sm text-zinc-300">Modal · usa el volumen configurado en Proveedores de infraestructura</div>
-            </Field>
-            <Field label="Subcarpeta opcional dentro del volumen Modal">
-              <input
-                className={input}
-                value={settings.docker_path}
-                onChange={(event) => patch("docker_path", event.target.value)}
-                placeholder="Vacío = raíz del volumen"
-              />
-              <span className="mt-2 block text-xs text-zinc-600">
-                Déjalo vacío para exportar directamente las categorías de modelos en la raíz del volumen Modal.
               </span>
             </Field>
           </div>
@@ -468,7 +446,7 @@ export function RuntimeMega3Panel() {
           icon={<Container />}
           eyebrow="Runtime Configuration"
           title="Configuración de ejecución Docker"
-          text="El comando usa el build real con su tag 1.0.0, se ejecuta en modo interactivo y se elimina al salir."
+          text="El comando se genera desde la Runtime Configuration guardada: imagen, nombre, puertos, GPU, reinicio, volúmenes y argumentos adicionales."
         />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <Text
@@ -560,7 +538,7 @@ export function RuntimeMega3Panel() {
                 Docker Run interactivo
               </span>
               <p className="mt-1 text-xs text-zinc-600">
-                Comando real con --rm -it, GPU, puertos, volúmenes y el build local.
+                Comando real según la configuración actual. Usa --rm solo cuando la política de reinicio es “no”.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -838,19 +816,29 @@ function Summary({ result }: { result: RuntimeModelVolumeExportResponse }) {
 }
 
 
-function runtimeImageReference(buildName: string): string {
-  const trimmed = buildName.trim();
-  if (!trimmed) return "ia-comfyui-python-build:1.0.0";
+function runtimeImageReference(launch: RuntimeLaunchSettings): string {
+  const configuredImage = launch.image_name.trim();
+  if (configuredImage) return configuredImage;
 
-  const lastSlash = trimmed.lastIndexOf("/");
-  const lastColon = trimmed.lastIndexOf(":");
-  return lastColon > lastSlash ? trimmed : `${trimmed}:1.0.0`;
+  const buildName = launch.build_name.trim();
+  if (!buildName) return "tryon-runtime:latest";
+
+  const lastSlash = buildName.lastIndexOf("/");
+  const lastColon = buildName.lastIndexOf(":");
+  return lastColon > lastSlash ? buildName : `${buildName}:latest`;
 }
 
 function buildInteractiveDockerRunLines(
   launch: RuntimeLaunchSettings,
 ): string[] {
-  const lines = ["docker run --rm -it"];
+  const lines = ["docker run -it"];
+
+  // Docker no permite --rm junto con una política de reinicio.
+  if (launch.restart_policy === "no") {
+    lines.push("  --rm");
+  } else {
+    lines.push(`  --restart ${launch.restart_policy}`);
+  }
 
   if (launch.gpu_mode === "nvidia" || launch.gpu_mode === "auto") {
     lines.push("  --gpus all");
@@ -869,8 +857,10 @@ function buildInteractiveDockerRunLines(
   ] as const;
 
   for (const [volume, destination] of mounts) {
-    if (volume.trim() && destination.trim()) {
-      lines.push(`  -v ${volume.trim()}:${destination.trim()}`);
+    const normalizedVolume = volume.trim();
+    const normalizedDestination = destination.trim();
+    if (normalizedVolume && normalizedDestination) {
+      lines.push(`  -v ${normalizedVolume}:${normalizedDestination}`);
     }
   }
 
@@ -879,7 +869,7 @@ function buildInteractiveDockerRunLines(
     if (normalized) lines.push(`  ${normalized}`);
   }
 
-  lines.push(`  ${runtimeImageReference(launch.build_name)}`);
+  lines.push(`  ${runtimeImageReference(launch)}`);
   return lines;
 }
 
