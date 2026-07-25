@@ -173,15 +173,47 @@ export default function AiEnginePage() {
   };
 
   const save = async () => {
-    if (!draft || draft.modal_max_containers < draft.modal_min_containers) {
-      toast.error("El máximo de contenedores Modal debe ser igual o mayor que el mínimo.");
-      return;
-    }
+    if (!draft) return;
+
+    const payload: AiEngineSettingsUpdate = {
+      ...toSettingsDraft(draft),
+      modal_scaledown_window_seconds: Math.max(
+        60,
+        Number.isFinite(draft.modal_scaledown_window_seconds)
+          ? draft.modal_scaledown_window_seconds
+          : DEFAULT_MODAL_SETTINGS.modal_scaledown_window_seconds,
+      ),
+      modal_execution_timeout_seconds: Math.max(
+        60,
+        Number.isFinite(draft.modal_execution_timeout_seconds)
+          ? draft.modal_execution_timeout_seconds
+          : DEFAULT_MODAL_SETTINGS.modal_execution_timeout_seconds,
+      ),
+      modal_min_containers: Math.max(
+        0,
+        Number.isFinite(draft.modal_min_containers)
+          ? draft.modal_min_containers
+          : DEFAULT_MODAL_SETTINGS.modal_min_containers,
+      ),
+      modal_max_containers: Math.max(
+        1,
+        Number.isFinite(draft.modal_max_containers)
+          ? draft.modal_max_containers
+          : DEFAULT_MODAL_SETTINGS.modal_max_containers,
+      ),
+    };
+
+    payload.modal_max_containers = Math.max(
+      payload.modal_max_containers,
+      payload.modal_min_containers,
+    );
+
+    setDraft(payload);
     setSaving(true);
     try {
       const value = await browserApiRequest<AiEngineSettings>("/api/admin/ai-providers/engine-settings", {
         method: "PUT",
-        body: JSON.stringify(draft),
+        body: JSON.stringify(payload),
       });
       setSettings(value);
       setDraft(toSettingsDraft(value));
