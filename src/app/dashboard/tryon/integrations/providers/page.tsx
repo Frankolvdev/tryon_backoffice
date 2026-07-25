@@ -57,7 +57,7 @@ const DEFAULT_MODAL_SETTINGS: AiEngineSettingsUpdate = {
   modal_min_containers: 0,
   modal_max_containers: 3,
   modal_concurrency: 1,
-  modal_input_concurrency: 100,
+  modal_input_concurrency: 1000,
   modal_scaledown_window_seconds: 300,
   modal_execution_timeout_seconds: 1800,
   queue_block_seconds: 5,
@@ -308,7 +308,7 @@ export default function AiEnginePage() {
               <NumberField label="Contenedores mínimos" description="Usa 0 para escalar a cero cuando no haya trabajos." value={draft.modal_min_containers} min={0} max={100} onChange={(v) => update("modal_min_containers", v)} />
               <NumberField label="Contenedores máximos" description="Máximo de contenedores GPU que Modal podrá levantar para atender la demanda." value={draft.modal_max_containers} max={100} onChange={(v) => update("modal_max_containers", v)} />
               <NumberField label="Workflows simultáneos por GPU" description="Cantidad máxima de workflows pesados que cada contenedor GPU puede ejecutar simultáneamente. Se recomienda mantener 1 para evitar saturación de VRAM." value={draft.modal_concurrency} max={16} onChange={(v) => update("modal_concurrency", v)} />
-              <NumberField label="Conexiones HTTP/WebSocket por contenedor" description="Cantidad máxima de entradas HTTP y WebSocket que el mismo contenedor puede atender. No aumenta los workflows simultáneos ni el uso de VRAM. Recomendado para ComfyUI: 100." value={draft.modal_input_concurrency} max={1000} onChange={(v) => update("modal_input_concurrency", v)} />
+              <NumberField label="Conexiones HTTP/WebSocket por contenedor" description="Cantidad máxima de entradas HTTP y WebSocket que el mismo contenedor puede atender. No aumenta los workflows simultáneos ni el uso de VRAM. Si no existe un valor guardado se usa el máximo predeterminado: 1000." value={draft.modal_input_concurrency} max={1000} onChange={(v) => update("modal_input_concurrency", v)} />
               <NumberField label="Apagado por inactividad (segundos)" description="Tiempo sin actividad antes de liberar el contenedor. Recomendado: 300." value={draft.modal_scaledown_window_seconds} min={60} max={3600} onChange={(v) => update("modal_scaledown_window_seconds", v)} />
               <NumberField label="Timeout de ejecución (segundos)" description="Tiempo máximo permitido para una generación. Recomendado: 1800." value={draft.modal_execution_timeout_seconds} min={60} max={86400} onChange={(v) => update("modal_execution_timeout_seconds", v)} />
             </div>
