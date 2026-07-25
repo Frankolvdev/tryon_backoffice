@@ -260,7 +260,12 @@ export function RuntimeMega3Panel() {
   };
 
   const formattedCommand = formatDockerCommand(
-    buildInteractiveDockerRunLines(launch),
+    buildInteractiveDockerRunLines(
+      launch,
+      settings?.destination_type === "docker_volume"
+        ? settings.docker_volume
+        : "",
+    ),
     terminalFormat,
   );
 
@@ -446,7 +451,7 @@ export function RuntimeMega3Panel() {
           icon={<Container />}
           eyebrow="Runtime Configuration"
           title="Configuración de ejecución Docker"
-          text="El comando se genera desde la Runtime Configuration guardada: imagen, nombre, puertos, GPU, reinicio, volúmenes y argumentos adicionales."
+          text="El comando interactivo usa el build real con tag 1.0.0, GPU, puertos y los volúmenes configurados. Se elimina al salir."
         />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <Text
@@ -467,9 +472,9 @@ export function RuntimeMega3Panel() {
           <div className="md:col-span-2 xl:col-span-3 rounded-xl border border-white/8 bg-black/20 px-4 py-3 text-xs text-zinc-500">
             Imagen que ejecutará Docker:{" "}
             <strong className="text-zinc-300">
-              {runtimeImageReference(launch)}
+              {runtimeImageReference(launch.build_name)}
             </strong>
-            . Se usa “Nombre de imagen” cuando está configurado; de lo contrario se utiliza el nombre del build local.
+            . El campo “Nombre de imagen” se conserva como metadato de publicación y no reemplaza el build local.
           </div>
           <NumberField
             label="Puerto host"
@@ -538,7 +543,7 @@ export function RuntimeMega3Panel() {
                 Docker Run interactivo
               </span>
               <p className="mt-1 text-xs text-zinc-600">
-                Comando real según la configuración actual. Usa --rm solo cuando la política de reinicio es “no”.
+                Comando interactivo real con --rm -it. Si los volúmenes del runtime están vacíos, reutiliza el volumen Docker del exportador para modelos y workflows.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -820,59 +825,70 @@ function asTrimmedString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function runtimeImageReference(launch: RuntimeLaunchSettings): string {
-  const configuredImage = asTrimmedString(launch?.image_name);
-  if (configuredImage) return configuredImage;
+function runtimeImageReference(buildName: unknown): string {
+  const normalizedBuildName = asTrimmedString(buildName);
+  if (!normalizedBuildName) return "ia-comfyui-python-build:1.0.0";
 
-  const buildName = asTrimmedString(launch?.build_name);
-  if (!buildName) return "tryon-runtime:latest";
-
-  const lastSlash = buildName.lastIndexOf("/");
-  const lastColon = buildName.lastIndexOf(":");
-  return lastColon > lastSlash ? buildName : `${buildName}:latest`;
+  const lastSlash = normalizedBuildName.lastIndexOf("/");
+  const lastColon = normalizedBuildName.lastIndexOf(":");
+  return lastColon > lastSlash
+    ? normalizedBuildName
+    : `${normalizedBuildName}:1.0.0`;
 }
 
 function buildInteractiveDockerRunLines(
   launch: RuntimeLaunchSettings,
+  exportedModelsVolume: unknown,
 ): string[] {
-  const lines = ["docker run -it"];
-
-  const restartPolicy =
-    asTrimmedString(launch?.restart_policy) || "no";
-
-  // Docker no permite --rm junto con una política de reinicio.
-  if (restartPolicy === "no") {
-    lines.push("  --rm");
-  } else {
-    lines.push(`  --restart ${restartPolicy}`);
-  }
+  // Este bloque es deliberadamente interactivo y efímero.
+  // La política de reinicio pertenece al comando detached del backend.
+  const lines = ["docker run --rm -it"];
 
   const gpuMode = asTrimmedString(launch?.gpu_mode);
   if (gpuMode === "nvidia" || gpuMode === "auto") {
     lines.push("  --gpus all");
   }
 
-  const containerName = asTrimmedString(launch?.container_name);
-  if (containerName) {
-    lines.push(`  --name ${containerName}`);
-  }
+  const containerName =
+    asTrimmedString(launch?.container_name) || "generation-runtime";
+  lines.push(`  --name ${containerName}`);
 
   const hostPort = Number(launch?.host_port) || 8190;
   const containerPort = Number(launch?.container_port) || 8188;
   lines.push(`  -p ${hostPort}:${containerPort}`);
 
-  const mounts: Array<[unknown, unknown]> = [
-    [launch?.models_volume, launch?.models_mount_path],
-    [launch?.workflows_volume, launch?.workflows_mount_path],
-    [launch?.output_volume, launch?.output_mount_path],
+  const fallbackVolume = asTrimmedString(exportedModelsVolume);
+  const modelsVolume =
+    asTrimmedString(launch?.models_volume) || fallbackVolume;
+  const workflowsVolume =
+    asTrimmedString(launch?.workflows_volume) || fallbackVolume;
+  const outputVolume = asTrimmedString(launch?.output_volume);
+
+  const mounts: Array<[string, string]> = [
+    [
+      modelsVolume,
+      asTrimmedString(launch?.models_mount_path)
+        || "/app/ComfyUI/models",
+    ],
+    [
+      workflowsVolume,
+      asTrimmedString(launch?.workflows_mount_path)
+        || "/app/ComfyUI/user/default/workflows",
+    ],
+    [
+      outputVolume,
+      asTrimmedString(launch?.output_mount_path)
+        || "/app/ComfyUI/output",
+    ],
   ];
 
+  const mounted = new Set<string>();
   for (const [volume, destination] of mounts) {
-    const normalizedVolume = asTrimmedString(volume);
-    const normalizedDestination = asTrimmedString(destination);
-    if (normalizedVolume && normalizedDestination) {
-      lines.push(`  -v ${normalizedVolume}:${normalizedDestination}`);
-    }
+    if (!volume || !destination) continue;
+    const mount = `${volume}:${destination}`;
+    if (mounted.has(mount)) continue;
+    mounted.add(mount);
+    lines.push(`  -v ${mount}`);
   }
 
   const extraArguments = Array.isArray(launch?.extra_arguments)
@@ -884,7 +900,7 @@ function buildInteractiveDockerRunLines(
     if (normalized) lines.push(`  ${normalized}`);
   }
 
-  lines.push(`  ${runtimeImageReference(launch)}`);
+  lines.push(`  ${runtimeImageReference(launch?.build_name)}`);
   return lines;
 }
 
