@@ -74,8 +74,8 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         icon: Cpu,
       },
       {
-        label: "RunPod",
-        href: "/dashboard/tryon/integrations/runpod",
+        label: "Proveedores de infraestructura",
+        href: "/dashboard/tryon/integrations/infrastructure-providers",
         icon: ServerCog,
       },
       {
