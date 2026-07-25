@@ -26,20 +26,6 @@ export type RuntimeBuildStatus =
   | "active"
   | "cancelled";
 
-
-export interface RuntimeDeploymentState {
-  provider: "modal";
-  status: "preparing"|"validating"|"deploying"|"deployed"|"failed";
-  image_tag?: string;
-  app_name?: string | null;
-  volume_name?: string | null;
-  context_path?: string | null;
-  started_at?: string | null;
-  finished_at?: string | null;
-  error?: string | null;
-  last_output?: string | null;
-}
-
 export interface RuntimeBuild {
   id: number;
   runtime_config_id: number;
@@ -52,7 +38,7 @@ export interface RuntimeBuild {
   error_message: string | null;
   image_id: string | null;
   image_size_bytes: number | null;
-  manifest: Record<string, unknown> & { deployments?: Record<string, RuntimeDeploymentState> };
+  manifest: Record<string, unknown>;
   validation_result: Record<string, unknown>;
   published: boolean;
   active: boolean;
@@ -171,3 +157,35 @@ export interface RuntimeLaunchSettings {
   gpu_mode:"auto"|"nvidia"|"none"; restart_policy:"no"|"always"|"unless-stopped"|"on-failure"; extra_arguments:string[];
 }
 export interface RuntimeLaunchPreview { command:string; lines:string[] }
+
+
+export interface RuntimeDeploymentProvider {
+  key: string;
+  label: string;
+  enabled: boolean;
+  configured: boolean;
+}
+
+export interface RuntimeDeploymentProviderList {
+  items: RuntimeDeploymentProvider[];
+}
+
+export type RuntimeDeploymentStatus = "queued" | "running" | "deployed" | "failed";
+
+export interface RuntimeDeployment {
+  id: string;
+  build_id: number;
+  provider: string;
+  status: RuntimeDeploymentStatus;
+  phase: string;
+  progress: number;
+  message: string;
+  logs: string;
+  error: string | null;
+  app_name: string | null;
+  image_tag: string | null;
+  volume_name: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
