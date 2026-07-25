@@ -331,6 +331,7 @@ export function RuntimeMega3Panel() {
             >
               <option value="local">Carpeta local</option>
               <option value="docker_volume">Volumen Docker</option>
+              <option value="modal">Volumen Modal</option>
             </select>
           </Field>
         </div>
@@ -361,6 +362,27 @@ export function RuntimeMega3Panel() {
               <span className="mt-2 block text-xs text-zinc-600">
                 Déjalo vacío para exportar directamente unet/, vae/, loras/ y
                 las demás categorías en la raíz.
+              </span>
+            </Field>
+          </div>
+        )}
+
+
+
+        {settings.destination_type === "modal" && (
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <Field label="Proveedor">
+              <div className="flex h-11 items-center rounded-xl border border-white/10 bg-black/25 px-3 text-sm text-zinc-300">Modal · usa el volumen configurado en Proveedores de infraestructura</div>
+            </Field>
+            <Field label="Subcarpeta opcional dentro del volumen Modal">
+              <input
+                className={input}
+                value={settings.docker_path}
+                onChange={(event) => patch("docker_path", event.target.value)}
+                placeholder="Vacío = raíz del volumen"
+              />
+              <span className="mt-2 block text-xs text-zinc-600">
+                Déjalo vacío para exportar directamente las categorías de modelos en la raíz del volumen Modal.
               </span>
             </Field>
           </div>
