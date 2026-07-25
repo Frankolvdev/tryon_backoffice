@@ -334,9 +334,34 @@ export function RuntimeMega3Panel() {
             >
               <option value="local">Carpeta local</option>
               <option value="docker_volume">Volumen Docker</option>
+              <option value="modal">Volumen Modal</option>
             </select>
           </Field>
         </div>
+
+        {settings.destination_type === "modal" && (
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <Field label="Volumen Modal configurado">
+              <div className={`${input} flex items-center text-zinc-300`}>
+                Se usará el volumen configurado en Proveedores de infraestructura
+              </div>
+              <span className="mt-2 block text-xs text-zinc-600">
+                El backend toma automáticamente el nombre del volumen Modal activo.
+              </span>
+            </Field>
+            <Field label="Subcarpeta opcional dentro del volumen Modal">
+              <input
+                className={input}
+                value={settings.docker_path}
+                onChange={(event) => patch("docker_path", event.target.value)}
+                placeholder="Vacío = raíz del volumen"
+              />
+              <span className="mt-2 block text-xs text-zinc-600">
+                Déjalo vacío para exportar directamente las carpetas de modelos.
+              </span>
+            </Field>
+          </div>
+        )}
 
         {settings.destination_type === "docker_volume" && (
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
