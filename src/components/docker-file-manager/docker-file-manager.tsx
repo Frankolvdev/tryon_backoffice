@@ -55,6 +55,7 @@ function uploadFileWithProgress(
   file: File,
   volume: string,
   destinationPath: string,
+  apiBase: string,
   onProgress: (loaded: number, total: number) => void,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -66,7 +67,7 @@ function uploadFileWithProgress(
     });
     request.open(
       "POST",
-      `/api/admin/docker-file-manager/upload-stream?${query.toString()}`,
+      `${apiBase}/upload-stream?${query.toString()}`,
     );
     request.withCredentials = true;
     request.setRequestHeader("Content-Type", "application/octet-stream");
@@ -103,6 +104,8 @@ function uploadFileWithProgress(
 }
 
 export function DockerFileManager() {
+  const [provider, setProvider] = useState<"docker" | "modal">("docker");
+  const apiBase = provider === "modal" ? "/api/admin/modal-file-manager" : "/api/admin/docker-file-manager";
   const [volumes, setVolumes] = useState<DockerVolume[]>([]);
   const [volume, setVolume] = useState("");
   const [path, setPath] = useState("");
@@ -117,7 +120,7 @@ export function DockerFileManager() {
   const loadVolumes = useCallback(async () => {
     setLoadingMessage("Cargando volúmenes Docker…");
     const response = await browserApiRequest<{ items: DockerVolume[] }>(
-      "/api/admin/docker-file-manager/volumes",
+      `${apiBase}/volumes`,
     );
     setVolumes(response.items);
     setVolume((current) =>
@@ -127,7 +130,7 @@ export function DockerFileManager() {
     );
     setLoadingMessage("");
     return response.items;
-  }, []);
+  }, [apiBase]);
 
   const browse = useCallback(async (selectedVolume = volume, selectedPath = path) => {
     if (!selectedVolume) {
@@ -138,16 +141,20 @@ export function DockerFileManager() {
     }
     setLoadingMessage(selectedPath ? `Abriendo ${selectedPath}…` : `Abriendo ${selectedVolume}…`);
     const response = await browserApiRequest<DockerBrowse>(
-      `/api/admin/docker-file-manager/browse?volume=${encodeURIComponent(selectedVolume)}&path=${encodeURIComponent(selectedPath)}`,
+      `${apiBase}/browse?volume=${encodeURIComponent(selectedVolume)}&path=${encodeURIComponent(selectedPath)}`,
     );
     setEntries(response.items);
     setSelected(null);
     setLoadingMessage("");
-  }, [path, volume]);
+  }, [apiBase, path, volume]);
 
   useEffect(() => {
+    setVolume("");
+    setPath("");
+    setEntries([]);
+    setSelected(null);
     void loadVolumes().catch((error: Error) => toast.error(error.message));
-  }, [loadVolumes]);
+  }, [loadVolumes, provider]);
 
   useEffect(() => {
     void browse(volume, path).catch((error: Error) => toast.error(error.message));
@@ -183,7 +190,7 @@ export function DockerFileManager() {
     if (!name) return;
     void action(
       () =>
-        browserApiRequest("/api/admin/docker-file-manager/volumes", {
+        browserApiRequest(`${apiBase}/volumes`, {
           method: "POST",
           body: JSON.stringify({
             name,
@@ -206,7 +213,7 @@ export function DockerFileManager() {
     setLoadingMessage(`Eliminando volumen ${volumeToDelete}…`);
     try {
       await browserApiRequest(
-        `/api/admin/docker-file-manager/volumes/${encodeURIComponent(volumeToDelete)}?force=true`,
+        `${apiBase}/volumes/${encodeURIComponent(volumeToDelete)}?force=true`,
         { method: "DELETE" },
       );
 
@@ -239,7 +246,7 @@ export function DockerFileManager() {
     if (!name) return;
     void action(
       () =>
-        browserApiRequest("/api/admin/docker-file-manager/directories", {
+        browserApiRequest(`${apiBase}/directories`, {
           method: "POST",
           body: JSON.stringify({
             volume,
@@ -257,7 +264,7 @@ export function DockerFileManager() {
     void action(
       () =>
         browserApiRequest(
-          `/api/admin/docker-file-manager/paths?volume=${encodeURIComponent(volume)}&path=${encodeURIComponent(selected.path)}`,
+          `${apiBase}/paths?volume=${encodeURIComponent(volume)}&path=${encodeURIComponent(selected.path)}`,
           { method: "DELETE" },
         ),
       "Elemento eliminado.",
@@ -291,7 +298,7 @@ export function DockerFileManager() {
           totalBytes,
         });
 
-        await uploadFileWithProgress(file, volume, destinationPath, (loaded, requestTotal) => {
+        await uploadFileWithProgress(file, volume, destinationPath, apiBase, (loaded, requestTotal) => {
           const fileTotal = requestTotal || file.size;
           const overallLoaded = completedBytes + Math.min(loaded, file.size);
           const sent = fileTotal > 0 && loaded >= fileTotal;
@@ -346,7 +353,7 @@ export function DockerFileManager() {
 
   const download = () => {
     if (selected?.type !== "file") return;
-    window.location.href = `/api/admin/docker-file-manager/download?volume=${encodeURIComponent(volume)}&path=${encodeURIComponent(selected.path)}`;
+    window.location.href = `${apiBase}/download?volume=${encodeURIComponent(volume)}&path=${encodeURIComponent(selected.path)}`;
   };
 
   const renameSelected = () => {
@@ -355,7 +362,7 @@ export function DockerFileManager() {
     if (!name || name === selected.name) return;
     void action(
       () =>
-        browserApiRequest("/api/admin/docker-file-manager/rename", {
+        browserApiRequest(`${apiBase}/rename`, {
           method: "POST",
           body: JSON.stringify({ volume, path: selected.path, new_name: name }),
         }),
@@ -384,7 +391,7 @@ export function DockerFileManager() {
     if (!destination) return;
     void action(
       () =>
-        browserApiRequest("/api/admin/docker-file-manager/transfer", {
+        browserApiRequest(`${apiBase}/transfer`, {
           method: "POST",
           body: JSON.stringify({
             source_volume: volume,
@@ -409,13 +416,7 @@ export function DockerFileManager() {
               <HardDrive />
             </div>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-red-500">
-                Infraestructura Docker
-              </p>
-              <h1 className="mt-2 text-2xl font-semibold text-white">Docker File Manager</h1>
-              <p className="mt-2 text-sm text-zinc-500">
-                Administra volúmenes y archivos sin copiar el volumen completo al host.
-              </p>
+              <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-red-500">Infraestructura de archivos</p><h1 className="mt-2 text-2xl font-semibold text-white">File Manager</h1><p className="mt-2 text-sm text-zinc-500">Administra archivos de Docker local o del volumen configurado en Modal.</p><label className="mt-4 block max-w-xs text-xs font-semibold uppercase tracking-wide text-zinc-500">Proveedor<select value={provider} onChange={(event)=>setProvider(event.target.value as "docker"|"modal")} className="mt-2 h-10 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-sm normal-case text-white"><option value="docker">Docker local</option><option value="modal">Modal</option></select></label>
             </div>
           </div>
           <div className="flex gap-2">
@@ -439,7 +440,7 @@ export function DockerFileManager() {
             </button>
             <button
               className="luxia-red-glow inline-flex h-10 items-center gap-2 rounded-xl bg-red-700 px-3 text-sm font-semibold text-white"
-              disabled={busy || Boolean(loadingMessage)}
+              disabled={provider === "modal" || busy || Boolean(loadingMessage)}
               onClick={createVolume}
             >
               <Plus size={15} />Crear volumen
@@ -457,7 +458,7 @@ export function DockerFileManager() {
 
       <section className="grid gap-5 xl:grid-cols-[300px_1fr]">
         <aside className="luxia-panel rounded-3xl p-4">
-          <h2 className="mb-3 text-sm font-semibold text-white">Volúmenes Docker</h2>
+          <h2 className="mb-3 text-sm font-semibold text-white">{provider === "modal" ? "Volumen Modal" : "Volúmenes Docker"}</h2>
           <div className="space-y-2">
             {volumes.map((item) => (
               <button
@@ -481,7 +482,7 @@ export function DockerFileManager() {
           </div>
           {volume && (
             <button
-              disabled={busy}
+              disabled={provider === "modal" || busy}
               onClick={() => void deleteVolume()}
               className="mt-4 inline-flex items-center gap-2 text-sm text-red-400 disabled:opacity-40"
             >
@@ -528,13 +529,13 @@ export function DockerFileManager() {
                 multiple
                 onChange={(event) => void upload(event.target.files)}
               />
-              <button disabled={!selected || busy} className={btn} onClick={renameSelected}>
+              <button disabled={provider === "modal" || !selected || busy} className={btn} onClick={renameSelected}>
                 <Pencil size={15} />Renombrar
               </button>
-              <button disabled={!selected || busy} className={btn} onClick={() => transfer("copy")}>
+              <button disabled={provider === "modal" || !selected || busy} className={btn} onClick={() => transfer("copy")}>
                 <Copy size={15} />Copiar
               </button>
-              <button disabled={!selected || busy} className={btn} onClick={() => transfer("move")}>
+              <button disabled={provider === "modal" || !selected || busy} className={btn} onClick={() => transfer("move")}>
                 <Move size={15} />Mover
               </button>
               <button disabled={selected?.type !== "file" || busy} className={btn} onClick={download}>
