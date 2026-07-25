@@ -262,9 +262,7 @@ export function RuntimeMega3Panel() {
   const formattedCommand = formatDockerCommand(
     buildInteractiveDockerRunLines(
       launch,
-      settings?.destination_type === "docker_volume"
-        ? settings.docker_volume
-        : "",
+      settings?.docker_volume,
     ),
     terminalFormat,
   );
@@ -858,10 +856,21 @@ function buildInteractiveDockerRunLines(
   lines.push(`  -p ${hostPort}:${containerPort}`);
 
   const fallbackVolume = asTrimmedString(exportedModelsVolume);
+  const normalizedBuildName =
+    asTrimmedString(launch?.build_name) || "ia-comfyui-python-build";
+  const imageBaseName = normalizedBuildName
+    .replace(/:[^/]+$/, "")
+    .replace(/-build$/i, "");
+  const derivedSharedVolume = `${imageBaseName}-volume`;
+
   const modelsVolume =
-    asTrimmedString(launch?.models_volume) || fallbackVolume;
+    asTrimmedString(launch?.models_volume)
+    || fallbackVolume
+    || derivedSharedVolume;
   const workflowsVolume =
-    asTrimmedString(launch?.workflows_volume) || fallbackVolume;
+    asTrimmedString(launch?.workflows_volume)
+    || fallbackVolume
+    || modelsVolume;
   const outputVolume = asTrimmedString(launch?.output_volume);
 
   const mounts: Array<[string, string]> = [
