@@ -133,7 +133,7 @@ export function DockerFileManager() {
   }, [apiBase]);
 
   const browse = useCallback(async (selectedVolume = volume, selectedPath = path) => {
-    if (!selectedVolume) {
+    if (!selectedVolume || !volumes.some((item) => item.name === selectedVolume)) {
       setLoadingMessage("");
       setEntries([]);
       setSelected(null);
@@ -146,7 +146,7 @@ export function DockerFileManager() {
     setEntries(response.items);
     setSelected(null);
     setLoadingMessage("");
-  }, [apiBase, path, volume]);
+  }, [apiBase, path, volume, volumes]);
 
   useEffect(() => {
     setVolume("");
@@ -416,7 +416,7 @@ export function DockerFileManager() {
               <HardDrive />
             </div>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-red-500">Infraestructura de archivos</p><h1 className="mt-2 text-2xl font-semibold text-white">File Manager</h1><p className="mt-2 text-sm text-zinc-500">Administra archivos de Docker local o del volumen configurado en Modal.</p><label className="mt-4 block max-w-xs text-xs font-semibold uppercase tracking-wide text-zinc-500">Proveedor<select value={provider} onChange={(event)=>setProvider(event.target.value as "docker"|"modal")} className="mt-2 h-10 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-sm normal-case text-white"><option value="docker">Docker local</option><option value="modal">Modal</option></select></label>
+              <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-red-500">Infraestructura de archivos</p><h1 className="mt-2 text-2xl font-semibold text-white">File Manager</h1><p className="mt-2 text-sm text-zinc-500">Administra archivos de Docker local o del volumen configurado en Modal.</p><label className="mt-4 block max-w-xs text-xs font-semibold uppercase tracking-wide text-zinc-500">Proveedor<select value={provider} onChange={(event)=>{setVolume("");setPath("");setEntries([]);setSelected(null);setProvider(event.target.value as "docker"|"modal");}} className="mt-2 h-10 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-sm normal-case text-white"><option value="docker">Docker local</option><option value="modal">Modal</option></select></label>
             </div>
           </div>
           <div className="flex gap-2">
