@@ -26,6 +26,20 @@ export type RuntimeBuildStatus =
   | "active"
   | "cancelled";
 
+
+export interface RuntimeDeploymentState {
+  provider: "modal";
+  status: "preparing"|"validating"|"deploying"|"deployed"|"failed";
+  image_tag?: string;
+  app_name?: string | null;
+  volume_name?: string | null;
+  context_path?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  error?: string | null;
+  last_output?: string | null;
+}
+
 export interface RuntimeBuild {
   id: number;
   runtime_config_id: number;
@@ -38,7 +52,7 @@ export interface RuntimeBuild {
   error_message: string | null;
   image_id: string | null;
   image_size_bytes: number | null;
-  manifest: Record<string, unknown>;
+  manifest: Record<string, unknown> & { deployments?: Record<string, RuntimeDeploymentState> };
   validation_result: Record<string, unknown>;
   published: boolean;
   active: boolean;
