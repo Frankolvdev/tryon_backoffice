@@ -3,14 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, Cpu, FlaskConical, HelpCircle, LoaderCircle, RefreshCcw, Save, Server, ServerCog, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
-
 import { TryOnEmptyState } from "@/components/backoffice/tryon/tryon-empty-state";
 import { TryOnModuleHeader } from "@/components/backoffice/tryon/tryon-module-header";
 import { browserApiRequest } from "@/lib/api/browser-api";
 import { cn } from "@/lib/utils";
 import type { AiEngineSettings, AiEngineSettingsUpdate } from "@/types/admin-ai-engine-settings";
 import type { AiProviderHealth, AiProvidersOverview } from "@/types/admin-ai-providers";
-
 type NumberFieldProps = {
   label: string;
   description: string;
@@ -22,7 +20,6 @@ type NumberFieldProps = {
 
 function NumberField({ label, description, value, min = 1, max, onChange }: NumberFieldProps) {
   const safeValue = Number.isFinite(value) ? value : min;
-
   return (
     <label className="rounded-2xl border border-white/7 bg-black/20 p-4">
       <span className="flex items-center gap-2 text-sm font-medium text-white">
@@ -46,7 +43,6 @@ function NumberField({ label, description, value, min = 1, max, onChange }: Numb
     </label>
   );
 }
-
 const DEFAULT_MODAL_SETTINGS: AiEngineSettingsUpdate = {
   local_parallel_executions: 1,
   runpod_min_workers: 0,
@@ -62,7 +58,6 @@ const DEFAULT_MODAL_SETTINGS: AiEngineSettingsUpdate = {
   modal_execution_timeout_seconds: 1800,
   queue_block_seconds: 5,
 };
-
 function toSettingsDraft(value: Partial<AiEngineSettings> | null | undefined): AiEngineSettingsUpdate {
   return {
     local_parallel_executions:
@@ -95,7 +90,6 @@ function toSettingsDraft(value: Partial<AiEngineSettings> | null | undefined): A
       value?.queue_block_seconds ?? DEFAULT_MODAL_SETTINGS.queue_block_seconds,
   };
 }
-
 function providerLabel(provider: string): string {
   const labels: Record<string, string> = {
     simulated: "Simulado",
@@ -106,13 +100,11 @@ function providerLabel(provider: string): string {
   };
   return labels[provider] ?? provider;
 }
-
 function ProviderIcon({ provider }: { provider: string }) {
   if (provider === "runpod_serverless" || provider === "modal") return <Server size={19} />;
   if (provider === "comfyui_local" || provider === "local_docker") return <Cpu size={19} />;
   return <FlaskConical size={19} />;
 }
-
 function ConfiguredEngineCard({ provider }: { provider: AiProviderHealth }) {
   return (
     <article className="rounded-2xl border border-white/7 bg-white/[0.025] p-5">
@@ -142,7 +134,6 @@ function ConfiguredEngineCard({ provider }: { provider: AiProviderHealth }) {
     </article>
   );
 }
-
 export default function AiEnginePage() {
   const [settings, setSettings] = useState<AiEngineSettings | null>(null);
   const [overview, setOverview] = useState<AiProvidersOverview | null>(null);
@@ -150,7 +141,6 @@ export default function AiEnginePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -168,7 +158,6 @@ export default function AiEnginePage() {
       setLoading(false);
     }
   }, []);
-
   useEffect(() => { void load(); }, [load]);
 
   const update = <K extends keyof AiEngineSettingsUpdate>(key: K, value: AiEngineSettingsUpdate[K]) => {
@@ -177,11 +166,10 @@ export default function AiEnginePage() {
 
   const save = async () => {
     if (!draft) return;
-
     const payload: AiEngineSettingsUpdate = {
       ...toSettingsDraft(draft),
       modal_scaledown_window_seconds: Math.max(
-        60,
+        1,
         Number.isFinite(draft.modal_scaledown_window_seconds)
           ? draft.modal_scaledown_window_seconds
           : DEFAULT_MODAL_SETTINGS.modal_scaledown_window_seconds,
@@ -205,12 +193,10 @@ export default function AiEnginePage() {
           : DEFAULT_MODAL_SETTINGS.modal_max_containers,
       ),
     };
-
     payload.modal_max_containers = Math.max(
       payload.modal_max_containers,
       payload.modal_min_containers,
     );
-
     setDraft(payload);
     setSaving(true);
     try {
@@ -227,7 +213,6 @@ export default function AiEnginePage() {
       setSaving(false);
     }
   };
-
   return (
     <div>
       <TryOnModuleHeader
@@ -240,9 +225,7 @@ export default function AiEnginePage() {
           <LoaderCircle className="animate-spin text-red-500" />
         </section>
       )}
-
       {!loading && error && <div className="mt-5"><TryOnEmptyState error title="No se pudo cargar la configuración" description={error} /></div>}
-
       {!loading && draft && settings && (
         <>
           <section className="luxia-panel mt-5 rounded-3xl p-6">
@@ -265,7 +248,6 @@ export default function AiEnginePage() {
               </div>
             )}
           </section>
-
         <section className="luxia-panel mt-5 rounded-3xl p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -279,7 +261,6 @@ export default function AiEnginePage() {
               <RefreshCcw size={15} /> Recargar
             </button>
           </div>
-
           <div className="mt-6 rounded-2xl border border-white/7 bg-black/20 p-5">
             <div className="flex items-center gap-2 text-sm font-semibold text-white"><Cpu size={16} /> Configuración local</div>
             <p className="mt-2 text-xs leading-5 text-zinc-500">Controla únicamente la concurrencia del worker local y ComfyUI.</p>
@@ -293,7 +274,6 @@ export default function AiEnginePage() {
             />
             </div>
           </div>
-
           <div className="mt-5 rounded-2xl border border-white/7 bg-black/20 p-5">
             <div className="flex items-center gap-2 text-sm font-semibold text-white"><ServerCog size={16} /> Configuración Modal</div>
             <p className="mt-2 text-xs leading-5 text-zinc-500">Parámetros obligatorios y esenciales para escalar el runtime de generación en Modal. Se validan junto con Configuración del proveedor antes de cada Deploy.</p>
@@ -309,11 +289,10 @@ export default function AiEnginePage() {
               <NumberField label="Contenedores máximos" description="Máximo de contenedores GPU que Modal podrá levantar para atender la demanda." value={draft.modal_max_containers} max={100} onChange={(v) => update("modal_max_containers", v)} />
               <NumberField label="Workflows simultáneos por GPU" description="Cantidad máxima de workflows pesados que cada contenedor GPU puede ejecutar simultáneamente. Se recomienda mantener 1 para evitar saturación de VRAM." value={draft.modal_concurrency} max={16} onChange={(v) => update("modal_concurrency", v)} />
               <NumberField label="Conexiones HTTP/WebSocket por contenedor" description="Cantidad máxima de entradas HTTP y WebSocket que el mismo contenedor puede atender. No aumenta los workflows simultáneos ni el uso de VRAM. Si no existe un valor guardado se usa el máximo predeterminado: 1000." value={draft.modal_input_concurrency} max={1000} onChange={(v) => update("modal_input_concurrency", v)} />
-              <NumberField label="Apagado por inactividad (segundos)" description="Tiempo sin actividad antes de liberar el contenedor. Recomendado: 300." value={draft.modal_scaledown_window_seconds} min={60} max={3600} onChange={(v) => update("modal_scaledown_window_seconds", v)} />
+              <NumberField label="Apagado por inactividad (segundos)" description="Tiempo sin actividad antes de liberar el contenedor. Recomendado: 300." value={draft.modal_scaledown_window_seconds} min={1} max={3600} onChange={(v) => update("modal_scaledown_window_seconds", v)} />
               <NumberField label="Timeout de ejecución (segundos)" description="Tiempo máximo permitido para una generación. Recomendado: 1800." value={draft.modal_execution_timeout_seconds} min={60} max={86400} onChange={(v) => update("modal_execution_timeout_seconds", v)} />
             </div>
           </div>
-
           <div className="mt-5 rounded-2xl border border-white/7 bg-black/20 p-5">
             <div className="flex items-center gap-2 text-sm font-semibold text-white"><ServerCog size={16} /> Configuración de cola</div>
             <p className="mt-2 text-xs leading-5 text-zinc-500">Ajusta la espera del consumidor de Redis sin seleccionar ni activar proveedores.</p>
@@ -327,7 +306,6 @@ export default function AiEnginePage() {
             />
             </div>
           </div>
-
           <div className="mt-5 flex flex-col gap-4 rounded-2xl border border-amber-500/15 bg-amber-500/[0.05] p-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex gap-3">
               <TriangleAlert className="mt-0.5 shrink-0 text-amber-300" size={18} />
@@ -341,7 +319,6 @@ export default function AiEnginePage() {
               {saving ? <LoaderCircle size={16} className="animate-spin" /> : <Save size={16} />} Guardar configuración
             </button>
           </div>
-
           <div className="mt-5 flex items-center gap-2 text-xs text-zinc-600"><ServerCog size={14} /> La capacidad de Modal se administra aquí; credenciales, aplicación, entorno y volumen permanecen en Configuración del proveedor.</div>
         </section>
         </>
