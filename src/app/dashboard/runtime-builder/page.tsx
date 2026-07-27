@@ -66,7 +66,7 @@ export default function RuntimeBuilderPage() {
   };
   const deleteProfileById = async (profile: RuntimeBuilderProfileSummary) => {
     if(!window.confirm(`¿Eliminar el runtime ${profile.name}?`)) return;
-    await browserApiRequest(`/api/admin/runtime-builder/profiles/${profile.id}`,{method:"DELETE"});
+    await browserApiRequest(`/api/admin/runtime-builder/profiles/${profile.id}/delete`,{method:"POST"});
     if (config?.id === profile.id) setEditingProfile(false);
     await load();
   };

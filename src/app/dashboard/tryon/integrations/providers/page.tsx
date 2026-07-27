@@ -106,6 +106,28 @@ function ProviderIcon({ provider }: { provider: string }) {
   if (provider === "comfyui_local" || provider === "local_docker") return <Cpu size={19} />;
   return <FlaskConical size={19} />;
 }
+const ENGINE_ORDER = ["simulated", "comfyui_local", "runpod_serverless", "modal", "beam"] as const;
+
+function normalizeProviders(overview: AiProvidersOverview | null): AiProviderHealth[] {
+  const received = new Map(
+    (overview?.providers ?? []).map((provider) => [provider.provider, provider]),
+  );
+
+  return ENGINE_ORDER.map((provider) => {
+    const existing = received.get(provider);
+    if (existing) return existing;
+
+    return {
+      provider,
+      enabled: false,
+      configured: false,
+      available: false,
+      message: `${providerLabel(provider)} todavía no está configurado.`,
+      details: {},
+    };
+  });
+}
+
 function ConfiguredEngineCard({ provider }: { provider: AiProviderHealth }) {
   return (
     <article className="rounded-2xl border border-white/7 bg-white/[0.025] p-5">
@@ -116,7 +138,9 @@ function ConfiguredEngineCard({ provider }: { provider: AiProviderHealth }) {
           </div>
           <div>
             <h3 className="font-medium text-white">{providerLabel(provider.provider)}</h3>
-            <p className="mt-1 text-xs text-zinc-500">Motor configurado</p>
+            <p className="mt-1 text-xs text-zinc-500">
+              {provider.configured ? "Motor configurado" : "Pendiente de configuración"}
+            </p>
           </div>
         </div>
         <span className={cn(
@@ -237,17 +261,11 @@ export default function AiEnginePage() {
                 Se muestran únicamente los motores que ya existen y están configurados. La selección del motor se realiza dentro de cada módulo de generación.
               </p>
             </div>
-            {overview?.providers.filter((provider) => provider.configured).length ? (
-              <div className="mt-5 grid gap-4 xl:grid-cols-3">
-                {overview.providers.filter((provider) => provider.configured).map((provider) => (
-                  <ConfiguredEngineCard key={provider.provider} provider={provider} />
-                ))}
-              </div>
-            ) : (
-              <div className="mt-5 rounded-2xl border border-white/7 bg-black/20 p-5 text-sm text-zinc-500">
-                No hay motores configurados todavía. Configura la conexión correspondiente antes de asignarla a un módulo.
-              </div>
-            )}
+            <div className="mt-5 grid gap-4 xl:grid-cols-3">
+              {normalizeProviders(overview).map((provider) => (
+                <ConfiguredEngineCard key={provider.provider} provider={provider} />
+              ))}
+            </div>
           </section>
         <section className="luxia-panel mt-5 rounded-3xl p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
