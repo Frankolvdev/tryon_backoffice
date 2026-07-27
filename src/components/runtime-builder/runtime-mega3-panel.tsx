@@ -299,7 +299,7 @@ export function RuntimeMega3Panel() {
           icon={<Database />}
           eyebrow="Workflow Model Exporter"
           title="Exportación reproducible de modelos"
-          text="Selecciona carpeta local o volumen Docker, conserva la última configuración y revisa el resumen de cada ejecución."
+          text="Exporta los modelos requeridos a una carpeta local, Docker, Modal, RunPod o Beam y revisa el progreso de cada ejecución."
         />
         <div className="grid gap-4 lg:grid-cols-3">
           <Field label="Ruta local de ComfyUI">
@@ -335,6 +335,8 @@ export function RuntimeMega3Panel() {
               <option value="local">Carpeta local</option>
               <option value="docker_volume">Volumen Docker</option>
               <option value="modal">Volumen Modal</option>
+              <option value="runpod">RunPod Network Volume</option>
+              <option value="beam">Volumen Beam</option>
             </select>
           </Field>
         </div>
@@ -359,6 +361,29 @@ export function RuntimeMega3Panel() {
               <span className="mt-2 block text-xs text-zinc-600">
                 Déjalo vacío para exportar directamente las carpetas de modelos.
               </span>
+            </Field>
+          </div>
+        )}
+
+        {(settings.destination_type === "runpod" || settings.destination_type === "beam") && (
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <Field label={settings.destination_type === "runpod" ? "RunPod Network Volume configurado" : "Volumen Beam configurado"}>
+              <div className={`${input} flex items-center text-zinc-300`}>
+                Se usarán las credenciales y el volumen configurados en Proveedores de infraestructura
+              </div>
+              <span className="mt-2 block text-xs text-zinc-600">
+                {settings.destination_type === "runpod"
+                  ? "RunPod requiere además Access Key y Secret de su S3 API."
+                  : "Beam utiliza su CLI aislado para copiar la carpeta al volumen."}
+              </span>
+            </Field>
+            <Field label="Subcarpeta opcional dentro del volumen">
+              <input
+                className={input}
+                value={settings.docker_path}
+                onChange={(event) => patch("docker_path", event.target.value)}
+                placeholder="Vacío = raíz del volumen"
+              />
             </Field>
           </div>
         )}

@@ -147,7 +147,7 @@ export interface RuntimeContextJob {
 }
 
 export interface RuntimeModelExportSettings {
-  comfyui_path:string; output_directory:string; destination_type:"local"|"docker_volume"|"modal";
+  comfyui_path:string; output_directory:string; destination_type:"local"|"docker_volume"|"modal"|"runpod"|"beam";
   docker_volume:string; docker_path:string; calculate_sha256:boolean; overwrite:boolean; skip_identical:boolean;
 }
 export interface RuntimeLaunchSettings {
