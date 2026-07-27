@@ -4,7 +4,7 @@ import { Boxes, CheckCircle2, Code2, FileJson2, LoaderCircle, Plus, RefreshCcw, 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { browserApiRequest } from "@/lib/api/browser-api";
-import type { RuntimeBuilderConfig, RuntimeGeneratedFiles, RuntimeValidationResponse } from "@/types/admin-runtime-builder";
+import type { RuntimeBuilderConfig, RuntimeGeneratedFiles, RuntimeValidationResponse, RuntimeBuilderProfileSummary, RuntimeBuilderProfileList } from "@/types/admin-runtime-builder";
 import { RuntimeBuildPanel } from "@/components/runtime-builder/runtime-build-panel";
 import { RuntimeImportWizard } from "@/components/runtime-builder/runtime-import-wizard";
 import { RuntimeContextGenerator } from "@/components/runtime-builder/runtime-context-generator";
@@ -32,17 +32,23 @@ export default function RuntimeBuilderPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [advancedMode, setAdvancedMode] = useState(false);
+  const [profiles, setProfiles] = useState<RuntimeBuilderProfileSummary[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const loaded = await browserApiRequest<RuntimeBuilderConfig>("/api/admin/runtime-builder/config");
+      const [loaded, profileList] = await Promise.all([browserApiRequest<RuntimeBuilderConfig>("/api/admin/runtime-builder/config"), browserApiRequest<RuntimeBuilderProfileList>("/api/admin/runtime-builder/profiles")]);
+      setProfiles(profileList.items);
       setConfig({ ...loaded, ...UNIVERSAL_PROFILE, include_comfyui_manager:true, runtime_name: safeRuntimeName(loaded.runtime_name) });
     }
     catch (error) { toast.error(error instanceof Error ? error.message : "No fue posible cargar Runtime Builder."); }
     finally { setLoading(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
+
+  const selectProfile = async (id:number) => { await browserApiRequest(`/api/admin/runtime-builder/profiles/${id}/select`,{method:"POST"}); await load(); toast.success("Perfil de runtime seleccionado."); };
+  const createProfile = async () => { const name=window.prompt("Nombre del nuevo perfil"); if(!name)return; const provider=(window.prompt("Proveedor: modal, runpod, beam o local","modal")||"modal").toLowerCase(); await browserApiRequest("/api/admin/runtime-builder/profiles",{method:"POST",body:JSON.stringify({name,provider})}); await load(); };
+  const deleteProfile = async () => { if(!config||!window.confirm(`¿Eliminar ${config.name}?`))return; await browserApiRequest(`/api/admin/runtime-builder/profiles/${config.id}`,{method:"DELETE"}); await load(); };
 
   const patch = (values: Partial<RuntimeBuilderConfig>) => setConfig((current) => current ? { ...current, ...values } : current);
   const save = async () => {
@@ -74,6 +80,7 @@ export default function RuntimeBuilderPage() {
   ];
 
   return <div className="space-y-5">
+    <section className="luxia-panel rounded-3xl p-4"><div className="flex flex-wrap items-end gap-3"><label className="min-w-72 flex-1"><span className="mb-2 block text-xs font-semibold uppercase text-zinc-500">Perfil de runtime</span><select className={inputClass} value={config.id} onChange={e=>void selectProfile(Number(e.target.value))}>{profiles.map(p=><option key={p.id} value={p.id}>{p.name} · {p.provider}</option>)}</select></label><label className="w-56"><span className="mb-2 block text-xs font-semibold uppercase text-zinc-500">Proveedor destino</span><select className={inputClass} value={config.provider} onChange={e=>patch({provider:e.target.value as RuntimeBuilderConfig["provider"]})}><option value="modal">Modal</option><option value="runpod">RunPod Serverless</option><option value="beam">Beam</option><option value="local">Local</option></select></label><button onClick={()=>void createProfile()} className="h-11 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white">Nuevo perfil</button><button disabled={profiles.length<=1} onClick={()=>void deleteProfile()} className="h-11 rounded-xl border border-red-500/20 px-4 text-sm text-red-300 disabled:opacity-40">Eliminar</button></div></section>
     <section className="luxia-panel rounded-3xl p-6">
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div className="flex gap-4"><div className="luxia-red-glow flex size-14 items-center justify-center rounded-2xl border border-red-500/20 bg-red-950/25 text-red-400"><ServerCog /></div><div>

@@ -4,7 +4,7 @@ export interface RuntimeModelAsset { resolver?: {class_type:string;field:string;
 export interface RuntimeEnvironmentVariable { key: string; value: string | null; secret: boolean; required: boolean; }
 export interface RuntimeVolume { name: string; mount_path: string; read_only: boolean; }
 export interface RuntimeBuilderConfig {
-  id: number; name: string; runtime_name: string; runtime_version: string; python_version: string; cuda_version: string;
+  id: number; name: string; provider: "modal" | "runpod" | "beam" | "local"; runtime_name: string; runtime_version: string; python_version: string; cuda_version: string;
   pytorch_index_url: string; comfyui_repository: string; comfyui_commit: string | null;
   target_platform: string; registry_image: string; include_comfyui_manager: boolean;
   custom_nodes: RuntimeCustomNode[]; python_dependencies: RuntimePythonDependency[];
@@ -189,3 +189,6 @@ export interface RuntimeDeployment {
   started_at: string | null;
   finished_at: string | null;
 }
+
+export interface RuntimeBuilderProfileSummary { id:number; name:string; provider:string; runtime_name:string; runtime_version:string; registry_image:string; is_active:boolean; updated_at:string; }
+export interface RuntimeBuilderProfileList { items: RuntimeBuilderProfileSummary[]; }

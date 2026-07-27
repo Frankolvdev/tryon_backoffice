@@ -1,159 +1,19 @@
 "use client";
-
-import { CloudCog, Container, LoaderCircle, RefreshCcw, Save, ServerCog } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { CloudCog, Container, LoaderCircle, RefreshCcw, Save } from "lucide-react";
+import { useCallback,useEffect,useState } from "react";
 import { toast } from "sonner";
-
 import { TryOnModuleHeader } from "@/components/backoffice/tryon/tryon-module-header";
 import { browserApiRequest } from "@/lib/api/browser-api";
-import type { ModalProviderConfig, ProviderActionResponse } from "@/types/admin-infrastructure-providers";
+import type { ModalProviderConfig,RunPodProviderConfig,BeamProviderConfig,ProviderActionResponse } from "@/types/admin-infrastructure-providers";
 import type { RuntimeModelExportSettings } from "@/types/admin-runtime-builder";
-
-const inputClass = "h-11 w-full rounded-xl border border-white/10 bg-black/25 px-3 text-sm text-white outline-none focus:border-red-500/50";
-
-type Tab = "docker" | "modal";
-
-const modalDefaults: ModalProviderConfig = {
-  enabled: false,
-  token_id: "",
-  token_secret: "",
-  token_secret_configured: false,
-  environment: "main",
-  app_name: "tryon-generation-runtime",
-  runtime_url: "",
-  volume_name: "tryon-models",
-  gpu: "L40S",
-  timeout_seconds: 900,
-};
-
-export default function InfrastructureProvidersPage() {
-  const [tab, setTab] = useState<Tab>("docker");
-  const [docker, setDocker] = useState<RuntimeModelExportSettings | null>(null);
-  const [modal, setModal] = useState<ModalProviderConfig>(modalDefaults);
-  const [volumes, setVolumes] = useState<Array<{ name: string }>>([]);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [dockerSettings, volumeResponse, modalSettings] = await Promise.all([
-        browserApiRequest<RuntimeModelExportSettings>("/api/admin/runtime-builder/models-volume/settings"),
-        browserApiRequest<{ items: Array<{ name: string }> }>("/api/admin/docker-file-manager/volumes"),
-        browserApiRequest<ModalProviderConfig>("/api/admin/infrastructure-providers/modal"),
-      ]);
-      setDocker(dockerSettings);
-      setVolumes(volumeResponse.items);
-      setModal({ ...modalDefaults, ...modalSettings, token_secret: "" });
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo cargar la configuración.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { void load(); }, [load]);
-
-  const saveDocker = async () => {
-    if (!docker) return;
-    setBusy("docker-save");
-    try {
-      const saved = await browserApiRequest<RuntimeModelExportSettings>(
-        "/api/admin/runtime-builder/models-volume/settings",
-        { method: "PUT", body: JSON.stringify(docker) },
-      );
-      setDocker(saved);
-      toast.success("Configuración Docker local guardada.");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo guardar Docker local.");
-    } finally { setBusy(null); }
-  };
-
-  const saveModal = async () => {
-    setBusy("modal-save");
-    try {
-      const saved = await browserApiRequest<ModalProviderConfig>(
-        "/api/admin/infrastructure-providers/modal",
-        { method: "PUT", body: JSON.stringify(modal) },
-      );
-      setModal({ ...saved, token_secret: "" });
-      toast.success("Configuración Modal guardada.");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo guardar Modal.");
-    } finally { setBusy(null); }
-  };
-
-  const modalAction = async (action: "test" | "volume") => {
-    setBusy(`modal-${action}`);
-    try {
-      const result = await browserApiRequest<ProviderActionResponse>(
-        `/api/admin/infrastructure-providers/modal/${action}`,
-        { method: "POST" },
-      );
-      (result.success ? toast.success : toast.error)(result.message);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "La operación con Modal falló.");
-    } finally { setBusy(null); }
-  };
-
-  return (
-    <div>
-      <TryOnModuleHeader
-        title="Proveedores de infraestructura"
-        description="Administra Docker local y Modal sin alterar el flujo actual de Runtime Builder."
-      />
-
-      <div className="mt-5 flex gap-2 rounded-2xl border border-white/8 bg-black/20 p-2">
-        <button type="button" onClick={() => setTab("docker")} className={`flex h-11 items-center gap-2 rounded-xl px-4 text-sm ${tab === "docker" ? "bg-red-500/15 text-red-300" : "text-zinc-400 hover:text-white"}`}>
-          <Container size={16} /> Docker local
-        </button>
-        <button type="button" onClick={() => setTab("modal")} className={`flex h-11 items-center gap-2 rounded-xl px-4 text-sm ${tab === "modal" ? "bg-red-500/15 text-red-300" : "text-zinc-400 hover:text-white"}`}>
-          <CloudCog size={16} /> Modal
-        </button>
-        <button type="button" onClick={() => void load()} className="ml-auto flex h-11 items-center gap-2 rounded-xl border border-white/8 px-4 text-sm text-zinc-400 hover:text-white">
-          <RefreshCcw size={15} /> Recargar
-        </button>
-      </div>
-
-      {loading ? (
-        <section className="luxia-panel mt-5 flex min-h-72 items-center justify-center rounded-3xl"><LoaderCircle className="animate-spin text-red-500" /></section>
-      ) : tab === "docker" && docker ? (
-        <section className="luxia-panel mt-5 rounded-3xl p-6">
-          <div className="flex items-center gap-2 text-sm text-red-300"><ServerCog size={16} /> Docker local</div>
-          <h2 className="mt-2 text-xl font-semibold text-white">Atajo de configuración existente</h2>
-          <p className="mt-2 text-sm text-zinc-500">Este formulario usa exactamente la misma configuración guardada por Runtime Builder.</p>
-          <div className="mt-6 grid gap-5 lg:grid-cols-2">
-            <label className="space-y-2 text-sm text-zinc-300">Ruta local de ComfyUI<input className={inputClass} value={docker.comfyui_path} onChange={(e) => setDocker({ ...docker, comfyui_path: e.target.value })} /></label>
-            <label className="space-y-2 text-sm text-zinc-300">Directorio local de salida<input className={inputClass} value={docker.output_directory} onChange={(e) => setDocker({ ...docker, output_directory: e.target.value })} /></label>
-            <label className="space-y-2 text-sm text-zinc-300">Destino<select className={inputClass} value={docker.destination_type} onChange={(e) => setDocker({ ...docker, destination_type: e.target.value as RuntimeModelExportSettings["destination_type"] })}><option value="local">Directorio local</option><option value="docker_volume">Volumen Docker</option></select></label>
-            <label className="space-y-2 text-sm text-zinc-300">Volumen Docker<select className={inputClass} value={docker.docker_volume} onChange={(e) => setDocker({ ...docker, docker_volume: e.target.value })}><option value="">Seleccionar volumen</option>{volumes.map((volume) => <option key={volume.name} value={volume.name}>{volume.name}</option>)}</select></label>
-            <label className="space-y-2 text-sm text-zinc-300 lg:col-span-2">Subcarpeta opcional dentro del volumen<input className={inputClass} value={docker.docker_path} onChange={(e) => setDocker({ ...docker, docker_path: e.target.value })} /></label>
-          </div>
-          <button type="button" onClick={() => void saveDocker()} disabled={busy !== null} className="mt-6 inline-flex h-11 items-center gap-2 rounded-xl bg-red-600 px-5 text-sm font-medium text-white disabled:opacity-50"><Save size={16} /> {busy === "docker-save" ? "Guardando..." : "Guardar configuración"}</button>
-        </section>
-      ) : (
-        <section className="luxia-panel mt-5 rounded-3xl p-6">
-          <div className="flex items-center gap-2 text-sm text-red-300"><CloudCog size={16} /> Modal</div>
-          <h2 className="mt-2 text-xl font-semibold text-white">Configuración del proveedor</h2>
-          <div className="mt-6 grid gap-5 lg:grid-cols-2">
-            <label className="flex items-center gap-3 rounded-xl border border-white/8 bg-black/20 p-4 text-sm text-zinc-300"><input type="checkbox" checked={modal.enabled} onChange={(e) => setModal({ ...modal, enabled: e.target.checked })} /> Proveedor activo</label>
-            <div />
-            <label className="space-y-2 text-sm text-zinc-300">Token ID<input className={inputClass} value={modal.token_id} onChange={(e) => setModal({ ...modal, token_id: e.target.value })} /></label>
-            <label className="space-y-2 text-sm text-zinc-300">Token Secret<input type="password" className={inputClass} value={modal.token_secret} placeholder={modal.token_secret_configured ? "Configurado; deja vacío para conservarlo" : "Introduce el Token Secret"} onChange={(e) => setModal({ ...modal, token_secret: e.target.value })} /></label>
-            <label className="space-y-2 text-sm text-zinc-300">Environment<input className={inputClass} value={modal.environment} onChange={(e) => setModal({ ...modal, environment: e.target.value })} /></label>
-            <label className="space-y-2 text-sm text-zinc-300">Nombre de aplicación<input className={inputClass} value={modal.app_name} onChange={(e) => setModal({ ...modal, app_name: e.target.value })} /></label>
-            <label className="space-y-2 text-sm text-zinc-300 lg:col-span-2">URL pública del runtime Modal<input className={inputClass} placeholder="https://...modal.run" value={modal.runtime_url} onChange={(e) => setModal({ ...modal, runtime_url: e.target.value })} /><span className="block text-xs text-zinc-500">Es la URL desplegada de ComfyUI. El backend usará <code>/api/tryon/pipeline</code> para enviar el pipeline completo.</span></label>
-            <label className="space-y-2 text-sm text-zinc-300">Nombre de volumen<input className={inputClass} value={modal.volume_name} onChange={(e) => setModal({ ...modal, volume_name: e.target.value })} /></label>
-            <label className="space-y-2 text-sm text-zinc-300">GPU<select className={inputClass} value={modal.gpu} onChange={(e) => setModal({ ...modal, gpu: e.target.value })}><option value="L40S">L40S</option><option value="A100-80GB">A100 80 GB</option><option value="H100">H100</option><option value="B200">B200</option></select></label>
-            <label className="space-y-2 text-sm text-zinc-300">Timeout (segundos)<input type="number" min={60} max={86400} className={inputClass} value={modal.timeout_seconds} onChange={(e) => setModal({ ...modal, timeout_seconds: Number(e.target.value) })} /></label>
-          </div>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button type="button" onClick={() => void saveModal()} disabled={busy !== null} className="inline-flex h-11 items-center gap-2 rounded-xl bg-red-600 px-5 text-sm font-medium text-white disabled:opacity-50"><Save size={16} /> {busy === "modal-save" ? "Guardando..." : "Guardar"}</button>
-            <button type="button" onClick={() => void modalAction("test")} disabled={busy !== null} className="h-11 rounded-xl border border-white/10 px-5 text-sm text-zinc-300 disabled:opacity-50">{busy === "modal-test" ? "Probando..." : "Probar conexión"}</button>
-            <button type="button" onClick={() => void modalAction("volume")} disabled={busy !== null} className="h-11 rounded-xl border border-white/10 px-5 text-sm text-zinc-300 disabled:opacity-50">{busy === "modal-volume" ? "Comprobando..." : "Crear o comprobar volumen"}</button>
-          </div>
-        </section>
-      )}
-    </div>
-  );
-}
+const input="h-11 w-full rounded-xl border border-white/10 bg-black/25 px-3 text-sm text-white outline-none focus:border-red-500/50";
+type Tab="docker"|"modal"|"runpod"|"beam";
+const modalDefault:ModalProviderConfig={enabled:false,token_id:"",token_secret:"",token_secret_configured:false,environment:"main",app_name:"tryon-generation-runtime",runtime_url:"",volume_name:"tryon-models",gpu:"L40S",timeout_seconds:900};
+const runpodDefault:RunPodProviderConfig={enabled:false,api_key:"",api_key_configured:false,endpoint_id:"",network_volume_id:"",network_volume_name:"tryon-models",data_center_id:"",timeout_seconds:900};
+const beamDefault:BeamProviderConfig={enabled:false,api_key:"",api_key_configured:false,workspace:"",endpoint:"",volume_name:"tryon-models",timeout_seconds:900};
+export default function Page(){const[tab,setTab]=useState<Tab>("docker"),[docker,setDocker]=useState<RuntimeModelExportSettings|null>(null),[modal,setModal]=useState(modalDefault),[runpod,setRunpod]=useState(runpodDefault),[beam,setBeam]=useState(beamDefault),[volumes,setVolumes]=useState<Array<{name:string}>>([]),[loading,setLoading]=useState(true),[busy,setBusy]=useState<string|null>(null);
+const load=useCallback(async()=>{setLoading(true);try{const[d,v,m,r,b]=await Promise.all([browserApiRequest<RuntimeModelExportSettings>("/api/admin/runtime-builder/models-volume/settings"),browserApiRequest<{items:Array<{name:string}>}>("/api/admin/docker-file-manager/volumes"),browserApiRequest<ModalProviderConfig>("/api/admin/infrastructure-providers/modal"),browserApiRequest<RunPodProviderConfig>("/api/admin/infrastructure-providers/runpod"),browserApiRequest<BeamProviderConfig>("/api/admin/infrastructure-providers/beam")]);setDocker(d);setVolumes(v.items);setModal({...modalDefault,...m,token_secret:""});setRunpod({...runpodDefault,...r,api_key:""});setBeam({...beamDefault,...b,api_key:""})}catch(e){toast.error(e instanceof Error?e.message:"No se pudo cargar.")}finally{setLoading(false)}},[]);useEffect(()=>{void load()},[load]);
+const save=async(key:"modal"|"runpod"|"beam",value:unknown)=>{setBusy(key+"-save");try{const saved=await browserApiRequest<any>(`/api/admin/infrastructure-providers/${key}`,{method:"PUT",body:JSON.stringify(value)});if(key==="modal")setModal({...saved,token_secret:""});if(key==="runpod")setRunpod({...saved,api_key:""});if(key==="beam")setBeam({...saved,api_key:""});toast.success("Configuración guardada.")}catch(e){toast.error(e instanceof Error?e.message:"No se pudo guardar.")}finally{setBusy(null)}};
+const action=async(key:"modal"|"runpod"|"beam",kind:"test"|"volume")=>{setBusy(`${key}-${kind}`);try{const r=await browserApiRequest<ProviderActionResponse>(`/api/admin/infrastructure-providers/${key}/${kind}`,{method:"POST"});(r.success?toast.success:toast.error)(r.message)}catch(e){toast.error(e instanceof Error?e.message:"Operación fallida.")}finally{setBusy(null)}};
+return <div><TryOnModuleHeader title="Proveedores de infraestructura" description="Configura Local, Modal, RunPod Serverless y Beam de forma independiente."/><div className="mt-5 flex flex-wrap gap-2 rounded-2xl border border-white/8 bg-black/20 p-2">{([['docker','Docker local'],['modal','Modal'],['runpod','RunPod Serverless'],['beam','Beam']] as const).map(([k,l])=><button key={k} onClick={()=>setTab(k)} className={`h-11 rounded-xl px-4 text-sm ${tab===k?'bg-red-500/15 text-red-300':'text-zinc-400'}`}>{l}</button>)}<button onClick={()=>void load()} className="ml-auto h-11 rounded-xl border border-white/8 px-4 text-zinc-400"><RefreshCcw size={15} className="mr-2 inline"/>Recargar</button></div>{loading?<section className="luxia-panel mt-5 flex min-h-72 items-center justify-center rounded-3xl"><LoaderCircle className="animate-spin text-red-500"/></section>:tab==='docker'&&docker?<section className="luxia-panel mt-5 rounded-3xl p-6"><Title name="Docker local"/><div className="mt-6 grid gap-5 lg:grid-cols-2"><F label="Ruta local de ComfyUI"><input className={input} value={docker.comfyui_path} onChange={e=>setDocker({...docker,comfyui_path:e.target.value})}/></F><F label="Directorio de salida"><input className={input} value={docker.output_directory} onChange={e=>setDocker({...docker,output_directory:e.target.value})}/></F><F label="Volumen Docker"><select className={input} value={docker.docker_volume} onChange={e=>setDocker({...docker,docker_volume:e.target.value})}><option value="">Seleccionar</option>{volumes.map(v=><option key={v.name}>{v.name}</option>)}</select></F></div></section>:tab==='modal'?<ProviderCard name="Modal" busy={busy} onSave={()=>save('modal',modal)} onTest={()=>action('modal','test')} onVolume={()=>action('modal','volume')}><Check value={modal.enabled} onChange={v=>setModal({...modal,enabled:v})}/><F label="Token ID"><input className={input} value={modal.token_id} onChange={e=>setModal({...modal,token_id:e.target.value})}/></F><F label="Token Secret"><input type="password" className={input} value={modal.token_secret} placeholder={modal.token_secret_configured?'Configurado; vacío conserva':'Token secret'} onChange={e=>setModal({...modal,token_secret:e.target.value})}/></F><F label="App"><input className={input} value={modal.app_name} onChange={e=>setModal({...modal,app_name:e.target.value})}/></F><F label="Volumen"><input className={input} value={modal.volume_name} onChange={e=>setModal({...modal,volume_name:e.target.value})}/></F></ProviderCard>:tab==='runpod'?<ProviderCard name="RunPod Serverless" busy={busy} onSave={()=>save('runpod',runpod)} onTest={()=>action('runpod','test')} onVolume={()=>action('runpod','volume')}><Check value={runpod.enabled} onChange={v=>setRunpod({...runpod,enabled:v})}/><F label="API key"><input type="password" className={input} value={runpod.api_key} placeholder={runpod.api_key_configured?'Configurada; vacío conserva':'API key'} onChange={e=>setRunpod({...runpod,api_key:e.target.value})}/></F><F label="Endpoint predeterminado"><input className={input} value={runpod.endpoint_id} onChange={e=>setRunpod({...runpod,endpoint_id:e.target.value})}/></F><F label="Network Volume ID"><input className={input} value={runpod.network_volume_id} onChange={e=>setRunpod({...runpod,network_volume_id:e.target.value})}/></F><F label="Nombre del volumen"><input className={input} value={runpod.network_volume_name} onChange={e=>setRunpod({...runpod,network_volume_name:e.target.value})}/></F></ProviderCard>:<ProviderCard name="Beam" busy={busy} onSave={()=>save('beam',beam)} onTest={()=>action('beam','test')} onVolume={()=>action('beam','volume')}><Check value={beam.enabled} onChange={v=>setBeam({...beam,enabled:v})}/><F label="API key"><input type="password" className={input} value={beam.api_key} placeholder={beam.api_key_configured?'Configurada; vacío conserva':'API key'} onChange={e=>setBeam({...beam,api_key:e.target.value})}/></F><F label="Workspace"><input className={input} value={beam.workspace} onChange={e=>setBeam({...beam,workspace:e.target.value})}/></F><F label="Endpoint predeterminado"><input className={input} value={beam.endpoint} onChange={e=>setBeam({...beam,endpoint:e.target.value})}/></F><F label="Volumen"><input className={input} value={beam.volume_name} onChange={e=>setBeam({...beam,volume_name:e.target.value})}/></F></ProviderCard>}</div>}
+function Title({name}:{name:string}){return <><div className="flex items-center gap-2 text-sm text-red-300"><CloudCog size={16}/>{name}</div><h2 className="mt-2 text-xl font-semibold text-white">Configuración del proveedor</h2></>};function F({label,children}:{label:string;children:React.ReactNode}){return <label className="space-y-2 text-sm text-zinc-300"><span>{label}</span>{children}</label>};function Check({value,onChange}:{value:boolean;onChange:(v:boolean)=>void}){return <label className="flex items-center gap-3 rounded-xl border border-white/8 p-4 text-sm text-zinc-300"><input type="checkbox" checked={value} onChange={e=>onChange(e.target.checked)}/>Proveedor activo</label>};function ProviderCard({name,children,busy,onSave,onTest,onVolume}:{name:string;children:React.ReactNode;busy:string|null;onSave:()=>void;onTest:()=>void;onVolume:()=>void}){return <section className="luxia-panel mt-5 rounded-3xl p-6"><Title name={name}/><div className="mt-6 grid gap-5 lg:grid-cols-2">{children}</div><div className="mt-6 flex gap-3"><button disabled={!!busy} onClick={onSave} className="h-11 rounded-xl bg-red-600 px-5 text-sm text-white"><Save size={16} className="mr-2 inline"/>Guardar</button><button disabled={!!busy} onClick={onTest} className="h-11 rounded-xl border border-white/10 px-5 text-sm text-zinc-300">Probar conexión</button><button disabled={!!busy} onClick={onVolume} className="h-11 rounded-xl border border-white/10 px-5 text-sm text-zinc-300">Crear o comprobar volumen</button></div></section>}
