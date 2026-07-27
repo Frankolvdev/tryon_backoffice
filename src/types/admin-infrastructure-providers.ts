@@ -13,8 +13,10 @@ export interface RunPodProviderConfig {
 }
 
 export interface BeamProviderConfig {
-  enabled:boolean; api_key:string; api_key_configured:boolean; workspace:string; endpoint:string;
-  volume_name:string; timeout_seconds:number;
+  enabled:boolean; api_key:string; api_key_configured:boolean; workspace:string; endpoint:string; deployment_name:string;
+  volume_name:string; volume_mount_path:string; gpu:string; cpu:number; memory_mb:number; workers:number;
+  min_containers:number; max_containers:number; tasks_per_container:number; keep_warm_seconds:number;
+  max_pending_tasks:number; retries:number; checkpoint_enabled:boolean; timeout_seconds:number;
 }
 
 export interface ProviderActionResponse { success:boolean; message:string; details:Record<string,unknown>; }
