@@ -97,11 +97,12 @@ function providerLabel(provider: string): string {
     local_docker: "ComfyUI Local",
     runpod_serverless: "RunPod Serverless",
     modal: "Modal",
+    beam: "Beam",
   };
   return labels[provider] ?? provider;
 }
 function ProviderIcon({ provider }: { provider: string }) {
-  if (provider === "runpod_serverless" || provider === "modal") return <Server size={19} />;
+  if (provider === "runpod_serverless" || provider === "modal" || provider === "beam") return <Server size={19} />;
   if (provider === "comfyui_local" || provider === "local_docker") return <Cpu size={19} />;
   return <FlaskConical size={19} />;
 }

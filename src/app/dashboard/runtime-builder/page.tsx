@@ -1,6 +1,6 @@
 "use client";
 
-import { Boxes, CheckCircle2, Code2, FileJson2, LoaderCircle, Plus, RefreshCcw, Save, ServerCog, Trash2, TriangleAlert } from "lucide-react";
+import { Boxes, CheckCircle2, Code2, FileJson2, LoaderCircle, Plus, RefreshCcw, Save, ServerCog, Trash2, TriangleAlert, ArrowLeft, LogIn } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { browserApiRequest } from "@/lib/api/browser-api";
@@ -33,6 +33,10 @@ export default function RuntimeBuilderPage() {
   const [saving, setSaving] = useState(false);
   const [advancedMode, setAdvancedMode] = useState(false);
   const [profiles, setProfiles] = useState<RuntimeBuilderProfileSummary[]>([]);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [creatingProfile, setCreatingProfile] = useState(false);
+  const [newProfileName, setNewProfileName] = useState("");
+  const [newProfileProvider, setNewProfileProvider] = useState<RuntimeBuilderConfig["provider"]>("modal");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -46,9 +50,26 @@ export default function RuntimeBuilderPage() {
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  const selectProfile = async (id:number) => { await browserApiRequest(`/api/admin/runtime-builder/profiles/${id}/select`,{method:"POST"}); await load(); toast.success("Perfil de runtime seleccionado."); };
-  const createProfile = async () => { const name=window.prompt("Nombre del nuevo perfil"); if(!name)return; const provider=(window.prompt("Proveedor: modal, runpod, beam o local","modal")||"modal").toLowerCase(); await browserApiRequest("/api/admin/runtime-builder/profiles",{method:"POST",body:JSON.stringify({name,provider})}); await load(); };
-  const deleteProfile = async () => { if(!config||!window.confirm(`¿Eliminar ${config.name}?`))return; await browserApiRequest(`/api/admin/runtime-builder/profiles/${config.id}`,{method:"DELETE"}); await load(); };
+  const selectProfile = async (id:number) => {
+    await browserApiRequest(`/api/admin/runtime-builder/profiles/${id}/select`,{method:"POST"});
+    await load();
+    setEditingProfile(true);
+    toast.success("Runtime abierto.");
+  };
+  const createProfile = async () => {
+    const name = newProfileName.trim();
+    if (!name) { toast.error("Escribe el nombre del runtime."); return; }
+    const created = await browserApiRequest<RuntimeBuilderConfig>("/api/admin/runtime-builder/profiles",{method:"POST",body:JSON.stringify({name,provider:newProfileProvider})});
+    setCreatingProfile(false); setNewProfileName("");
+    await load(); setEditingProfile(true);
+    toast.success(`Runtime ${created.name} creado para ${created.provider}.`);
+  };
+  const deleteProfileById = async (profile: RuntimeBuilderProfileSummary) => {
+    if(!window.confirm(`¿Eliminar el runtime ${profile.name}?`)) return;
+    await browserApiRequest(`/api/admin/runtime-builder/profiles/${profile.id}`,{method:"DELETE"});
+    if (config?.id === profile.id) setEditingProfile(false);
+    await load();
+  };
 
   const patch = (values: Partial<RuntimeBuilderConfig>) => setConfig((current) => current ? { ...current, ...values } : current);
   const save = async () => {
@@ -74,13 +95,26 @@ export default function RuntimeBuilderPage() {
 
   if (loading || !config) return <div className="flex min-h-80 items-center justify-center"><LoaderCircle className="animate-spin text-red-500" /></div>;
 
+  if (!editingProfile) return <div className="space-y-5">
+    <section className="luxia-panel rounded-3xl p-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div><p className="text-[10px] font-semibold uppercase tracking-[.2em] text-red-500">Infraestructura IA</p><h1 className="mt-2 text-2xl font-semibold text-white">Runtimes</h1><p className="mt-2 text-sm text-zinc-500">Cada runtime pertenece permanentemente al proveedor elegido al crearlo.</p></div>
+        <button onClick={()=>setCreatingProfile(true)} className="inline-flex h-11 items-center gap-2 rounded-xl bg-red-600 px-5 text-sm font-semibold text-white"><Plus size={16}/>Crear runtime</button>
+      </div>
+    </section>
+    <section className="luxia-panel overflow-hidden rounded-3xl">
+      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b border-white/8 bg-black/20 text-xs uppercase text-zinc-500"><tr><th className="p-4">Nombre</th><th className="p-4">Proveedor</th><th className="p-4">Versión</th><th className="p-4">Actualizado</th><th className="p-4 text-right">Acciones</th></tr></thead><tbody>{profiles.map(profile=><tr key={profile.id} className="border-b border-white/6 last:border-0"><td className="p-4"><div className="font-medium text-white">{profile.name}</div><div className="mt-1 text-xs text-zinc-600">{profile.runtime_name}</div></td><td className="p-4"><span className="rounded-full border border-white/10 bg-white/[.03] px-3 py-1 text-xs capitalize text-zinc-300">{profile.provider}</span></td><td className="p-4 text-zinc-400">{profile.runtime_version}</td><td className="p-4 text-zinc-500">{new Date(profile.updated_at).toLocaleString("es-MX")}</td><td className="p-4"><div className="flex justify-end gap-2"><button onClick={()=>void selectProfile(profile.id)} className="inline-flex h-9 items-center gap-2 rounded-xl border border-white/10 px-3 text-xs text-zinc-200"><LogIn size={14}/>Entrar</button><button disabled={profiles.length<=1} onClick={()=>void deleteProfileById(profile)} className="inline-flex h-9 items-center gap-2 rounded-xl border border-red-500/20 px-3 text-xs text-red-300 disabled:opacity-40"><Trash2 size={14}/>Eliminar</button></div></td></tr>)}</tbody></table></div>
+    </section>
+    {creatingProfile&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"><div className="w-full max-w-lg rounded-3xl border border-white/10 bg-zinc-950 p-6 shadow-2xl"><h2 className="text-xl font-semibold text-white">Crear runtime</h2><p className="mt-2 text-sm text-zinc-500">El proveedor quedará asociado al runtime y no se podrá cambiar después.</p><label className="mt-5 block"><span className="mb-2 block text-sm text-zinc-300">Nombre</span><input autoFocus className={inputClass} value={newProfileName} onChange={e=>setNewProfileName(e.target.value)} placeholder="Ej. TryOn producción"/></label><label className="mt-4 block"><span className="mb-2 block text-sm text-zinc-300">Proveedor</span><select className={inputClass} value={newProfileProvider} onChange={e=>setNewProfileProvider(e.target.value as RuntimeBuilderConfig["provider"])}><option value="modal">Modal</option><option value="runpod">RunPod Serverless</option><option value="beam">Beam</option><option value="local">Local / Docker</option></select></label><div className="mt-6 flex justify-end gap-3"><button onClick={()=>setCreatingProfile(false)} className="h-11 rounded-xl border border-white/10 px-4 text-sm text-zinc-300">Cancelar</button><button onClick={()=>void createProfile()} className="h-11 rounded-xl bg-red-600 px-5 text-sm font-semibold text-white">Crear y entrar</button></div></div></div>}
+  </div>;
+
   const tabs: {id: Tab; label: string}[] = [
     {id:"import",label:"1–3. Preparar Runtime"},{id:"base",label:"4. Configuración base"},{id:"nodes",label:`4. Custom Nodes (${config.custom_nodes.length})`},{id:"models",label:`4. Modelos (${config.models.length})`},
     {id:"dependencies",label:"4. Dependencias"},{id:"environment",label:"4. Variables y volúmenes"},{id:"preview",label:"5. Validar y generar archivos"},{id:"generator",label:"6. Generar Runtime"},{id:"model-export",label:"Modelos y Docker"},{id:"builds",label:"7–9. Build & Deploy"},
   ];
 
   return <div className="space-y-5">
-    <section className="luxia-panel rounded-3xl p-4"><div className="flex flex-wrap items-end gap-3"><label className="min-w-72 flex-1"><span className="mb-2 block text-xs font-semibold uppercase text-zinc-500">Perfil de runtime</span><select className={inputClass} value={config.id} onChange={e=>void selectProfile(Number(e.target.value))}>{profiles.map(p=><option key={p.id} value={p.id}>{p.name} · {p.provider}</option>)}</select></label><label className="w-56"><span className="mb-2 block text-xs font-semibold uppercase text-zinc-500">Proveedor destino</span><select className={inputClass} value={config.provider} onChange={e=>patch({provider:e.target.value as RuntimeBuilderConfig["provider"]})}><option value="modal">Modal</option><option value="runpod">RunPod Serverless</option><option value="beam">Beam</option><option value="local">Local</option></select></label><button onClick={()=>void createProfile()} className="h-11 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white">Nuevo perfil</button><button disabled={profiles.length<=1} onClick={()=>void deleteProfile()} className="h-11 rounded-xl border border-red-500/20 px-4 text-sm text-red-300 disabled:opacity-40">Eliminar</button></div></section>
+    <section className="luxia-panel rounded-3xl p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-3"><button onClick={()=>setEditingProfile(false)} className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 px-3 text-sm text-zinc-300"><ArrowLeft size={15}/>Runtimes</button><div><p className="text-xs uppercase tracking-wider text-zinc-600">Runtime abierto</p><p className="font-semibold text-white">{config.name}</p></div></div><div className="rounded-xl border border-white/10 bg-black/20 px-4 py-2"><span className="text-xs text-zinc-500">Proveedor fijo</span><p className="text-sm font-semibold capitalize text-zinc-200">{config.provider}</p></div></div></section>
     <section className="luxia-panel rounded-3xl p-6">
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div className="flex gap-4"><div className="luxia-red-glow flex size-14 items-center justify-center rounded-2xl border border-red-500/20 bg-red-950/25 text-red-400"><ServerCog /></div><div>
