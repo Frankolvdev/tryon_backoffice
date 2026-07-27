@@ -278,13 +278,6 @@ export default function AiEnginePage() {
             <div className="flex items-center gap-2 text-sm font-semibold text-white"><ServerCog size={16} /> Configuración Modal</div>
             <p className="mt-2 text-xs leading-5 text-zinc-500">Parámetros obligatorios y esenciales para escalar el runtime de generación en Modal. Se validan junto con Configuración del proveedor antes de cada Deploy.</p>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <label className="rounded-2xl border border-white/7 bg-black/20 p-4">
-                <span className="text-sm font-medium text-white">GPU de Modal</span>
-                <p className="mt-2 min-h-10 text-xs leading-5 text-zinc-500">L40S es la recomendación inicial por equilibrio entre VRAM, rendimiento y costo.</p>
-                <select value={draft.modal_gpu || DEFAULT_MODAL_SETTINGS.modal_gpu} onChange={(e) => update("modal_gpu", e.target.value as AiEngineSettingsUpdate["modal_gpu"])} className="mt-3 h-11 w-full rounded-xl border border-white/8 bg-[#09090a] px-3 text-sm text-white">
-                  {['L4','L40S','A10G','A100-40GB','A100-80GB','H100'].map((gpu) => <option key={gpu} value={gpu}>{gpu}{gpu === 'L40S' ? ' (recomendada)' : ''}</option>)}
-                </select>
-              </label>
               <NumberField label="Contenedores mínimos" description="Usa 0 para escalar a cero cuando no haya trabajos." value={draft.modal_min_containers} min={0} max={100} onChange={(v) => update("modal_min_containers", v)} />
               <NumberField label="Contenedores máximos" description="Máximo de contenedores GPU que Modal podrá levantar para atender la demanda." value={draft.modal_max_containers} max={100} onChange={(v) => update("modal_max_containers", v)} />
               <NumberField label="Workflows simultáneos por GPU" description="Cantidad máxima de workflows pesados que cada contenedor GPU puede ejecutar simultáneamente. Se recomienda mantener 1 para evitar saturación de VRAM." value={draft.modal_concurrency} max={16} onChange={(v) => update("modal_concurrency", v)} />
