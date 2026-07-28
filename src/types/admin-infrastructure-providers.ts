@@ -7,6 +7,7 @@ export interface RunPodProviderConfig {
   enabled:boolean; api_key:string; api_key_configured:boolean;
   s3_access_key:string; s3_secret_key:string; s3_secret_key_configured:boolean;
   endpoint_id:string; endpoint_name:string; template_id:string; template_name:string; registry_auth_id:string;
+  ghcr_username:string; ghcr_token:string; ghcr_token_configured:boolean;
   network_volume_id:string; network_volume_name:string; network_volume_size_gb:number; data_center_id:string;
   gpu_type_ids:string[]; allowed_cuda_versions:string[]; workers_min:number; workers_max:number;
   idle_timeout_seconds:number; execution_timeout_seconds:number; scaler_type:"QUEUE_DELAY"|"REQUEST_COUNT";
