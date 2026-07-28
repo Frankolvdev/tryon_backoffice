@@ -147,8 +147,8 @@ export default function Page() {
       </ProviderCard>
       : <ProviderCard name="Beam" busy={busy} onSave={() => save('beam', beam)} onTest={() => action('beam', 'test')} onVolume={() => action('beam', 'volume')}>
         <Check value={beam.enabled} onChange={v => setBeam({ ...beam, enabled: v })} />
-        <F label="Token ID"><input className={input} value={beam.workspace} onChange={e => setBeam({ ...beam, workspace: e.target.value })} /></F>
-        <F label="Token Secret"><input type="password" className={input} value={beam.api_key} placeholder={beam.api_key_configured ? 'Configurado; vacío conserva' : 'Token secret'} onChange={e => setBeam({ ...beam, api_key: e.target.value })} /></F>
+        <F label="Primary Key"><input className={input} value={beam.workspace} placeholder="Primary Key de Beam" autoComplete="off" onChange={e => setBeam({ ...beam, workspace: e.target.value })} /></F>
+        <F label="Token"><input type="password" className={input} value={beam.api_key} placeholder={beam.api_key_configured ? 'Configurado; vacío conserva' : 'Token de Beam'} autoComplete="new-password" onChange={e => setBeam({ ...beam, api_key: e.target.value })} /></F>
         <F label="App"><input className={input} value={beam.deployment_name} onChange={e => setBeam({ ...beam, deployment_name: e.target.value })} /></F>
         <F label="Volumen"><input className={input} value={beam.volume_name} onChange={e => setBeam({ ...beam, volume_name: e.target.value })} /></F>
         <F label="GPU"><select className={input} value={beam.gpu} onChange={e => setBeam({ ...beam, gpu: e.target.value })}>{BEAM_GPUS.map(gpu => <option key={gpu} value={gpu}>{gpu}</option>)}</select></F>
