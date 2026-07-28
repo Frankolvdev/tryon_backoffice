@@ -150,9 +150,7 @@ export default function Page() {
         <F label="API key"><input type="password" className={input} value={beam.api_key} placeholder={beam.api_key_configured ? 'Configurada; vacío conserva' : 'API key'} onChange={e => setBeam({ ...beam, api_key: e.target.value })} /></F>
         <F label="Workspace"><input className={input} value={beam.workspace} onChange={e => setBeam({ ...beam, workspace: e.target.value })} /></F>
         <F label="Endpoint predeterminado"><input className={input} value={beam.endpoint} onChange={e => setBeam({ ...beam, endpoint: e.target.value })} /></F>
-        <F label="Nombre del deployment"><input className={input} value={beam.deployment_name} onChange={e => setBeam({ ...beam, deployment_name: e.target.value })} /></F>
         <F label="Volumen"><input className={input} value={beam.volume_name} onChange={e => setBeam({ ...beam, volume_name: e.target.value })} /></F>
-        <F label="Ruta de montaje"><input className={input} value={beam.volume_mount_path} onChange={e => setBeam({ ...beam, volume_mount_path: e.target.value })} /></F>
         <F label="GPU"><select className={input} value={beam.gpu} onChange={e => setBeam({ ...beam, gpu: e.target.value })}>{BEAM_GPUS.map(gpu => <option key={gpu} value={gpu}>{gpu}</option>)}</select></F>
         <NumberInput label="Contenedores mínimos" value={beam.min_containers} onChange={v => setBeam({ ...beam, min_containers: v })} />
         <NumberInput label="Contenedores máximos" value={beam.max_containers} onChange={v => setBeam({ ...beam, max_containers: v })} />

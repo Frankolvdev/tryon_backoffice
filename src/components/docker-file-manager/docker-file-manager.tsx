@@ -104,8 +104,9 @@ function uploadFileWithProgress(
 }
 
 export function DockerFileManager() {
-  const [provider, setProvider] = useState<"docker" | "modal">("docker");
-  const apiBase = provider === "modal" ? "/api/admin/modal-file-manager" : "/api/admin/docker-file-manager";
+  type FileManagerProvider = "docker" | "modal" | "runpod" | "beam";
+  const [provider, setProvider] = useState<FileManagerProvider>("docker");
+  const apiBase = provider === "docker" ? "/api/admin/docker-file-manager" : `/api/admin/${provider}-file-manager`;
   const [volumes, setVolumes] = useState<DockerVolume[]>([]);
   const [volume, setVolume] = useState("");
   const [path, setPath] = useState("");
@@ -118,7 +119,7 @@ export function DockerFileManager() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const loadVolumes = useCallback(async () => {
-    setLoadingMessage("Cargando volúmenes Docker…");
+    setLoadingMessage("Cargando volúmenes…");
     const response = await browserApiRequest<{ items: DockerVolume[] }>(
       `${apiBase}/volumes`,
     );
@@ -186,7 +187,7 @@ export function DockerFileManager() {
   };
 
   const createVolume = () => {
-    const name = window.prompt("Nombre del nuevo volumen Docker:");
+    const name = window.prompt("Nombre del nuevo volumen:");
     if (!name) return;
     void action(
       () =>
@@ -199,7 +200,7 @@ export function DockerFileManager() {
           }),
         }),
       "Volumen creado.",
-      "Creando volumen Docker…",
+      "Creando volumen…",
     );
   };
 
@@ -303,7 +304,7 @@ export function DockerFileManager() {
           const overallLoaded = completedBytes + Math.min(loaded, file.size);
           const sent = fileTotal > 0 && loaded >= fileTotal;
           if (sent) {
-            setLoadingMessage(`Guardando ${file.name} en el volumen Docker…`);
+            setLoadingMessage(`Guardando ${file.name} en el volumen…`);
           }
           setUploadProgress({
             phase: sent ? "processing" : "uploading",
@@ -416,7 +417,7 @@ export function DockerFileManager() {
               <HardDrive />
             </div>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-red-500">Infraestructura de archivos</p><h1 className="mt-2 text-2xl font-semibold text-white">File Manager</h1><p className="mt-2 text-sm text-zinc-500">Administra archivos de Docker local o del volumen configurado en Modal.</p><label className="mt-4 block max-w-xs text-xs font-semibold uppercase tracking-wide text-zinc-500">Proveedor<select value={provider} onChange={(event)=>{setVolume("");setPath("");setEntries([]);setSelected(null);setProvider(event.target.value as "docker"|"modal");}} className="mt-2 h-10 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-sm normal-case text-white"><option value="docker">Docker local</option><option value="modal">Modal</option></select></label>
+              <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-red-500">Infraestructura de archivos</p><h1 className="mt-2 text-2xl font-semibold text-white">File Manager</h1><p className="mt-2 text-sm text-zinc-500">Administra archivos de Docker local, Modal, RunPod y Beam desde una sola vista.</p><label className="mt-4 block max-w-xs text-xs font-semibold uppercase tracking-wide text-zinc-500">Proveedor<select value={provider} onChange={(event)=>{setVolume("");setPath("");setEntries([]);setSelected(null);setProvider(event.target.value as FileManagerProvider);}} className="mt-2 h-10 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-sm normal-case text-white"><option value="docker">Docker local</option><option value="modal">Modal</option><option value="runpod">RunPod</option><option value="beam">Beam</option></select></label>
             </div>
           </div>
           <div className="flex gap-2">
@@ -440,7 +441,7 @@ export function DockerFileManager() {
             </button>
             <button
               className="luxia-red-glow inline-flex h-10 items-center gap-2 rounded-xl bg-red-700 px-3 text-sm font-semibold text-white"
-              disabled={provider === "modal" || busy || Boolean(loadingMessage)}
+              disabled={provider !== "docker" || busy || Boolean(loadingMessage)}
               onClick={createVolume}
             >
               <Plus size={15} />Crear volumen
@@ -458,7 +459,7 @@ export function DockerFileManager() {
 
       <section className="grid gap-5 xl:grid-cols-[300px_1fr]">
         <aside className="luxia-panel rounded-3xl p-4">
-          <h2 className="mb-3 text-sm font-semibold text-white">{provider === "modal" ? "Volumen Modal" : "Volúmenes Docker"}</h2>
+          <h2 className="mb-3 text-sm font-semibold text-white">{provider === "docker" ? "Volúmenes Docker" : `Volumen ${provider === "runpod" ? "RunPod" : provider === "beam" ? "Beam" : "Modal"}`}</h2>
           <div className="space-y-2">
             {volumes.map((item) => (
               <button
@@ -482,7 +483,7 @@ export function DockerFileManager() {
           </div>
           {volume && (
             <button
-              disabled={provider === "modal" || busy}
+              disabled={provider !== "docker" || busy}
               onClick={() => void deleteVolume()}
               className="mt-4 inline-flex items-center gap-2 text-sm text-red-400 disabled:opacity-40"
             >
