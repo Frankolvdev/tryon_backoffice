@@ -294,18 +294,6 @@ export default function AiEnginePage() {
             </div>
           </div>
           <div className="mt-5 rounded-2xl border border-white/7 bg-black/20 p-5">
-            <div className="flex items-center gap-2 text-sm font-semibold text-white"><ServerCog size={16} /> Configuración Modal</div>
-            <p className="mt-2 text-xs leading-5 text-zinc-500">Parámetros obligatorios y esenciales para escalar el runtime de generación en Modal. Se validan junto con Configuración del proveedor antes de cada Deploy.</p>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <NumberField label="Contenedores mínimos" description="Usa 0 para escalar a cero cuando no haya trabajos." value={draft.modal_min_containers} min={0} max={100} onChange={(v) => update("modal_min_containers", v)} />
-              <NumberField label="Contenedores máximos" description="Máximo de contenedores GPU que Modal podrá levantar para atender la demanda." value={draft.modal_max_containers} max={100} onChange={(v) => update("modal_max_containers", v)} />
-              <NumberField label="Workflows simultáneos por GPU" description="Cantidad máxima de workflows pesados que cada contenedor GPU puede ejecutar simultáneamente. Se recomienda mantener 1 para evitar saturación de VRAM." value={draft.modal_concurrency} max={16} onChange={(v) => update("modal_concurrency", v)} />
-              <NumberField label="Conexiones HTTP/WebSocket por contenedor" description="Cantidad máxima de entradas HTTP y WebSocket que el mismo contenedor puede atender. No aumenta los workflows simultáneos ni el uso de VRAM. Si no existe un valor guardado se usa el máximo predeterminado: 1000." value={draft.modal_input_concurrency} max={1000} onChange={(v) => update("modal_input_concurrency", v)} />
-              <NumberField label="Apagado por inactividad (segundos)" description="Tiempo sin actividad antes de liberar el contenedor. Recomendado: 300." value={draft.modal_scaledown_window_seconds} min={1} max={3600} onChange={(v) => update("modal_scaledown_window_seconds", v)} />
-              <NumberField label="Timeout de ejecución (segundos)" description="Tiempo máximo permitido para una generación. Recomendado: 1800." value={draft.modal_execution_timeout_seconds} min={60} max={86400} onChange={(v) => update("modal_execution_timeout_seconds", v)} />
-            </div>
-          </div>
-          <div className="mt-5 rounded-2xl border border-white/7 bg-black/20 p-5">
             <div className="flex items-center gap-2 text-sm font-semibold text-white"><ServerCog size={16} /> Configuración de cola</div>
             <p className="mt-2 text-xs leading-5 text-zinc-500">Ajusta la espera del consumidor de Redis sin seleccionar ni activar proveedores.</p>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -324,14 +312,12 @@ export default function AiEnginePage() {
               <div>
                 <p className="text-sm font-medium text-amber-200">Reinicio requerido</p>
                 <p className="mt-1 text-xs leading-5 text-amber-200/60">Los workers se crean al iniciar el backend. Guarda los cambios y reinicia Uvicorn para aplicarlos.</p>
-                <p className="mt-1 text-xs text-zinc-500">La configuración de Modal se aplicará al siguiente runtime generado y se validará antes de cada Deploy.</p>
               </div>
             </div>
             <button type="button" disabled={saving} onClick={() => void save()} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-red-600 px-5 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50">
               {saving ? <LoaderCircle size={16} className="animate-spin" /> : <Save size={16} />} Guardar configuración
             </button>
           </div>
-          <div className="mt-5 flex items-center gap-2 text-xs text-zinc-600"><ServerCog size={14} /> La capacidad de Modal se administra aquí; credenciales, aplicación, entorno y volumen permanecen en Configuración del proveedor.</div>
         </section>
         </>
       )}
