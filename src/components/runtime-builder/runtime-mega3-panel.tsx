@@ -9,6 +9,7 @@ import {
   Play,
   Save,
   Search,
+  Square,
   TriangleAlert,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -259,6 +260,20 @@ export function RuntimeMega3Panel() {
     }
   };
 
+  const cancelBeam = async () => {
+    if (!job || job.job_id === "creating") return;
+    try {
+      const updated = await browserApiRequest<RuntimeContextJob>(
+        `/api/admin/runtime-builder/models-volume/jobs/${job.job_id}/cancel`,
+        { method: "POST" },
+      );
+      setJob(updated);
+      toast.success("Cancelación solicitada.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo cancelar.");
+    }
+  };
+
   const formattedCommand = formatDockerCommand(
     buildInteractiveDockerRunLines(
       launch,
@@ -468,19 +483,37 @@ export function RuntimeMega3Panel() {
         </div>
 
         {job && (
-          <div className="mt-5">
-            <div className="flex justify-between text-sm">
-              <span className="text-zinc-400">
-                {job.message || "Procesando exportación…"}
-              </span>
-              <b className="text-red-300">{job.progress || 0}%</b>
+          <div className="mt-5 rounded-2xl border border-white/10 bg-black/25 p-4">
+            <div className="flex items-start justify-between gap-4 text-sm">
+              <span className="text-zinc-400">{job.message || "Procesando exportación…"}</span>
+              <div className="flex items-center gap-3">
+                <b className="text-red-300">{job.progress || 0}%</b>
+                {settings.destination_type === "beam" && ["queued", "running"].includes(job.status) && (
+                  <button onClick={() => void cancelBeam()} className="inline-flex h-8 items-center gap-2 rounded-lg border border-red-500/30 px-3 text-xs text-red-300">
+                    <Square size={12} /> Cancelar
+                  </button>
+                )}
+              </div>
             </div>
             <div className="mt-2 h-2 rounded-full bg-white/5">
-              <div
-                className="h-2 rounded-full bg-red-700 transition-all"
-                style={{ width: `${Math.max(1, job.progress || 0)}%` }}
-              />
+              <div className="h-2 rounded-full bg-red-700 transition-all" style={{ width: `${Math.max(1, job.progress || 0)}%` }} />
             </div>
+            {settings.destination_type === "beam" && job.details && (
+              <div className="mt-4 grid gap-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
+                <Metric label="Estado" value={job.details.status || job.phase} />
+                <Metric label="Archivo" value={job.details.file_name || "—"} />
+                <Metric label="Categoría" value={job.details.category || "—"} />
+                <Metric label="Archivo actual" value={`${job.details.file_index || 0} / ${job.details.files_total || 0}`} />
+                <Metric label="Progreso archivo" value={`${Math.round(job.details.file_progress || 0)}%`} />
+                <Metric label="Progreso global" value={`${Math.round(job.details.global_progress || job.progress || 0)}%`} />
+                <Metric label="Velocidad" value={`${bytes(job.details.speed_bps || 0)}/s`} />
+                <Metric label="ETA" value={formatEta(job.details.eta_seconds || 0)} />
+                <div className="sm:col-span-2 xl:col-span-4 rounded-xl border border-white/8 bg-black/30 p-3 text-zinc-400">
+                  Bytes enviados: {bytes(job.details.bytes_sent || 0)} / {bytes(job.details.bytes_total || 0)}
+                  {job.details.native_line ? <div className="mt-2 break-all font-mono text-[11px] text-zinc-600">{job.details.native_line}</div> : null}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -982,6 +1015,14 @@ function formatDockerCommand(
       index < clean.length - 1 ? `${line} ${continuation}` : line,
     )
     .join("\n");
+}
+
+function formatEta(seconds: number) {
+  const safe = Math.max(0, Math.round(seconds));
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const secs = safe % 60;
+  return [hours, minutes, secs].map((value) => String(value).padStart(2, "0")).join(":");
 }
 
 function bytes(value: number) {

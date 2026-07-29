@@ -139,6 +139,11 @@ export interface RuntimeContextJob {
   phase: string;
   progress: number;
   message: string;
+  details?: {
+    file_name?: string; category?: string; relative_path?: string; file_index?: number; files_total?: number;
+    file_progress?: number; global_progress?: number; speed_bps?: number; eta_seconds?: number;
+    bytes_sent?: number; bytes_total?: number; attempt?: number; status?: string; native_line?: string;
+  } | null;
   error: string | null;
   result: RuntimeContextGenerateResponse | RuntimeModelVolumeExportResponse | null;
   created_at: string;
