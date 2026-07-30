@@ -175,7 +175,7 @@ export interface RuntimeDeploymentProviderList {
   items: RuntimeDeploymentProvider[];
 }
 
-export type RuntimeDeploymentStatus = "queued" | "running" | "deployed" | "failed";
+export type RuntimeDeploymentStatus = "queued" | "running" | "deployed" | "failed" | "cancelled";
 
 export interface RuntimeDeployment {
   id: string;
