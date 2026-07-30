@@ -13,7 +13,7 @@ const input = "h-11 w-full rounded-xl border border-white/10 bg-black/25 px-3 te
 type Tab = "docker" | "modal" | "runpod" | "beam";
 const MODAL_GPUS = ["T4", "L4", "A10G", "L40S", "A100-40GB", "A100-80GB", "H100", "H200", "B200"];
 const RUNPOD_GPUS = ["NVIDIA GeForce RTX 4090", "NVIDIA RTX A6000", "NVIDIA A40", "NVIDIA L4", "NVIDIA L40", "NVIDIA L40S", "NVIDIA A100 40GB", "NVIDIA A100 80GB", "NVIDIA H100 80GB", "NVIDIA H200"];
-const BEAM_GPUS = [...MODAL_GPUS];
+const BEAM_SERVERLESS_GPUS = ["A10G", "RTX4090", "T4"] as const;
 
 const modalDefault: ModalProviderConfig = { enabled: false, token_id: "", token_secret: "", token_secret_configured: false, environment: "main", app_name: "tryon-generation-runtime", runtime_url: "", volume_name: "tryon-models", gpu: "L40S", timeout_seconds: 900 };
 const runpodDefault: RunPodProviderConfig = { enabled: false, api_key: "", api_key_configured: false, s3_access_key: "", s3_secret_key: "", s3_secret_key_configured: false, endpoint_id: "", endpoint_name: "tryon-generation-runtime", template_id: "", template_name: "tryon-generation-runtime", registry_auth_id: "", ghcr_username: "", ghcr_token: "", ghcr_token_configured: false, network_volume_id: "", network_volume_name: "tryon-models", network_volume_size_gb: 100, data_center_id: "", gpu_type_ids: ["NVIDIA L40S"], allowed_cuda_versions: ["12.8"], workers_min: 0, workers_max: 5, idle_timeout_seconds: 5, execution_timeout_seconds: 900, scaler_type: "QUEUE_DELAY", scaler_value: 4, flashboot: true, container_disk_gb: 100, timeout_seconds: 900 };
@@ -151,7 +151,7 @@ export default function Page() {
         <F label="Token"><input type="password" className={input} value={beam.api_key} placeholder={beam.api_key_configured ? 'Configurado; vacío conserva' : 'Token de Beam'} onChange={e => setBeam({ ...beam, api_key: e.target.value })} /></F>
         <F label="App"><input className={input} value={beam.deployment_name} onChange={e => setBeam({ ...beam, deployment_name: e.target.value })} /></F>
         <F label="Volumen"><input className={input} value={beam.volume_name} onChange={e => setBeam({ ...beam, volume_name: e.target.value })} /></F>
-        <F label="GPU"><select className={input} value={beam.gpu} onChange={e => setBeam({ ...beam, gpu: e.target.value })}>{BEAM_GPUS.map(gpu => <option key={gpu} value={gpu}>{gpu}</option>)}</select></F>
+        <F label="GPU"><select className={input} value={beam.gpu} onChange={e => setBeam({ ...beam, gpu: e.target.value })}>{!BEAM_SERVERLESS_GPUS.includes(beam.gpu as (typeof BEAM_SERVERLESS_GPUS)[number]) && <option value={beam.gpu}>{beam.gpu} (sin capacidad serverless)</option>}{BEAM_SERVERLESS_GPUS.map(gpu => <option key={gpu} value={gpu}>{gpu} · serverless disponible</option>)}</select></F>
         <NumberInput label="Contenedores mínimos" value={beam.min_containers} onChange={v => setBeam({ ...beam, min_containers: v })} />
         <NumberInput label="Contenedores máximos" value={beam.max_containers} onChange={v => setBeam({ ...beam, max_containers: v })} />
         <NumberInput label="Workflows simultáneos por GPU" value={beam.tasks_per_container} onChange={v => setBeam({ ...beam, tasks_per_container: v })} />
