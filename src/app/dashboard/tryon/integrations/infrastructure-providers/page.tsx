@@ -15,7 +15,7 @@ const MODAL_GPUS = ["T4", "L4", "A10G", "L40S", "A100-40GB", "A100-80GB", "H100"
 const RUNPOD_GPUS = ["NVIDIA GeForce RTX 4090", "NVIDIA RTX A6000", "NVIDIA A40", "NVIDIA L4", "NVIDIA L40", "NVIDIA L40S", "NVIDIA A100 40GB", "NVIDIA A100 80GB", "NVIDIA H100 80GB", "NVIDIA H200"];
 const BEAM_SERVERLESS_GPUS = ["A10G", "RTX4090", "T4"] as const;
 
-const modalDefault: ModalProviderConfig = { enabled: false, token_id: "", token_secret: "", token_secret_configured: false, environment: "main", app_name: "tryon-generation-runtime", runtime_url: "", volume_name: "tryon-models", gpu: "L40S", timeout_seconds: 900 };
+const modalDefault: ModalProviderConfig = { enabled: false, token_id: "", token_secret: "", token_secret_configured: false, environment: "main", app_name: "tryon-generation-runtime", runtime_url: "", volume_name: "tryon-models", gpu: "L40S", snapshot_resident_models: ["diffusion_models/realDream_klein9BV1.safetensors", "text_encoders/qwen_3_8b.safetensors", "unet/Flux2-Klein-9B-True-v2-bf16.safetensors"], timeout_seconds: 900 };
 const runpodDefault: RunPodProviderConfig = { enabled: false, api_key: "", api_key_configured: false, s3_access_key: "", s3_secret_key: "", s3_secret_key_configured: false, endpoint_id: "", endpoint_name: "tryon-generation-runtime", template_id: "", template_name: "tryon-generation-runtime", registry_auth_id: "", ghcr_username: "", ghcr_token: "", ghcr_token_configured: false, network_volume_id: "", network_volume_name: "tryon-models", network_volume_size_gb: 100, data_center_id: "", gpu_type_ids: ["NVIDIA L40S"], allowed_cuda_versions: ["12.8"], workers_min: 0, workers_max: 5, idle_timeout_seconds: 5, execution_timeout_seconds: 900, scaler_type: "QUEUE_DELAY", scaler_value: 4, flashboot: true, container_disk_gb: 100, timeout_seconds: 900 };
 const beamDefault: BeamProviderConfig = { enabled: false, api_key: "", api_key_configured: false, workspace: "", endpoint: "", deployment_name: "tryon-generation-runtime", volume_name: "tryon-models", volume_mount_path: "/models", gpu: "L40S", cpu: 8, memory_mb: 65536, workers: 1, min_containers: 0, max_containers: 5, tasks_per_container: 1, keep_warm_seconds: 300, max_pending_tasks: 100, retries: 2, checkpoint_enabled: false, callback_url: "", authorized: true, timeout_seconds: 1800 };
 
@@ -62,7 +62,7 @@ export default function Page() {
       if (key === "modal") {
         const [saved, savedEngine] = await Promise.all([
           browserApiRequest<ModalProviderConfig>("/api/admin/infrastructure-providers/modal", { method: "PUT", body: JSON.stringify(value) }),
-          browserApiRequest<AiEngineSettings>("/api/admin/ai-providers/engine-settings", { method: "PUT", body: JSON.stringify(modalEngine) }),
+          browserApiRequest<AiEngineSettings>("/api/admin/ai-providers/engine-settings", { method: "PUT", body: JSON.stringify({ ...modalEngine, modal_gpu: (value as ModalProviderConfig).gpu }) }),
         ]);
         setModal({ ...modalDefault, ...saved, token_secret: "" });
         setModalEngine(savedEngine);
@@ -110,7 +110,8 @@ export default function Page() {
         <F label="Token Secret"><input type="password" className={input} value={modal.token_secret} placeholder={modal.token_secret_configured ? 'Configurado; vacío conserva' : 'Token secret'} onChange={e => setModal({ ...modal, token_secret: e.target.value })} /></F>
         <F label="App"><input className={input} value={modal.app_name} onChange={e => setModal({ ...modal, app_name: e.target.value })} /></F>
         <F label="Volumen"><input className={input} value={modal.volume_name} onChange={e => setModal({ ...modal, volume_name: e.target.value })} /></F>
-        <F label="GPU"><select className={input} value={modalEngine.modal_gpu} onChange={e => updateModalEngine('modal_gpu', e.target.value as AiEngineSettingsUpdate['modal_gpu'])}>{MODAL_GPUS.map(gpu => <option key={gpu} value={gpu}>{gpu}</option>)}</select></F>
+        <F label="GPU"><select className={input} value={modal.gpu} onChange={e => setModal({ ...modal, gpu: e.target.value })}>{MODAL_GPUS.map(gpu => <option key={gpu} value={gpu}>{gpu}</option>)}</select></F>
+        <F label="Modelos residentes del snapshot (una ruta por línea)"><textarea className={`${input} min-h-36 py-3`} value={modal.snapshot_resident_models.join("\n")} onChange={e => setModal({ ...modal, snapshot_resident_models: e.target.value.split(/\r?\n/).map(v => v.trim()).filter(Boolean) })} /></F>
         <NumberInput label="Contenedores mínimos" value={modalEngine.modal_min_containers} onChange={v => updateModalEngine('modal_min_containers', v)} />
         <NumberInput label="Contenedores máximos" value={modalEngine.modal_max_containers} onChange={v => updateModalEngine('modal_max_containers', v)} />
         <NumberInput label="Workflows simultáneos por GPU" value={modalEngine.modal_concurrency} onChange={v => updateModalEngine('modal_concurrency', v)} />
