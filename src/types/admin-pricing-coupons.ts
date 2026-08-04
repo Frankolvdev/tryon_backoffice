@@ -36,6 +36,7 @@ export interface FinancialProtectionRuleDiagnostic {
   module_key: string;
   module_name: string;
   desired_profit_usd: number;
+  desired_profit_per_token_usd: number;
   is_limiting: boolean;
 }
 
@@ -73,6 +74,7 @@ export interface PricingRuleResponse {
   quality_mode: QualityMode;
   generation_module_id?: number | null;
   desired_profit_usd: number;
+  desired_profit_per_token_usd: number;
   initial_estimated_duration_seconds: number;
   technical_margin_seconds: number;
   // Campos calculados legacy que el backend aún devuelve para compatibilidad.
@@ -95,6 +97,7 @@ export interface PricingRuleCreate {
   quality_mode?: QualityMode;
   generation_module_id?: number | null;
   desired_profit_usd: number;
+  desired_profit_per_token_usd: number;
   initial_estimated_duration_seconds: number;
   technical_margin_seconds: number;
   is_active: boolean;
@@ -103,6 +106,7 @@ export interface PricingRuleCreate {
 export interface PricingRuleUpdate {
   title?: string | null;
   desired_profit_usd?: number | null;
+  desired_profit_per_token_usd?: number | null;
   initial_estimated_duration_seconds?: number | null;
   technical_margin_seconds?: number | null;
   is_active?: boolean | null;
@@ -135,6 +139,7 @@ export interface AppliedPricingRuleResponse {
   estimated_billable_seconds: number;
   estimated_infrastructure_cost_usd: number | null;
   desired_profit_usd: number;
+  desired_profit_per_token_usd: number;
   estimated_final_price_usd: number | null;
   token_value_usd: number;
   estimated_tokens: number | null;

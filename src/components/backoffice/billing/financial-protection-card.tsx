@@ -32,19 +32,19 @@ export function FinancialProtectionCard() {
         <div className="flex size-12 items-center justify-center rounded-2xl border border-emerald-500/15 bg-emerald-950/15 text-emerald-400"><ShieldCheck size={22}/></div>
         <div>
           <h2 className="font-semibold text-white">Protección automática de ganancias</h2>
-          <p className="mt-2 text-sm leading-6 text-zinc-500">Los descuentos consumen únicamente la menor Ganancia deseada (USD) entre los módulos activos. Infraestructura, GPU, tiempos, scaledown y margen técnico no se modifican.</p>
+          <p className="mt-2 text-sm leading-6 text-zinc-500">Los descuentos consumen únicamente la menor ganancia configurada por token entre las reglas activas. El cálculo técnico de infraestructura permanece intacto.</p>
         </div>
       </div>
     </div>
     <div className="grid gap-3 p-6 md:grid-cols-4">
-      <Metric label="Ganancia segura global" value={report.safe_profit_usd == null ? "—" : `$${report.safe_profit_usd.toFixed(6)} USD`} />
+      <Metric label="Ganancia segura por token" value={report.safe_profit_per_token_usd == null ? "—" : `$${report.safe_profit_per_token_usd.toFixed(6)} USD`} />
       <Metric label="Máximo permitido" value={`${report.maximum_allowed_discount_percent.toFixed(2)}%`} />
       <Metric label="Mayor descuento activo" value={`${report.highest_active_discount_percent.toFixed(2)}%`} />
       <Metric label="Disponible" value={`${report.available_discount_percentage_points.toFixed(2)} pp`} />
     </div>
     <div className="mx-6 mb-6 rounded-2xl border border-white/7 bg-black/20 p-5 text-sm text-zinc-400">
       <p className="font-semibold text-white">Regla de mayor riesgo: {report.limiting_module_name ?? "Sin configuración"}</p>
-      <p className="mt-2">Con 100% de descuento renuncias a toda la ganancia segura, pero no se toca la infraestructura. Más de 100% queda bloqueado.</p>
+      <p className="mt-2">Con 100% de descuento renuncias a toda la ganancia incluida en los tokens vendidos, pero nunca se descuenta la infraestructura.</p>
       {report.warnings.map((item) => <p key={item} className="mt-2 flex gap-2 text-amber-300"><TriangleAlert size={16}/>{item}</p>)}
     </div>
     <div className="flex justify-end border-t border-white/6 p-5"><button type="button" onClick={() => void load()} className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/8 px-4 text-sm text-zinc-400"><RefreshCcw size={15}/>Actualizar</button></div>

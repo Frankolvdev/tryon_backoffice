@@ -90,7 +90,7 @@ export function TokenPackageEditor({
   useEffect(() => {
     void browserApiRequest<FinancialProtectionReport>("/api/admin/financial-protection")
       .then(setProfitProtection)
-      .catch((error) => toast.error(error instanceof Error ? error.message : "No fue posible cargar la ganancia segura."));
+      .catch((error) => toast.error(error instanceof Error ? error.message : "No fue posible cargar la ganancia por token."));
   }, []);
 
   const discountPercent = Number(requestedDiscount || 0);
@@ -248,7 +248,7 @@ export function TokenPackageEditor({
           <label className="mt-5 block">
             <span className="mb-2 block text-sm text-zinc-500">Descuento solicitado (%)</span>
             <input type="number" min={0} max={100} step="0.01" value={requestedDiscount} onChange={(event) => setRequestedDiscount(event.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white" />
-            <p className="mt-2 text-xs text-zinc-600">Este porcentaje consume únicamente la ganancia segura global; nunca modifica infraestructura.</p>
+            <p className="mt-2 text-xs text-zinc-600">Este porcentaje consume únicamente la ganancia por token global; nunca modifica infraestructura.</p>
           </label>
           <section className={`mt-5 rounded-2xl border p-5 ${discountPercent > 100 ? "border-red-500/30 bg-red-950/15" : "border-emerald-500/20 bg-emerald-950/10"}`}>
             <p className="font-semibold text-white">Validación de ganancia</p>

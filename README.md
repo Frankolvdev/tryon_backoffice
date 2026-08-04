@@ -1,20 +1,11 @@
-# Cierre del módulo Usuarios
+# MegaZIP 2 — BackOffice Profit per Token UI
 
-Copia el contenido de esta carpeta sobre la raíz del proyecto `backoffice`.
+- Pricing rules now edit **Ganancia deseada por token consumido (USD)**.
+- Pricing diagnostics show the limiting profit per token.
+- Applied pricing rules show profit/token and keep infrastructure diagnostics intact.
+- Plan/package discount simulators use the exact profit contained in their token quantity.
 
-Archivos incluidos:
-
-- `src/types/admin-users.ts`
-- `src/components/backoffice/user-subscription-panel.tsx`
-- `src/components/backoffice/user-token-purchases-panel.tsx`
-- `src/app/dashboard/users/[userId]/page.tsx`
-
-Los paneles reutilizan el proxy dinámico ya creado en:
-
-- `src/app/api/admin/[...segments]/route.ts`
-
-Después ejecuta:
-
+Run:
 ```powershell
 Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue
 npm run build

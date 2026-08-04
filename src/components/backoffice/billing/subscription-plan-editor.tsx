@@ -207,7 +207,7 @@ export function SubscriptionPlanEditor({
   useEffect(() => {
     void browserApiRequest<FinancialProtectionReport>("/api/admin/financial-protection")
       .then(setProfitProtection)
-      .catch((error) => toast.error(error instanceof Error ? error.message : "No fue posible cargar la ganancia segura."));
+      .catch((error) => toast.error(error instanceof Error ? error.message : "No fue posible cargar la ganancia por token."));
   }, []);
 
   const discountPercent = Number(requestedDiscount || 0);
