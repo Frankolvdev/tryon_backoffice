@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { BillingCouponEditor } from "@/components/backoffice/billing/billing-coupon-editor";
 import { CommercialEconomyCard } from "@/components/backoffice/billing/commercial-economy-card";
 import { PricingRuleEditor } from "@/components/backoffice/billing/pricing-rule-editor";
+import { AppliedPricingRules } from "@/components/backoffice/billing/applied-pricing-rules";
 import { browserApiRequest } from "@/lib/api/browser-api";
 
 import type {
@@ -388,10 +389,10 @@ export default function PricingCouponsPage() {
 
                     <div className="rounded-xl border border-white/6 bg-black/20 p-3">
                       <p className="text-[10px] text-zinc-700">
-                        Ganancia deseada
+                        Duración inicial
                       </p>
                       <p className="mt-1 text-lg font-semibold text-white">
-                        {rule.desired_profit_percent}%
+                        {rule.initial_estimated_duration_seconds} s
                       </p>
                     </div>
 
@@ -406,10 +407,10 @@ export default function PricingCouponsPage() {
 
                     <div className="rounded-xl border border-white/6 bg-black/20 p-3">
                       <p className="text-[10px] text-zinc-700">
-                        Costo promedio (USD)
+                        Ganancia deseada (USD)
                       </p>
                       <p className="mt-1 text-sm font-semibold text-zinc-300">
-                        {rule.average_execution_cost_usd.toFixed(2)} USD
+                        {rule.desired_profit_usd.toFixed(2)} USD
                       </p>
                     </div>
                   </div>
@@ -441,6 +442,8 @@ export default function PricingCouponsPage() {
               ))}
             </div>
           </section>
+
+          <AppliedPricingRules />
 
           <section className="luxia-panel mt-5 overflow-hidden rounded-3xl">
             <div className="border-b border-white/6 p-5">

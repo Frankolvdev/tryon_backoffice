@@ -4,6 +4,7 @@ import { CloudCog, LoaderCircle, RefreshCcw, Save } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { TryOnModuleHeader } from "@/components/backoffice/tryon/tryon-module-header";
+import { ProviderGpuPricingTable } from "@/components/backoffice/infrastructure/provider-gpu-pricing-table";
 import { browserApiRequest } from "@/lib/api/browser-api";
 import type { AiEngineSettings, AiEngineSettingsUpdate } from "@/types/admin-ai-engine-settings";
 import type { BeamProviderConfig, ModalProviderConfig, ProviderActionResponse, RunPodProviderConfig } from "@/types/admin-infrastructure-providers";
@@ -119,6 +120,7 @@ export default function Page() {
         <NumberInput label="Workflows simultáneos por GPU" value={modalEngine.modal_concurrency} onChange={v => updateModalEngine('modal_concurrency', v)} />
         <NumberInput label="Conexiones HTTP/WebSocket por contenedor" value={modalEngine.modal_input_concurrency} onChange={v => updateModalEngine('modal_input_concurrency', v)} />
         <NumberInput label="Apagado por inactividad (segundos)" value={modalEngine.modal_scaledown_window_seconds} onChange={v => updateModalEngine('modal_scaledown_window_seconds', v)} />
+        <div className="lg:col-span-2"><ProviderGpuPricingTable provider="modal" gpuKeys={MODAL_GPUS} /></div>
         <NumberInput label="Timeout de ejecución (segundos)" value={modalEngine.modal_execution_timeout_seconds} onChange={v => updateModalEngine('modal_execution_timeout_seconds', v)} />
       </ProviderCard>
       : tab === 'runpod' ? <ProviderCard providerKey="runpod" name="RunPod Serverless" busy={busy} onSave={() => save('runpod', runpod)} onTest={() => action('runpod', 'test')} onVolume={() => action('runpod', 'volume')}>
@@ -146,6 +148,7 @@ export default function Page() {
         <F label="Scaler"><select className={input} value={runpod.scaler_type} onChange={e => setRunpod({ ...runpod, scaler_type: e.target.value as RunPodProviderConfig['scaler_type'] })}><option value="QUEUE_DELAY">Queue delay</option><option value="REQUEST_COUNT">Request count</option></select></F>
         <NumberInput label="Valor del scaler" value={runpod.scaler_value} onChange={v => setRunpod({ ...runpod, scaler_value: v })} />
         <NumberInput label="Disco del contenedor (GB)" value={runpod.container_disk_gb} onChange={v => setRunpod({ ...runpod, container_disk_gb: v })} />
+        <div className="lg:col-span-2"><ProviderGpuPricingTable provider="runpod" gpuKeys={RUNPOD_GPUS} /></div>
         <label className="flex items-center gap-3 rounded-xl border border-white/8 p-4 text-sm text-zinc-300"><input type="checkbox" checked={runpod.flashboot} onChange={e => setRunpod({ ...runpod, flashboot: e.target.checked })} />Activar FlashBoot</label>
       </ProviderCard>
       : <ProviderCard providerKey="beam" name="Beam" busy={busy} onSave={() => save('beam', beam)} onTest={() => action('beam', 'test')} onVolume={() => action('beam', 'volume')}>
@@ -160,6 +163,7 @@ export default function Page() {
         <NumberInput label="Workflows simultáneos por GPU" value={beam.tasks_per_container} onChange={v => setBeam({ ...beam, tasks_per_container: v })} />
         <NumberInput label="Conexiones HTTP/WebSocket por contenedor" value={beam.workers} onChange={v => setBeam({ ...beam, workers: v })} />
         <NumberInput label="Apagado por inactividad (segundos)" value={beam.keep_warm_seconds} onChange={v => setBeam({ ...beam, keep_warm_seconds: v })} />
+        <div className="lg:col-span-2"><ProviderGpuPricingTable provider="beam" gpuKeys={BEAM_SERVERLESS_GPUS} /></div>
         <NumberInput label="Timeout de ejecución (segundos)" value={beam.timeout_seconds} onChange={v => setBeam({ ...beam, timeout_seconds: v })} />
       </ProviderCard>}
   </div>;

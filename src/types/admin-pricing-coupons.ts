@@ -19,6 +19,7 @@ export interface CommercialSettingsResponse {
 export interface CommercialPricePreviewResponse {
   average_execution_cost_usd: number;
   desired_profit_percent: number;
+  desired_profit_usd: number;
   token_value_usd: number;
   currency: string;
   final_price_usd: number;
@@ -33,8 +34,12 @@ export interface PricingRuleResponse {
   item_type: TryOnItemType;
   quality_mode: QualityMode;
   generation_module_id?: number | null;
+  desired_profit_usd: number;
+  initial_estimated_duration_seconds: number;
+  technical_margin_seconds: number;
   average_execution_cost_usd: number;
   desired_profit_percent: number;
+  desired_profit_usd: number;
   final_price_usd: number;
   required_tokens: number;
   effective_margin_percent: number;
@@ -49,14 +54,50 @@ export interface PricingRuleCreate {
   title: string;
   average_execution_cost_usd: number;
   desired_profit_percent: number;
+  desired_profit_usd: number;
   is_active: boolean;
 }
 
 export interface PricingRuleUpdate {
   title?: string | null;
-  average_execution_cost_usd?: number | null;
-  desired_profit_percent?: number | null;
+  desired_profit_usd?: number | null;
+  initial_estimated_duration_seconds?: number | null;
+  technical_margin_seconds?: number | null;
   is_active?: boolean | null;
+}
+
+
+export interface ProviderGpuPriceResponse {
+  id: number;
+  provider: string;
+  gpu_key: string;
+  cost_usd_per_second: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AppliedPricingRuleResponse {
+  rule_id: number;
+  rule_title: string;
+  generation_module_id: number;
+  module_key: string;
+  module_name: string;
+  provider: string;
+  gpu_key: string | null;
+  gpu_cost_usd_per_second: number | null;
+  estimated_duration_seconds: number;
+  estimate_source: string;
+  scaledown_seconds: number;
+  technical_margin_seconds: number;
+  estimated_billable_seconds: number;
+  estimated_infrastructure_cost_usd: number | null;
+  desired_profit_usd: number;
+  estimated_final_price_usd: number | null;
+  token_value_usd: number;
+  estimated_tokens: number | null;
+  configured: boolean;
+  warnings: string[];
 }
 
 export type CouponDiscountType =
