@@ -37,9 +37,9 @@ export interface PricingRuleResponse {
   desired_profit_usd: number;
   initial_estimated_duration_seconds: number;
   technical_margin_seconds: number;
+  // Campos calculados legacy que el backend aún devuelve para compatibilidad.
   average_execution_cost_usd: number;
   desired_profit_percent: number;
-  desired_profit_usd: number;
   final_price_usd: number;
   required_tokens: number;
   effective_margin_percent: number;
@@ -52,9 +52,13 @@ export interface PricingRuleResponse {
 
 export interface PricingRuleCreate {
   title: string;
-  average_execution_cost_usd: number;
-  desired_profit_percent: number;
+  operation_type?: PricingOperationType;
+  item_type?: TryOnItemType;
+  quality_mode?: QualityMode;
+  generation_module_id?: number | null;
   desired_profit_usd: number;
+  initial_estimated_duration_seconds: number;
+  technical_margin_seconds: number;
   is_active: boolean;
 }
 
