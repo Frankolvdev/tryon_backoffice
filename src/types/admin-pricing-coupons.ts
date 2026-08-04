@@ -16,6 +16,19 @@ export interface CommercialSettingsResponse {
   currency: string;
 }
 
+
+export interface BillingPolicyEntry {
+  charge_infrastructure: boolean;
+  apply_profit: boolean;
+}
+
+export interface ExecutionBillingPolicy {
+  completed: BillingPolicyEntry;
+  cancelled: BillingPolicyEntry;
+  failed_workflow_or_user: BillingPolicyEntry;
+  failed_platform_or_provider: BillingPolicyEntry;
+}
+
 export interface CommercialPricePreviewResponse {
   average_execution_cost_usd: number;
   desired_profit_percent: number;

@@ -25,6 +25,7 @@ import { toast } from "sonner";
 
 import { BillingCouponEditor } from "@/components/backoffice/billing/billing-coupon-editor";
 import { CommercialEconomyCard } from "@/components/backoffice/billing/commercial-economy-card";
+import { ExecutionBillingPolicyCard } from "@/components/backoffice/billing/execution-billing-policy-card";
 import { PricingRuleEditor } from "@/components/backoffice/billing/pricing-rule-editor";
 import { AppliedPricingRules } from "@/components/backoffice/billing/applied-pricing-rules";
 import { browserApiRequest } from "@/lib/api/browser-api";
@@ -302,6 +303,7 @@ export default function PricingCouponsPage() {
       </section>
 
       <CommercialEconomyCard onUpdated={() => void loadData()} />
+      <ExecutionBillingPolicyCard />
 
       {isLoading && (
         <section className="luxia-panel mt-5 flex min-h-80 items-center justify-center rounded-3xl">
