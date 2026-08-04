@@ -25,6 +25,7 @@ import { SystemStatusEditor } from "@/components/backoffice/system/system-status
 import { browserApiRequest } from "@/lib/api/browser-api";
 
 import { UserLibraryQuotaSetting } from "@/components/backoffice/system/user-library-quota-setting";
+import { GenerationDataResetCard } from "@/components/backoffice/system/generation-data-reset-card";
 
 import type {
   ConfigurationValidationResponse,
@@ -365,6 +366,8 @@ export default function SystemSettingsPage() {
                 </pre>
               </section>
             )}
+
+            <GenerationDataResetCard />
 
             <section className="luxia-panel mt-5 overflow-hidden rounded-3xl">
               <div className="border-b border-white/6 p-5">
