@@ -72,10 +72,16 @@ export function BillingCouponEditor({ coupon, onClose, onSaved }: Props) {
       eligible_item_ids: eligibleIds.split(",").map((v) => Number(v.trim())).filter((v) => Number.isInteger(v) && v > 0),
       metadata: parsedMetadata,
     };
-    const payload: BillingCouponCreate | BillingCouponUpdate = isEditing ? common : {
-      ...common, code: code.trim().toUpperCase(), discount_type: "percentage", duration,
-      duration_in_months: parsedDuration, percentage_off: percentage,
-    };
+    const payload: BillingCouponCreate | BillingCouponUpdate = isEditing
+      ? common
+      : {
+          ...common,
+          code: code.trim().toUpperCase(),
+          discount_type: "percentage" as const,
+          duration,
+          duration_in_months: parsedDuration,
+          percentage_off: percentage,
+        };
 
     setIsSaving(true);
     try {
