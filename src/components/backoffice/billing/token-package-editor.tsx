@@ -44,6 +44,7 @@ export function TokenPackageEditor({
   const [tokensAmount, setTokensAmount] = useState(
     String(tokenPackage?.tokens_amount ?? 100),
   );
+  const [requestedDiscount, setRequestedDiscount] = useState(String(tokenPackage?.requested_discount_percent ?? 0));
   const [stripePriceId, setStripePriceId] = useState(
     tokenPackage?.stripe_price_id ?? "",
   );
@@ -59,6 +60,7 @@ export function TokenPackageEditor({
     setName(tokenPackage?.name ?? "");
     setDescription(tokenPackage?.description ?? "");
     setTokensAmount(String(tokenPackage?.tokens_amount ?? 100));
+    setRequestedDiscount(String(tokenPackage?.requested_discount_percent ?? 0));
     setStripePriceId(tokenPackage?.stripe_price_id ?? "");
     setIsActive(tokenPackage?.is_active ?? true);
   }, [tokenPackage]);
@@ -117,6 +119,9 @@ export function TokenPackageEditor({
     event.preventDefault();
 
     const parsedTokens = Number(tokensAmount);
+    const parsedDiscount = Number(requestedDiscount);
+
+    if (!Number.isFinite(parsedDiscount) || parsedDiscount < 0 || parsedDiscount > 100) { toast.error("El descuento debe estar entre 0 y 100%."); return; }
 
     if (name.trim().length < 2) {
       toast.error("El nombre debe tener al menos 2 caracteres.");
@@ -134,6 +139,7 @@ export function TokenPackageEditor({
       name: name.trim(),
       description: description.trim() || null,
       tokens_amount: parsedTokens,
+      requested_discount_percent: parsedDiscount,
       stripe_price_id: stripePriceId.trim() || null,
       is_active: isActive,
     };
@@ -224,6 +230,12 @@ export function TokenPackageEditor({
               />
             </label>
           </div>
+
+          <label className="mt-5 block">
+            <span className="mb-2 block text-sm text-zinc-500">Descuento solicitado (%)</span>
+            <input type="number" min={0} max={100} step="0.01" value={requestedDiscount} onChange={(event) => setRequestedDiscount(event.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white" />
+            {tokenPackage && <p className="mt-2 text-xs text-zinc-600">Efectivo: {tokenPackage.effective_discount_percent}% · Máximo protegido: {tokenPackage.protected_discount_percent}%</p>}
+          </label>
 
           <section className="mt-5 rounded-2xl border border-red-500/15 bg-red-950/10 p-5">
             <div className="flex items-start gap-4">

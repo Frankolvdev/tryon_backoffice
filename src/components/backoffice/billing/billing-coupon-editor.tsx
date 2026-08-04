@@ -102,7 +102,7 @@ export function BillingCouponEditor({
     );
   const [isActive, setIsActive] =
     useState(coupon?.is_active ?? true);
-  const [appliesTo, setAppliesTo] = useState<"all" | "plans" | "token_packages">(coupon?.applies_to ?? "all");
+  const [appliesTo, setAppliesTo] = useState<"token_packages" | "free_token_purchase">(coupon?.applies_to ?? "token_packages");
   const [eligibleIds, setEligibleIds] = useState((coupon?.eligible_item_ids ?? []).join(", "));
   const [metadata, setMetadata] =
     useState(
@@ -153,7 +153,7 @@ export function BillingCouponEditor({
       coupon?.first_time_transaction_only ?? false,
     );
     setIsActive(coupon?.is_active ?? true);
-    setAppliesTo(coupon?.applies_to ?? "all");
+    setAppliesTo(coupon?.applies_to ?? "token_packages");
     setEligibleIds((coupon?.eligible_item_ids ?? []).join(", "));
     setMetadata(
       JSON.stringify(coupon?.metadata ?? {}, null, 2),
@@ -641,9 +641,8 @@ export function BillingCouponEditor({
             <label>
               <span className="mb-2 block text-sm text-zinc-500">Aplicable a</span>
               <select value={appliesTo} onChange={(event) => setAppliesTo(event.target.value as typeof appliesTo)} className="h-11 w-full rounded-xl border border-white/8 bg-[#09090a] px-4 text-sm text-zinc-300">
-                <option value="all">Todos los productos</option>
-                <option value="plans">Planes</option>
                 <option value="token_packages">Paquetes de tokens</option>
+                <option value="free_token_purchase">Compra libre de tokens</option>
               </select>
             </label>
             <label>

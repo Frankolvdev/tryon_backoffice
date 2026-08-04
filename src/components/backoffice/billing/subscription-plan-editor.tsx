@@ -110,6 +110,7 @@ export function SubscriptionPlanEditor({
         2,
       ),
     );
+  const [requestedDiscount, setRequestedDiscount] = useState(String(plan?.requested_discount_percent ?? 0));
   const [isPublic, setIsPublic] =
     useState(
       plan?.is_public ?? true,
@@ -172,6 +173,7 @@ export function SubscriptionPlanEditor({
         2,
       ),
     );
+    setRequestedDiscount(String(plan?.requested_discount_percent ?? 0));
     setIsPublic(
       plan?.is_public ?? true,
     );
@@ -257,6 +259,7 @@ export function SubscriptionPlanEditor({
       Number(priority);
     const parsedSortOrder =
       Number(sortOrder);
+    const parsedDiscount = Number(requestedDiscount);
 
     if (
       !Number.isInteger(
@@ -282,6 +285,8 @@ export function SubscriptionPlanEditor({
       );
       return;
     }
+
+    if (!Number.isFinite(parsedDiscount) || parsedDiscount < 0 || parsedDiscount > 100) { toast.error("El descuento debe estar entre 0 y 100%."); return; }
 
     if (
       !Number.isInteger(
@@ -357,6 +362,7 @@ export function SubscriptionPlanEditor({
         billingInterval,
       currency: commercialSettings?.currency ?? plan?.currency ?? "USD",
       price_amount: calculatedPrice ?? Number(plan?.price_amount ?? 0),
+      requested_discount_percent: parsedDiscount,
       tokens_per_period:
         parsedTokens,
       max_generations_per_period:

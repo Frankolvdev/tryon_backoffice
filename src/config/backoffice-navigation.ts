@@ -134,8 +134,13 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         icon: PackageOpen,
       },
       {
-        label: "Pricing y cupones",
-        href: "/dashboard/billing/pricing-coupons",
+        label: "Pricing",
+        href: "/dashboard/billing/pricing",
+        icon: BadgePercent,
+      },
+      {
+        label: "Cupones",
+        href: "/dashboard/billing/coupons",
         icon: BadgePercent,
       },
       {

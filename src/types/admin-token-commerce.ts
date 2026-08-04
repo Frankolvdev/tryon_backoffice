@@ -16,6 +16,10 @@ export interface TokenPackageResponse {
   calculated_price_cents: number;
   commercial_token_value: number;
   price_is_automatic: boolean;
+  nominal_price_cents: number;
+  requested_discount_percent: number;
+  effective_discount_percent: number;
+  protected_discount_percent: number;
   currency: string;
   stripe_price_id: string | null;
   is_active: boolean;
@@ -27,6 +31,7 @@ export interface TokenPackageCreate {
   description?: string | null;
   tokens_amount: number;
   price_cents?: number | null;
+  requested_discount_percent: number;
   currency?: string | null;
   stripe_price_id?: string | null;
   is_active: boolean;
@@ -37,6 +42,7 @@ export interface TokenPackageUpdate {
   description?: string | null;
   tokens_amount?: number | null;
   price_cents?: number | null;
+  requested_discount_percent?: number | null;
   currency?: string | null;
   stripe_price_id?: string | null;
   is_active?: boolean | null;

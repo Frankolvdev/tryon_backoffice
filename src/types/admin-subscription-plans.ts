@@ -14,6 +14,11 @@ export interface SubscriptionPlanResponse {
   calculated_price_cents?: number;
   commercial_token_value?: number;
   price_is_automatic?: boolean;
+  nominal_price_amount: string;
+  requested_discount_percent: string;
+  effective_discount_percent: string;
+  discount_amount: string;
+  protected_discount_percent: string;
   tokens_per_period: number;
   max_generations_per_period: number | null;
   priority: number;
@@ -42,7 +47,8 @@ export interface SubscriptionPlanCreate {
   description?: string | null;
   billing_interval: BillingInterval;
   currency: string;
-  price_amount: number;
+  price_amount?: number | null;
+  requested_discount_percent: number;
   tokens_per_period: number;
   max_generations_per_period?: number | null;
   priority: number;
@@ -59,6 +65,7 @@ export interface SubscriptionPlanUpdate {
   billing_interval?: BillingInterval | null;
   currency?: string | null;
   price_amount?: number | null;
+  requested_discount_percent?: number | null;
   tokens_per_period?: number | null;
   max_generations_per_period?: number | null;
   priority?: number | null;

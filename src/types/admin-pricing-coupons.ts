@@ -29,6 +29,41 @@ export interface ExecutionBillingPolicy {
   failed_platform_or_provider: BillingPolicyEntry;
 }
 
+
+export interface FinancialProtectionRuleDiagnostic {
+  pricing_rule_id: number;
+  generation_module_id: number;
+  module_key: string;
+  module_name: string;
+  provider: string;
+  gpu_key: string | null;
+  protected_duration_seconds: number;
+  billable_seconds: number;
+  gpu_cost_usd_per_second: number | null;
+  infrastructure_cost_usd: number | null;
+  desired_profit_usd: number;
+  normal_price_usd: number | null;
+  maximum_safe_discount_percent: number | null;
+  configured: boolean;
+  warnings: string[];
+}
+
+export interface FinancialProtectionReport {
+  protected_discount_percent: number;
+  duration_safety_buffer_percent: number;
+  calculated_maximum_safe_discount_percent: number | null;
+  available_headroom_percentage_points: number | null;
+  status: string;
+  limiting_pricing_rule_id: number | null;
+  limiting_generation_module_id: number | null;
+  limiting_module_key: string | null;
+  limiting_module_name: string | null;
+  limiting_provider: string | null;
+  limiting_gpu_key: string | null;
+  diagnostics: FinancialProtectionRuleDiagnostic[];
+  warnings: string[];
+}
+
 export interface CommercialPricePreviewResponse {
   average_execution_cost_usd: number;
   desired_profit_percent: number;
@@ -147,7 +182,7 @@ export interface BillingCouponResponse {
   valid_from: string | null;
   valid_until: string | null;
   is_active: boolean;
-  applies_to: "all" | "plans" | "token_packages";
+  applies_to: "token_packages" | "free_token_purchase";
   eligible_item_ids: number[];
   metadata: Record<string, unknown>;
   created_at: string;
@@ -177,7 +212,7 @@ export interface BillingCouponCreate {
   valid_from?: string | null;
   valid_until?: string | null;
   is_active: boolean;
-  applies_to: "all" | "plans" | "token_packages";
+  applies_to: "token_packages" | "free_token_purchase";
   eligible_item_ids: number[];
   metadata: Record<string, unknown>;
 }
@@ -191,7 +226,7 @@ export interface BillingCouponUpdate {
   valid_from?: string | null;
   valid_until?: string | null;
   is_active?: boolean | null;
-  applies_to?: "all" | "plans" | "token_packages" | null;
+  applies_to?: "token_packages" | "free_token_purchase" | null;
   eligible_item_ids?: number[] | null;
   metadata?: Record<string, unknown> | null;
 }
