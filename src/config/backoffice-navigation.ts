@@ -104,6 +104,11 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         icon: BadgeDollarSign,
       },
       {
+        label: "Finanzas por generación",
+        href: "/dashboard/finances/generations",
+        icon: BadgeDollarSign,
+      },
+      {
         label: "Pagos",
         href: "/dashboard/billing/payments",
         icon: CreditCard,

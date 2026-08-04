@@ -41,6 +41,7 @@ export interface FinancialProtectionRuleDiagnostic {
 
 export interface FinancialProtectionReport {
   safe_profit_usd: number | null;
+  safe_profit_per_token_usd: number | null;
   maximum_allowed_discount_percent: number;
   highest_active_discount_percent: number;
   available_discount_percentage_points: number;

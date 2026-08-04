@@ -94,7 +94,8 @@ export function TokenPackageEditor({
   }, []);
 
   const discountPercent = Number(requestedDiscount || 0);
-  const safeProfitUsd = profitProtection?.safe_profit_usd ?? 0;
+  const safeProfitPerTokenUsd = profitProtection?.safe_profit_per_token_usd ?? 0;
+  const safeProfitUsd = safeProfitPerTokenUsd * Math.max(0, Number(tokensAmount || 0));
   const discountedProfitUsd = Number.isFinite(discountPercent) ? safeProfitUsd * discountPercent / 100 : 0;
   const remainingProfitUsd = Math.max(0, safeProfitUsd - discountedProfitUsd);
   const potentialLossUsd = Math.max(0, discountPercent - 100) * safeProfitUsd / 100;
