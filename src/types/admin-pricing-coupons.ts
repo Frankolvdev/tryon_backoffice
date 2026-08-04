@@ -35,31 +35,20 @@ export interface FinancialProtectionRuleDiagnostic {
   generation_module_id: number;
   module_key: string;
   module_name: string;
-  provider: string;
-  gpu_key: string | null;
-  protected_duration_seconds: number;
-  billable_seconds: number;
-  gpu_cost_usd_per_second: number | null;
-  infrastructure_cost_usd: number | null;
   desired_profit_usd: number;
-  normal_price_usd: number | null;
-  maximum_safe_discount_percent: number | null;
-  configured: boolean;
-  warnings: string[];
+  is_limiting: boolean;
 }
 
 export interface FinancialProtectionReport {
-  protected_discount_percent: number;
-  duration_safety_buffer_percent: number;
-  calculated_maximum_safe_discount_percent: number | null;
-  available_headroom_percentage_points: number | null;
+  safe_profit_usd: number | null;
+  maximum_allowed_discount_percent: number;
+  highest_active_discount_percent: number;
+  available_discount_percentage_points: number;
   status: string;
   limiting_pricing_rule_id: number | null;
   limiting_generation_module_id: number | null;
   limiting_module_key: string | null;
   limiting_module_name: string | null;
-  limiting_provider: string | null;
-  limiting_gpu_key: string | null;
   diagnostics: FinancialProtectionRuleDiagnostic[];
   warnings: string[];
 }
@@ -152,9 +141,7 @@ export interface AppliedPricingRuleResponse {
   warnings: string[];
 }
 
-export type CouponDiscountType =
-  | "percentage"
-  | "fixed_amount";
+export type CouponDiscountType = "percentage";
 
 export type CouponDuration =
   | "once"
@@ -204,8 +191,6 @@ export interface BillingCouponCreate {
   duration: CouponDuration;
   duration_in_months?: number | null;
   percentage_off?: number | null;
-  amount_off?: number | null;
-  currency?: string | null;
   max_redemptions?: number | null;
   first_time_transaction_only: boolean;
   minimum_amount?: number | null;

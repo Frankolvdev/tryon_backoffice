@@ -22,7 +22,7 @@ import type {
   SubscriptionPlanResponse,
   SubscriptionPlanUpdate,
 } from "@/types/admin-subscription-plans";
-import type { CommercialSettingsResponse } from "@/types/admin-pricing-coupons";
+import type { CommercialSettingsResponse, FinancialProtectionReport } from "@/types/admin-pricing-coupons";
 
 interface SubscriptionPlanEditorProps {
   plan: SubscriptionPlanResponse | null;
@@ -121,6 +121,7 @@ export function SubscriptionPlanEditor({
     );
   const [commercialSettings, setCommercialSettings] =
     useState<CommercialSettingsResponse | null>(null);
+  const [profitProtection, setProfitProtection] = useState<FinancialProtectionReport | null>(null);
   const [isLoadingEconomy, setIsLoadingEconomy] =
     useState(true);
   const [isSaving, setIsSaving] =
@@ -202,6 +203,18 @@ export function SubscriptionPlanEditor({
 
     void loadCommercialSettings();
   }, []);
+
+  useEffect(() => {
+    void browserApiRequest<FinancialProtectionReport>("/api/admin/financial-protection")
+      .then(setProfitProtection)
+      .catch((error) => toast.error(error instanceof Error ? error.message : "No fue posible cargar la ganancia segura."));
+  }, []);
+
+  const discountPercent = Number(requestedDiscount || 0);
+  const safeProfitUsd = profitProtection?.safe_profit_usd ?? 0;
+  const discountedProfitUsd = Number.isFinite(discountPercent) ? safeProfitUsd * discountPercent / 100 : 0;
+  const remainingProfitUsd = Math.max(0, safeProfitUsd - discountedProfitUsd);
+  const potentialLossUsd = Math.max(0, discountPercent - 100) * safeProfitUsd / 100;
 
   const calculatedPrice = useMemo(() => {
     const tokens = Number(tokensPerPeriod);
@@ -286,7 +299,7 @@ export function SubscriptionPlanEditor({
       return;
     }
 
-    if (!Number.isFinite(parsedDiscount) || parsedDiscount < 0 || parsedDiscount > 100) { toast.error("El descuento debe estar entre 0 y 100%."); return; }
+    if (!Number.isFinite(parsedDiscount) || parsedDiscount < 0 || parsedDiscount > 100) { toast.error(`No puedes superar 100% de la ganancia protegida. Pérdida potencial: $${potentialLossUsd.toFixed(6)} USD.`); return; }
 
     if (
       !Number.isInteger(
@@ -598,6 +611,21 @@ export function SubscriptionPlanEditor({
               />
             </label>
           </div>
+
+          <label className="mt-5 block">
+            <span className="mb-2 block text-sm text-zinc-500">Descuento deseado sobre la ganancia (%)</span>
+            <input type="number" min={0} max={100} step="0.01" value={requestedDiscount} onChange={(event) => setRequestedDiscount(event.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white" />
+          </label>
+          <section className={`mt-5 rounded-2xl border p-5 ${discountPercent > 100 ? "border-red-500/30 bg-red-950/15" : "border-emerald-500/20 bg-emerald-950/10"}`}>
+            <p className="font-semibold text-white">Validación de ganancia</p>
+            <div className="mt-3 grid gap-3 text-sm md:grid-cols-4">
+              <div><p className="text-zinc-600">Ganancia segura</p><p className="font-semibold text-white">${safeProfitUsd.toFixed(6)}</p></div>
+              <div><p className="text-zinc-600">Se descuenta</p><p className="font-semibold text-white">${discountedProfitUsd.toFixed(6)}</p></div>
+              <div><p className="text-zinc-600">Ganancia restante</p><p className="font-semibold text-white">${remainingProfitUsd.toFixed(6)}</p></div>
+              <div><p className="text-zinc-600">Máximo permitido</p><p className="font-semibold text-white">100%</p></div>
+            </div>
+            {discountPercent > 100 && <p className="mt-3 text-sm text-red-300">No puedes guardar este plan: perderías aproximadamente ${potentialLossUsd.toFixed(6)} USD.</p>}
+          </section>
 
           <section className="mt-5 rounded-2xl border border-red-500/15 bg-red-950/10 p-5">
             <div className="flex items-start gap-4">
