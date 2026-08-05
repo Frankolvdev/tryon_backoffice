@@ -29,6 +29,14 @@ function providerLabel(provider: string): string {
   return provider;
 }
 
+
+function assetKindLabel(objectKey: string): string {
+  if (objectKey.startsWith("generation-inputs/")) return "Entrada de generación";
+  if (objectKey.startsWith("generation-results/")) return "Resultado generado";
+  if (objectKey.startsWith("user-library/")) return "Biblioteca de usuario";
+  return "Otro archivo";
+}
+
 function formatBytes(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return "No disponible";
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -105,6 +113,10 @@ export function StorageFileCard({ file, onDeleted }: StorageFileCardProps) {
             <div className="flex justify-between gap-4 border-b border-white/5 pb-3">
               <dt className="text-zinc-700">Proveedor</dt>
               <dd className="text-right text-zinc-400">{providerLabel(file.provider)}</dd>
+            </div>
+            <div className="flex justify-between gap-4 border-b border-white/5 pb-3">
+              <dt className="text-zinc-700">Uso</dt>
+              <dd className="text-right text-zinc-400">{assetKindLabel(file.object_key)}</dd>
             </div>
             <div className="flex justify-between gap-4 border-b border-white/5 pb-3">
               <dt className="text-zinc-700">Bucket</dt>

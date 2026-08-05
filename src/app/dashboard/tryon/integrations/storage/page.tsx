@@ -43,6 +43,7 @@ export default function TryOnStoragePage() {
   const [provider, setProvider] = useState("");
   const [role, setRole] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
+  const [assetKind, setAssetKind] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -59,6 +60,7 @@ export default function TryOnStoragePage() {
       if (provider) params.set("provider", provider);
       if (role) params.set("role", role);
       if (typeFilter) params.set("file_type", typeFilter);
+      if (assetKind) params.set("asset_kind", assetKind);
 
       const response = await browserApiRequest<AdminStorageFile[]>(
         `/api/admin/storage/files?${params.toString()}`,
@@ -70,14 +72,14 @@ export default function TryOnStoragePage() {
     } finally {
       setIsLoading(false);
     }
-  }, [page, provider, role, search, typeFilter, userFilter]);
+  }, [assetKind, page, provider, role, search, typeFilter, userFilter]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadFiles(), 250);
     return () => window.clearTimeout(timer);
   }, [loadFiles]);
 
-  useEffect(() => setPage(0), [provider, role, search, typeFilter, userFilter]);
+  useEffect(() => setPage(0), [assetKind, provider, role, search, typeFilter, userFilter]);
 
   const providerOptions = useMemo(
     () => Array.from(new Set(files.map((file) => file.provider))).sort(),
@@ -147,6 +149,13 @@ export default function TryOnStoragePage() {
               <option value="documents">Documentos</option>
               <option value="archives">Comprimidos</option>
               <option value="other">Otros</option>
+            </select>
+            <select value={assetKind} onChange={(event) => setAssetKind(event.target.value)} className="h-11 rounded-xl border border-white/7 bg-[#09090a] px-3 text-sm text-zinc-300">
+              <option value="">Todos los usos</option>
+              <option value="generation_inputs">Entradas de generaciones</option>
+              <option value="generation_results">Resultados generados</option>
+              <option value="user_library">Biblioteca de usuarios</option>
+              <option value="other">Otros archivos</option>
             </select>
           </div>
           <p className="mt-4 text-xs text-zinc-700">Página {page + 1} · {files.length} registros cargados</p>
