@@ -1,17 +1,17 @@
-# Refinamiento de Pagos y Finanzas — BackOffice
+# FIX — Resultado bloqueado y conciliación pendiente
 
-## Incluye
-- Pestañas separadas: Pagos reales e Intentos de checkout.
-- Descuento, cupón, importe original y total pagado visibles.
-- Intentos sin PaymentIntent explicados como tales, no como errores ni pagos pendientes.
-- Conciliación deshabilitada para intentos.
-- Reembolsos retirados de Pagos, con nota que dirige a Caja y Bolsas.
-- Cards de Finanzas por generación renombradas como uso ya procesado, sin confundirlas con Caja.
+Este parche corrige exclusivamente la presentación y los datos del caso de facturación pendiente.
 
-## Aplicar
-```powershell
-cd "F:\PROYECTOS PERSONALES\TRYON\backoffice"
-Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue
-npm run build
-npm run dev
-```
+## Qué corrige
+- Conserva los tokens realmente cobrados inicialmente.
+- Guarda `estimated_final_tokens` y los tokens pendientes cuando la conciliación no puede completarse.
+- AppWeb muestra una tarjeta de resultado bloqueado, el costo estimado y el pendiente.
+- AppWeb permite reintentar el desbloqueo con el endpoint existente.
+- BackOffice diferencia tokens cobrados de tokens pendientes y muestra el estado bloqueado.
+- No modifica Modal, Beam, RunPod, Stripe ni el FIFO de bolsas.
+
+## Aplicación
+Copiar el contenido de cada carpeta sobre la raíz del proyecto correspondiente:
+- `backend/` sobre el backend.
+- `appweb/` sobre el AppWeb.
+- `backoffice/` sobre el BackOffice.
