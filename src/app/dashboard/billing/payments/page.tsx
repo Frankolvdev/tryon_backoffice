@@ -327,7 +327,7 @@ export default function BillingPaymentsPage() {
             <option value="">
               Cualquier estado
             </option>
-            <option value="pending">Pago en proceso</option>
+            <option value="pending">Pendiente de confirmar</option>
             <option value="processing">Pago en proceso</option>
             <option value="succeeded">Pagado</option>
             <option value="failed">Fallido</option>
