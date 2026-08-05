@@ -29,7 +29,15 @@ type FinanceBreakdown = {
   economic_total_for_generation_usd?: number;
   provider?: string;
   gpu_key?: string;
+  real_provider_seconds?: number;
+  configured_scaledown_seconds?: number;
+  technical_margin_seconds?: number;
   billable_seconds?: number;
+  gpu_cost_usd_per_second?: number;
+  raw_infrastructure_cost_usd?: number;
+  profit_rounding_surplus_usd?: number;
+  profit_after_customer_benefits_usd?: number;
+  rounding_surplus_for_company_usd?: number;
 };
 
 type FinanceItem = {
@@ -218,13 +226,14 @@ export default function GenerationFinancesPage() {
               <th>Para pagar al proveedor</th>
               <th>Beneficio entregado</th>
               <th>Lo que ganó tu empresa</th>
+              <th className="text-blue-300">Total de la generación</th>
               <th>Detalle</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} className="p-8 text-center text-zinc-500">
+                <td colSpan={9} className="p-8 text-center text-zinc-500">
                   Cargando…
                 </td>
               </tr>
@@ -248,6 +257,9 @@ export default function GenerationFinancesPage() {
                     <td>{usd(benefit)}</td>
                     <td className="text-emerald-300">
                       {usd(item.gross_profit_usd)}
+                    </td>
+                    <td className="font-semibold text-blue-300">
+                      {usd(item.infrastructure_cost_usd + item.gross_profit_usd)}
                     </td>
                     <td>
                       <button
@@ -292,11 +304,11 @@ export default function GenerationFinancesPage() {
               </button>
             </div>
 
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <div className="mt-6 grid gap-4 md:grid-cols-4">
               <FriendlyValue
-                label="Dinero para pagar al proveedor de IA"
+                label="Costo protegido del proveedor de IA"
                 value={usd(selected.infrastructure_cost_usd)}
-                help="Este dinero no es ganancia. Se reserva para Modal, Beam, RunPod o el proveedor utilizado."
+                help="Incluye el tiempo real, el tiempo previsto para apagar el contenedor y el margen técnico configurado."
               />
               <FriendlyValue
                 label="Beneficio entregado al cliente"
@@ -310,9 +322,32 @@ export default function GenerationFinancesPage() {
               <FriendlyValue
                 label="Lo que realmente ganó tu empresa"
                 value={usd(selected.gross_profit_usd)}
-                help="Este sí es el dinero que queda como ganancia después del beneficio."
+                help="Incluye la ganancia después de beneficios y cualquier centavo adicional generado por redondear tokens."
+              />
+              <FriendlyValue
+                label="Total de esta generación"
+                value={usd(selected.infrastructure_cost_usd + selected.gross_profit_usd)}
+                help="Suma el costo protegido del proveedor y todo lo que ganó tu empresa."
+                accent="blue"
               />
             </div>
+
+            <section className="mt-6 rounded-2xl border border-white/10 p-5">
+              <h3 className="font-semibold text-white">¿Cómo se calculó el costo del proveedor?</h3>
+              <p className="mt-1 text-sm text-zinc-400">Aquí puedes ver exactamente qué segundos se sumaron y cuánto representa cada parte.</p>
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full min-w-[720px] text-sm">
+                  <thead className="text-left text-zinc-500"><tr><th className="py-2">Parte del cálculo</th><th>Segundos</th><th>Costo por segundo</th><th>Importe</th></tr></thead>
+                  <tbody className="text-zinc-300">
+                    <TimeCostRow label="Tiempo real de la generación" seconds={Number(selected.breakdown.real_provider_seconds || 0)} rate={Number(selected.breakdown.gpu_cost_usd_per_second || 0)} />
+                    <TimeCostRow label="Tiempo previsto para apagar el contenedor" seconds={Number(selected.breakdown.configured_scaledown_seconds || 0)} rate={Number(selected.breakdown.gpu_cost_usd_per_second || 0)} />
+                    <TimeCostRow label="Margen técnico de seguridad" seconds={Number(selected.breakdown.technical_margin_seconds || 0)} rate={Number(selected.breakdown.gpu_cost_usd_per_second || 0)} />
+                    <tr className="border-t border-white/10 font-semibold text-white"><td className="py-3">Total protegido</td><td>{Number(selected.breakdown.billable_seconds || 0).toFixed(3)} s</td><td>{usd(Number(selected.breakdown.gpu_cost_usd_per_second || 0))}</td><td>{usd(selected.infrastructure_cost_usd)}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-3 text-xs text-zinc-500">Proveedor: {selected.breakdown.provider || "No indicado"} · GPU: {selected.breakdown.gpu_key || "No indicada"}. El margen técnico es una protección configurada; no se presenta como ganancia.</p>
+            </section>
 
             <section className="mt-6 rounded-2xl border border-white/10 p-5">
               <h3 className="font-semibold text-white">
@@ -399,21 +434,27 @@ export default function GenerationFinancesPage() {
                   )}`}
                 />
                 <Row
+                  label="Ganancia después de aplicar beneficios"
+                  value={usd(Number(selected.breakdown.profit_after_customer_benefits_usd ?? selected.breakdown.company_profit_usd ?? 0))}
+                />
+                <Row
+                  label="Centavos adicionales por redondear tokens"
+                  value={usd(Number(selected.breakdown.rounding_surplus_for_company_usd ?? selected.breakdown.profit_rounding_surplus_usd ?? 0))}
+                />
+                <Row
                   label="Lo que realmente ganó tu empresa"
                   value={usd(selected.gross_profit_usd)}
                   strong
                 />
                 <Row
-                  label="Dinero reservado para pagar al proveedor"
+                  label="Costo protegido del proveedor de IA"
                   value={usd(selected.infrastructure_cost_usd)}
                 />
                 <Row
-                  label="Total económico de esta generación"
-                  value={usd(
-                    selected.infrastructure_cost_usd +
-                      selected.gross_profit_usd,
-                  )}
+                  label="Total de esta generación"
+                  value={usd(selected.infrastructure_cost_usd + selected.gross_profit_usd)}
                   strong
+                  accent="blue"
                 />
               </div>
             </section>
@@ -428,17 +469,31 @@ function FriendlyValue({
   label,
   value,
   help,
+  accent = "default",
 }: {
   label: string;
   value: string;
   help: string;
+  accent?: "default" | "blue";
 }) {
   return (
-    <div className="rounded-xl bg-white/5 p-4">
-      <p className="text-xs uppercase text-zinc-500">{label}</p>
-      <p className="mt-2 text-xl font-semibold text-white">{value}</p>
+    <div className={accent === "blue" ? "rounded-xl border border-blue-500/30 bg-blue-500/10 p-4" : "rounded-xl bg-white/5 p-4"}>
+      <p className={accent === "blue" ? "text-xs uppercase text-blue-300" : "text-xs uppercase text-zinc-500"}>{label}</p>
+      <p className={accent === "blue" ? "mt-2 text-xl font-semibold text-blue-200" : "mt-2 text-xl font-semibold text-white"}>{value}</p>
       <p className="mt-2 text-xs leading-5 text-zinc-500">{help}</p>
     </div>
+  );
+}
+
+
+function TimeCostRow({ label, seconds, rate }: { label: string; seconds: number; rate: number }) {
+  return (
+    <tr className="border-t border-white/5">
+      <td className="py-3">{label}</td>
+      <td>{seconds.toFixed(3)} s</td>
+      <td>{usd(rate)}</td>
+      <td>{usd(seconds * rate)}</td>
+    </tr>
   );
 }
 
@@ -446,15 +501,17 @@ function Row({
   label,
   value,
   strong = false,
+  accent = "default",
 }: {
   label: string;
   value: string;
   strong?: boolean;
+  accent?: "default" | "blue";
 }) {
   return (
     <div className="flex items-center justify-between gap-4 rounded-lg bg-black/30 p-3">
       <span className="text-zinc-400">{label}</span>
-      <span className={strong ? "font-semibold text-white" : "text-zinc-200"}>
+      <span className={accent === "blue" ? "font-semibold text-blue-300" : strong ? "font-semibold text-white" : "text-zinc-200"}>
         {value}
       </span>
     </div>
