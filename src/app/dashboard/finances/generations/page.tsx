@@ -38,6 +38,10 @@ type FinanceBreakdown = {
   profit_rounding_surplus_usd?: number;
   profit_after_customer_benefits_usd?: number;
   rounding_surplus_for_company_usd?: number;
+  profit_applied?: boolean;
+  billing_policy_key?: string;
+  termination_status?: string;
+  final_tokens?: number;
 };
 
 type FinanceItem = {
@@ -446,6 +450,11 @@ export default function GenerationFinancesPage() {
               <h3 className="font-semibold text-white">
                 Resumen explicado de forma sencilla
               </h3>
+              {selected.breakdown.profit_applied === false && (
+                <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs leading-5 text-amber-100/80">
+                  Esta ejecución terminó como {selected.breakdown.termination_status || selected.status}. Según tu Política por resultado, no se cobró la ganancia configurada por token; únicamente se protegió el costo del proveedor y se aplicó el redondeo necesario a tokens enteros.
+                </div>
+              )}
               <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
                 <Row
                   label="Lo que habrías ganado sin beneficios"
@@ -468,18 +477,19 @@ export default function GenerationFinancesPage() {
                   value={usd(Number(selected.breakdown.profit_after_customer_benefits_usd ?? selected.breakdown.company_profit_usd ?? 0))}
                 />
                 <Row
-                  label="Centavos adicionales por redondear tokens"
+                  label={selected.breakdown.profit_applied === false ? "Diferencia por cobrar un token entero" : "Centavos adicionales por redondear tokens"}
                   value={usd(Number(selected.breakdown.rounding_surplus_for_company_usd ?? selected.breakdown.profit_rounding_surplus_usd ?? 0))}
                 />
                 <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 md:col-span-2">
                   <p className="text-sm font-medium text-emerald-200">
-                    ¿A dónde van esos centavos?
+                    {selected.breakdown.profit_applied === false
+                      ? "¿Por qué queda dinero para tu empresa si no cobraste ganancia?"
+                      : "¿A dónde van esos centavos?"}
                   </p>
                   <p className="mt-1 text-xs leading-5 text-emerald-100/70">
-                    Se suman completamente a la ganancia de tu empresa. Aparecen
-                    cuando el costo exacto requeriría una fracción de token, pero
-                    el sistema cobra tokens enteros. No se cuentan como costo del
-                    proveedor ni se pierden.
+                    {selected.breakdown.profit_applied === false
+                      ? "La política de este resultado cobró únicamente el costo del proveedor, sin agregar la ganancia configurada por token. Como los tokens se cobran enteros, el sistema necesitó cobrar al menos un token. Después de cubrir al proveedor, la diferencia queda en tu empresa como ajuste de cobro mínimo; no es la ganancia comercial configurada."
+                      : "Se suman completamente a la ganancia de tu empresa. Aparecen cuando el costo exacto requeriría una fracción de token, pero el sistema cobra tokens enteros. No se cuentan como costo del proveedor ni se pierden."}
                   </p>
                 </div>
                 <Row
