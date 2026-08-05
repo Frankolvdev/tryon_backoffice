@@ -7,6 +7,7 @@ import {
   ChartNoAxesCombined,
   CircleDollarSign,
   Calculator,
+  WalletCards,
   Cpu,
   CreditCard,
   Database,
@@ -108,6 +109,11 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         label: "Finanzas por generación",
         href: "/dashboard/finances/generations",
         icon: BadgeDollarSign,
+      },
+      {
+        label: "Caja y bolsas",
+        href: "/dashboard/finances/cashbox",
+        icon: WalletCards,
       },
       {
         label: "Pagos",
