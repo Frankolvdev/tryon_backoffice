@@ -28,6 +28,11 @@ export function SystemSettingsCategory({
 }: SystemSettingsCategoryProps) {
   const [isOpen, setIsOpen] =
     useState(true);
+  const visibleSettings = settings.filter(
+    (setting) => !["storage_provider", "local_storage_dir"].includes(setting.key),
+  );
+
+  if (visibleSettings.length === 0) return null;
 
   return (
     <section className="luxia-panel overflow-hidden rounded-3xl">
@@ -49,7 +54,7 @@ export function SystemSettingsCategory({
             </h2>
 
             <p className="mt-1 text-xs text-zinc-600">
-              {settings.length} configuraciones
+              {visibleSettings.length} configuraciones
             </p>
           </div>
         </div>
@@ -69,7 +74,7 @@ export function SystemSettingsCategory({
 
       {isOpen && (
         <div className="grid gap-4 p-5 lg:grid-cols-2 2xl:grid-cols-3">
-          {settings.map((setting) => (
+          {visibleSettings.map((setting) => (
             <SystemSettingCard
               key={setting.id}
               setting={setting}

@@ -22,6 +22,13 @@ interface StorageFileCardProps {
   onDeleted: (fileId: number) => void;
 }
 
+function providerLabel(provider: string): string {
+  if (provider === "local") return "Local";
+  if (provider === "amazon_s3" || provider === "s3") return "Amazon S3";
+  if (provider === "cloudflare_r2") return "Cloudflare R2";
+  return provider;
+}
+
 function formatBytes(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return "No disponible";
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -97,7 +104,11 @@ export function StorageFileCard({ file, onDeleted }: StorageFileCardProps) {
             </div>
             <div className="flex justify-between gap-4 border-b border-white/5 pb-3">
               <dt className="text-zinc-700">Proveedor</dt>
-              <dd className="text-right text-zinc-400">{file.provider}</dd>
+              <dd className="text-right text-zinc-400">{providerLabel(file.provider)}</dd>
+            </div>
+            <div className="flex justify-between gap-4 border-b border-white/5 pb-3">
+              <dt className="text-zinc-700">Bucket</dt>
+              <dd className="max-w-[65%] truncate text-right text-zinc-400">{file.bucket ?? "Local"}</dd>
             </div>
             <div className="flex justify-between gap-4 border-b border-white/5 pb-3">
               <dt className="text-zinc-700">Tipo MIME</dt>
@@ -128,6 +139,7 @@ export function StorageFileCard({ file, onDeleted }: StorageFileCardProps) {
               <Download size={14} /> Descargar
             </a>
             <TryOnCopyButton value={String(file.id)} label="Copiar ID" />
+            <TryOnCopyButton value={file.object_key} label="Copiar ruta" />
             <button
               type="button"
               disabled={isDeleting}

@@ -16,6 +16,7 @@ import {
 
 import { AiEngineTabs } from "@/components/backoffice/tryon/ai-engine-tabs";
 import { StorageFileCard } from "@/components/backoffice/tryon/storage-file-card";
+import { StorageProvidersPanel } from "@/components/backoffice/tryon/storage-providers-panel";
 import { TryOnEmptyState } from "@/components/backoffice/tryon/tryon-empty-state";
 import { TryOnModuleHeader } from "@/components/backoffice/tryon/tryon-module-header";
 import { browserApiRequest } from "@/lib/api/browser-api";
@@ -90,9 +91,11 @@ export default function TryOnStoragePage() {
     <div>
       <TryOnModuleHeader
         title="Almacenamiento"
-        description="Explora, filtra, previsualiza, descarga y administra archivos guardados en almacenamiento local o S3."
+        description="Configura Local, Amazon S3 o Cloudflare R2 y administra todos los archivos sin importar dónde fueron guardados."
       />
       <AiEngineTabs />
+
+      <StorageProvidersPanel onChanged={() => void loadFiles()} />
 
       <div className="mt-6 flex justify-end">
         <button type="button" onClick={() => void loadFiles()} disabled={isLoading} className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/8 bg-white/[0.025] px-4 text-sm text-zinc-400 disabled:opacity-50">
@@ -128,7 +131,7 @@ export default function TryOnStoragePage() {
             <input type="search" value={userFilter} onChange={(event) => setUserFilter(event.target.value)} placeholder="Usuario, correo o ID" className="h-11 rounded-xl border border-white/7 bg-[#09090a] px-3 text-sm text-zinc-300 outline-none" />
             <select value={provider} onChange={(event) => setProvider(event.target.value)} className="h-11 rounded-xl border border-white/7 bg-[#09090a] px-3 text-sm text-zinc-300">
               <option value="">Todos los proveedores</option>
-              {["local", "s3", "minio", "r2", ...providerOptions].filter((value, index, values) => values.indexOf(value) === index).map((value) => <option key={value} value={value}>{value}</option>)}
+              {["local", "s3", "amazon_s3", "cloudflare_r2", ...providerOptions].filter((value, index, values) => values.indexOf(value) === index).map((value) => <option key={value} value={value}>{value}</option>)}
             </select>
             <select value={role} onChange={(event) => setRole(event.target.value)} className="h-11 rounded-xl border border-white/7 bg-[#09090a] px-3 text-sm text-zinc-300">
               <option value="">Todos los roles</option>
@@ -171,7 +174,7 @@ export default function TryOnStoragePage() {
 
       <div className="mt-5 rounded-2xl border border-white/6 bg-black/20 p-4 text-xs leading-6 text-zinc-600">
         <Database size={16} className="mr-2 inline text-red-400" />
-        Las miniaturas y descargas pasan por una ruta administrativa autenticada. El visor funciona con archivos locales y S3 sin exponer credenciales.
+        Las miniaturas, aperturas, descargas y eliminaciones se resuelven usando el proveedor original de cada archivo. Cambiar el proveedor activo solo afecta cargas nuevas.
       </div>
     </div>
   );
