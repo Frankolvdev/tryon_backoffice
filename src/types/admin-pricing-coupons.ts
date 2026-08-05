@@ -134,6 +134,9 @@ export interface AppliedPricingRuleResponse {
   gpu_cost_usd_per_second: number | null;
   estimated_duration_seconds: number;
   estimate_source: string;
+  historical_samples_used: number;
+  estimate_confidence: string;
+  estimate_updated_at: string | null;
   scaledown_seconds: number;
   technical_margin_seconds: number;
   estimated_billable_seconds: number;
