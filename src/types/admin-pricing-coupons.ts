@@ -176,7 +176,8 @@ export interface BillingCouponResponse {
   valid_until: string | null;
   is_active: boolean;
   applies_to: ("token_packages" | "free_token_purchase")[];
-  eligible_item_ids: number[];
+  eligible_user_ids: number[];
+  max_redemptions_per_user: number | null;
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -194,17 +195,15 @@ export interface BillingCouponCreate {
   name: string;
   description?: string | null;
   discount_type: CouponDiscountType;
-  duration: CouponDuration;
-  duration_in_months?: number | null;
   percentage_off?: number | null;
   max_redemptions?: number | null;
   first_time_transaction_only: boolean;
-  minimum_amount?: number | null;
   valid_from?: string | null;
   valid_until?: string | null;
   is_active: boolean;
   applies_to: ("token_packages" | "free_token_purchase")[];
-  eligible_item_ids: number[];
+  eligible_user_ids: number[];
+  max_redemptions_per_user: number | null;
   metadata: Record<string, unknown>;
 }
 
@@ -213,12 +212,12 @@ export interface BillingCouponUpdate {
   description?: string | null;
   max_redemptions?: number | null;
   first_time_transaction_only?: boolean | null;
-  minimum_amount?: number | null;
   valid_from?: string | null;
   valid_until?: string | null;
   is_active?: boolean | null;
   applies_to?: ("token_packages" | "free_token_purchase")[] | null;
-  eligible_item_ids?: number[] | null;
+  eligible_user_ids?: number[] | null;
+  max_redemptions_per_user?: number | null;
   metadata?: Record<string, unknown> | null;
 }
 

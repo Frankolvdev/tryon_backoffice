@@ -1,10 +1,11 @@
 "use client";
 
-import { LoaderCircle, Save, X } from "lucide-react";
+import { LoaderCircle, Save, Search, X } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { browserApiRequest } from "@/lib/api/browser-api";
-import type { BillingCouponCreate, BillingCouponResponse, BillingCouponUpdate, CouponDuration, FinancialProtectionReport } from "@/types/admin-pricing-coupons";
+import type { BillingCouponCreate, BillingCouponResponse, BillingCouponUpdate, FinancialProtectionReport } from "@/types/admin-pricing-coupons";
+import type { AdminUser } from "@/types/admin-users";
 
 interface Props { coupon: BillingCouponResponse | null; onClose: () => void; onSaved: (coupon: BillingCouponResponse) => void; }
 
@@ -20,22 +21,23 @@ export function BillingCouponEditor({ coupon, onClose, onSaved }: Props) {
   const [code, setCode] = useState(coupon?.code ?? "");
   const [name, setName] = useState(coupon?.name ?? "");
   const [description, setDescription] = useState(coupon?.description ?? "");
-  const [duration, setDuration] = useState<CouponDuration>(coupon?.duration ?? "once");
-  const [durationMonths, setDurationMonths] = useState(coupon?.duration_in_months == null ? "" : String(coupon.duration_in_months));
   const [percentageOff, setPercentageOff] = useState(coupon?.percentage_off ?? "10");
   const [maxRedemptions, setMaxRedemptions] = useState(coupon?.max_redemptions == null ? "" : String(coupon.max_redemptions));
-  const [minimumAmount, setMinimumAmount] = useState(coupon?.minimum_amount ?? "");
   const [validFrom, setValidFrom] = useState(toLocalInput(coupon?.valid_from ?? null));
   const [validUntil, setValidUntil] = useState(toLocalInput(coupon?.valid_until ?? null));
   const [firstTimeOnly, setFirstTimeOnly] = useState(coupon?.first_time_transaction_only ?? false);
   const [isActive, setIsActive] = useState(coupon?.is_active ?? true);
   const [appliesTo, setAppliesTo] = useState<("token_packages" | "free_token_purchase")[]>(coupon?.applies_to?.length ? coupon.applies_to : ["token_packages"]);
-  const [eligibleIds, setEligibleIds] = useState((coupon?.eligible_item_ids ?? []).join(", "));
+  const [maxPerUser, setMaxPerUser] = useState(coupon?.max_redemptions_per_user == null ? "" : String(coupon.max_redemptions_per_user));
+  const [eligibleUserIds, setEligibleUserIds] = useState<number[]>(coupon?.eligible_user_ids ?? []);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [userSearch, setUserSearch] = useState("");
   const [metadata, setMetadata] = useState(JSON.stringify(coupon?.metadata ?? {}, null, 2));
   const [report, setReport] = useState<FinancialProtectionReport | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
+    void browserApiRequest<AdminUser[]>("/api/admin/users?skip=0&limit=100&include_deleted=false").then(setUsers).catch(()=>toast.error("No fue posible cargar los usuarios."));
     void browserApiRequest<FinancialProtectionReport>("/api/admin/financial-protection").then(setReport).catch((error) => toast.error(error instanceof Error ? error.message : "No fue posible cargar la ganancia segura."));
   }, []);
 
@@ -58,19 +60,17 @@ export function BillingCouponEditor({ coupon, onClose, onSaved }: Props) {
     catch { return void toast.error("Metadata debe ser un objeto JSON válido."); }
 
     const parsedMax = maxRedemptions ? Number(maxRedemptions) : null;
-    const parsedMinimum = minimumAmount ? Number(minimumAmount) : null;
-    const parsedDuration = duration === "repeating" ? Number(durationMonths) : null;
+    const parsedPerUser = maxPerUser ? Number(maxPerUser) : null;
     if (parsedMax !== null && (!Number.isInteger(parsedMax) || parsedMax < 1)) return void toast.error("El máximo de usos debe ser mayor que cero.");
-    if (parsedMinimum !== null && (!Number.isFinite(parsedMinimum) || parsedMinimum < 0)) return void toast.error("La compra mínima debe ser cero o mayor.");
-    if (duration === "repeating" && (!Number.isInteger(parsedDuration) || (parsedDuration ?? 0) < 1)) return void toast.error("Indica los meses de repetición.");
+    if (parsedPerUser !== null && (!Number.isInteger(parsedPerUser) || parsedPerUser < 1)) return void toast.error("El máximo por usuario debe ser mayor que cero.");
 
     const common: BillingCouponUpdate = {
       name: name.trim(), description: description.trim() || null, max_redemptions: parsedMax,
-      first_time_transaction_only: firstTimeOnly, minimum_amount: parsedMinimum,
+      first_time_transaction_only: firstTimeOnly,
       valid_from: validFrom ? new Date(validFrom).toISOString() : null,
       valid_until: validUntil ? new Date(validUntil).toISOString() : null,
       is_active: isActive, applies_to: appliesTo,
-      eligible_item_ids: eligibleIds.split(",").map((v) => Number(v.trim())).filter((v) => Number.isInteger(v) && v > 0),
+      eligible_user_ids: eligibleUserIds, max_redemptions_per_user: parsedPerUser,
       metadata: parsedMetadata,
     };
     const payload: BillingCouponCreate | BillingCouponUpdate = isEditing
@@ -79,8 +79,6 @@ export function BillingCouponEditor({ coupon, onClose, onSaved }: Props) {
           ...common,
           code: code.trim().toUpperCase(),
           discount_type: "percentage" as const,
-          duration,
-          duration_in_months: parsedDuration,
           percentage_off: percentage,
         };
 
@@ -99,12 +97,10 @@ export function BillingCouponEditor({ coupon, onClose, onSaved }: Props) {
         <Field label="Código"><input value={code} disabled={isEditing} onChange={(e)=>setCode(e.target.value.toUpperCase())} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"/></Field>
         <Field label="Nombre"><input value={name} onChange={(e)=>setName(e.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"/></Field>
         <Field label="Descuento sobre la ganancia (%)"><input type="number" min="0.01" max="100" step="0.01" disabled={isEditing} value={percentageOff} onChange={(e)=>setPercentageOff(e.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"/></Field>
-        <Field label="Duración"><select value={duration} disabled={isEditing} onChange={(e)=>setDuration(e.target.value as CouponDuration)} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"><option value="once">Una vez</option><option value="forever">Para siempre</option><option value="repeating">Repetitivo</option></select></Field>
-        {duration === "repeating" && <Field label="Meses"><input type="number" min={1} disabled={isEditing} value={durationMonths} onChange={(e)=>setDurationMonths(e.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"/></Field>}
         <Field label="Aplica a"><div className="flex min-h-11 flex-col justify-center gap-2 rounded-xl border border-white/8 bg-black/30 px-4 py-3 text-sm text-zinc-300"><label className="flex items-center gap-2"><input type="checkbox" checked={appliesTo.includes("token_packages")} onChange={(e)=>setAppliesTo((current)=>e.target.checked ? [...new Set([...current, "token_packages" as const])] : current.filter((item)=>item!=="token_packages"))}/> Paquetes de tokens</label><label className="flex items-center gap-2"><input type="checkbox" checked={appliesTo.includes("free_token_purchase")} onChange={(e)=>setAppliesTo((current)=>e.target.checked ? [...new Set([...current, "free_token_purchase" as const])] : current.filter((item)=>item!=="free_token_purchase"))}/> Compra libre de tokens</label></div></Field>
-        <Field label="Máximo de usos"><input type="number" min={1} value={maxRedemptions} onChange={(e)=>setMaxRedemptions(e.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"/></Field>
-        <Field label="Compra mínima"><input type="number" min={0} step="0.01" value={minimumAmount} onChange={(e)=>setMinimumAmount(e.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"/></Field>
-        <Field label="IDs elegibles"><input value={eligibleIds} onChange={(e)=>setEligibleIds(e.target.value)} placeholder="1, 2, 3" className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"/></Field>
+        <Field label="Máximo de usos totales"><input type="number" min={1} value={maxRedemptions} onChange={(e)=>setMaxRedemptions(e.target.value)} placeholder="Sin límite" className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"/></Field>
+        <Field label="Máximo de usos por usuario"><input type="number" min={1} value={maxPerUser} onChange={(e)=>setMaxPerUser(e.target.value)} placeholder="Sin límite" className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"/></Field>
+        <div className="md:col-span-2 xl:col-span-3"><span className="mb-2 block text-sm text-zinc-500">Usuarios permitidos</span><div className="rounded-2xl border border-white/8 bg-black/30 p-4"><div className="relative"><Search className="absolute left-3 top-3 size-4 text-zinc-600"/><input value={userSearch} onChange={(e)=>setUserSearch(e.target.value)} placeholder="Buscar por nombre o correo" className="h-10 w-full rounded-xl border border-white/8 bg-black/30 pl-10 pr-4 text-sm text-white"/></div><p className="mt-2 text-xs text-zinc-600">Sin usuarios seleccionados, el cupón será válido para todos.</p><div className="mt-3 max-h-52 space-y-2 overflow-auto">{users.filter((u)=>`${u.full_name ?? ""} ${u.email}`.toLowerCase().includes(userSearch.toLowerCase())).map((u)=><label key={u.id} className="flex items-center justify-between rounded-xl border border-white/6 px-3 py-2 text-sm"><span><span className="text-white">{u.full_name || "Sin nombre"}</span><span className="ml-2 text-zinc-600">{u.email}</span></span><input type="checkbox" checked={eligibleUserIds.includes(u.id)} onChange={(e)=>setEligibleUserIds((current)=>e.target.checked?[...current,u.id]:current.filter((id)=>id!==u.id))}/></label>)}</div></div></div>
         <Field label="Válido desde"><input type="datetime-local" value={validFrom} onChange={(e)=>setValidFrom(e.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"/></Field>
         <Field label="Válido hasta"><input type="datetime-local" value={validUntil} onChange={(e)=>setValidUntil(e.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"/></Field>
       </div>
