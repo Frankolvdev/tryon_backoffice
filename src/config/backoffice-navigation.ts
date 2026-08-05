@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  BookOpen,
   BadgeDollarSign,
   BadgePercent,
   Bell,
@@ -96,6 +97,10 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         icon: HardDrive,
       },
     ],
+  },
+  {
+    label: "Sistema legal",
+    items: [{ label: "Políticas legales", href: "/dashboard/system/legal-policies", icon: BookOpen }],
   },
   {
     label: "Comercial",
