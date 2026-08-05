@@ -6,6 +6,7 @@ import {
   Boxes,
   ChartNoAxesCombined,
   CircleDollarSign,
+  Calculator,
   Cpu,
   CreditCard,
   Database,
@@ -142,6 +143,11 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         label: "Pricing",
         href: "/dashboard/billing/pricing",
         icon: BadgePercent,
+      },
+      {
+        label: "Simulador de ganancias",
+        href: "/dashboard/finances/profit-simulator",
+        icon: Calculator,
       },
       {
         label: "Cupones",
