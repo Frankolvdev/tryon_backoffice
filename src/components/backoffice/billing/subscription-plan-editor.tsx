@@ -614,15 +614,15 @@ export function SubscriptionPlanEditor({
           </div>
 
           <label className="mt-5 block">
-            <span className="mb-2 block text-sm text-zinc-500">Descuento deseado sobre la ganancia (%)</span>
+            <span className="mb-2 block text-sm text-zinc-500">Porcentaje de tu ganancia que regalarás (%)</span>
             <input type="number" min={0} max={100} step="0.01" value={requestedDiscount} onChange={(event) => setRequestedDiscount(event.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white" />
           </label>
           <section className={`mt-5 rounded-2xl border p-5 ${discountPercent > 100 ? "border-red-500/30 bg-red-950/15" : "border-emerald-500/20 bg-emerald-950/10"}`}>
             <p className="font-semibold text-white">Validación de ganancia</p>
             <div className="mt-3 grid gap-3 text-sm md:grid-cols-4">
-              <div><p className="text-zinc-600">Ganancia segura</p><p className="font-semibold text-white">${safeProfitUsd.toFixed(6)}</p></div>
+              <div><p className="text-zinc-600">Ganancia total incluida</p><p className="font-semibold text-white">${safeProfitUsd.toFixed(6)}</p></div>
               <div><p className="text-zinc-600">Se descuenta</p><p className="font-semibold text-white">${discountedProfitUsd.toFixed(6)}</p></div>
-              <div><p className="text-zinc-600">Ganancia restante</p><p className="font-semibold text-white">${remainingProfitUsd.toFixed(6)}</p></div>
+              <div><p className="text-zinc-600">Lo que seguirás ganando</p><p className="font-semibold text-white">${remainingProfitUsd.toFixed(6)}</p></div>
               <div><p className="text-zinc-600">Máximo permitido</p><p className="font-semibold text-white">100%</p></div>
             </div>
             {discountPercent > 100 && <p className="mt-3 text-sm text-red-300">No puedes guardar este plan: perderías aproximadamente ${potentialLossUsd.toFixed(6)} USD.</p>}
