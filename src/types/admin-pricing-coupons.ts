@@ -227,3 +227,52 @@ export interface BillingCouponSyncResponse {
   stripe_promotion_code_id: string;
   message: string;
 }
+
+export interface PricingSimulatorScenario {
+  label: string;
+  discount_percent: number;
+  tokens: number;
+  customer_value_usd: number;
+  infrastructure_cost_usd: number;
+  normal_profit_usd: number;
+  discount_given_usd: number;
+  profit_after_discount_usd: number;
+  rounding_surplus_usd: number;
+  company_total_usd: number;
+}
+
+export interface PricingSimulatorRecommendation {
+  token_value_usd: number;
+  desired_profit_per_token_usd: number;
+  tokens: number;
+  worst_discount_percent: number;
+  estimated_company_profit_usd: number;
+  estimated_customer_value_usd: number;
+  distance_from_target_usd: number;
+}
+
+export interface PricingSimulatorResponse {
+  generation_module_id: number;
+  module_key: string;
+  module_name: string;
+  pricing_rule_id: number;
+  pricing_rule_title: string;
+  provider: string;
+  gpu_key: string | null;
+  gpu_cost_usd_per_second: number;
+  duration_seconds: number;
+  duration_source: string;
+  historical_samples_used: number;
+  estimate_confidence: string;
+  scaledown_seconds: number;
+  technical_margin_seconds: number;
+  billable_seconds: number;
+  infrastructure_cost_usd: number;
+  current_token_value_usd: number;
+  current_profit_per_token_usd: number;
+  simulated_token_value_usd: number;
+  simulated_profit_per_token_usd: number;
+  scenarios: PricingSimulatorScenario[];
+  recommendations: PricingSimulatorRecommendation[];
+  warnings: string[];
+}
