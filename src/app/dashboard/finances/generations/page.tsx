@@ -90,6 +90,36 @@ const sourceName = (bag: TokenBag) => {
   return source || "Origen no identificado";
 };
 
+const mergeTokenBags = (bags: TokenBag[]) => {
+  const grouped = new Map<string, TokenBag>();
+
+  bags.forEach((bag, index) => {
+    const key = String(
+      bag.token_bag_id ??
+        `${bag.reference_id || "sin-referencia"}-${bag.coupon_code || "sin-cupon"}-${index}`,
+    );
+    const current = grouped.get(key);
+    if (!current) {
+      grouped.set(key, { ...bag });
+      return;
+    }
+
+    current.tokens_used =
+      Number(current.tokens_used || 0) + Number(bag.tokens_used || 0);
+    current.profit_without_benefit_usd =
+      Number(current.profit_without_benefit_usd || 0) +
+      Number(bag.profit_without_benefit_usd || 0);
+    current.benefit_given_usd =
+      Number(current.benefit_given_usd || 0) +
+      Number(bag.benefit_given_usd || 0);
+    current.company_profit_usd =
+      Number(current.company_profit_usd || 0) +
+      Number(bag.company_profit_usd || 0);
+  });
+
+  return Array.from(grouped.values());
+};
+
 export default function GenerationFinancesPage() {
   const [data, setData] = useState<Response | null>(null);
   const [status, setStatus] = useState("");
@@ -371,8 +401,9 @@ export default function GenerationFinancesPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(selected.breakdown.token_bags_used || []).map(
-                      (bag, index) => (
+                    {mergeTokenBags(
+                      selected.breakdown.token_bags_used || [],
+                    ).map((bag, index) => (
                         <tr
                           key={`${bag.token_bag_id || index}`}
                           className="border-t border-white/5 text-zinc-300"
@@ -405,8 +436,7 @@ export default function GenerationFinancesPage() {
                             {usd(Number(bag.company_profit_usd || 0))}
                           </td>
                         </tr>
-                      ),
-                    )}
+                      ))}
                   </tbody>
                 </table>
               </div>
@@ -441,6 +471,17 @@ export default function GenerationFinancesPage() {
                   label="Centavos adicionales por redondear tokens"
                   value={usd(Number(selected.breakdown.rounding_surplus_for_company_usd ?? selected.breakdown.profit_rounding_surplus_usd ?? 0))}
                 />
+                <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 md:col-span-2">
+                  <p className="text-sm font-medium text-emerald-200">
+                    ¿A dónde van esos centavos?
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-emerald-100/70">
+                    Se suman completamente a la ganancia de tu empresa. Aparecen
+                    cuando el costo exacto requeriría una fracción de token, pero
+                    el sistema cobra tokens enteros. No se cuentan como costo del
+                    proveedor ni se pierden.
+                  </p>
+                </div>
                 <Row
                   label="Lo que realmente ganó tu empresa"
                   value={usd(selected.gross_profit_usd)}
