@@ -29,7 +29,7 @@ export function BillingCouponEditor({ coupon, onClose, onSaved }: Props) {
   const [validUntil, setValidUntil] = useState(toLocalInput(coupon?.valid_until ?? null));
   const [firstTimeOnly, setFirstTimeOnly] = useState(coupon?.first_time_transaction_only ?? false);
   const [isActive, setIsActive] = useState(coupon?.is_active ?? true);
-  const [appliesTo, setAppliesTo] = useState<"token_packages" | "free_token_purchase">(coupon?.applies_to ?? "token_packages");
+  const [appliesTo, setAppliesTo] = useState<("token_packages" | "free_token_purchase")[]>(coupon?.applies_to?.length ? coupon.applies_to : ["token_packages"]);
   const [eligibleIds, setEligibleIds] = useState((coupon?.eligible_item_ids ?? []).join(", "));
   const [metadata, setMetadata] = useState(JSON.stringify(coupon?.metadata ?? {}, null, 2));
   const [report, setReport] = useState<FinancialProtectionReport | null>(null);
@@ -50,6 +50,7 @@ export function BillingCouponEditor({ coupon, onClose, onSaved }: Props) {
     event.preventDefault();
     if (!isEditing && !/^[A-Za-z0-9_-]{2,100}$/.test(code)) return void toast.error("Código inválido.");
     if (name.trim().length < 2) return void toast.error("El nombre debe tener al menos 2 caracteres.");
+    if (appliesTo.length === 0) return void toast.error("Selecciona al menos un tipo de compra.");
     if (isUnsafe) return void toast.error(`No puedes superar 100% de la ganancia protegida. Pérdida potencial: $${loss.toFixed(6)} USD.`);
 
     let parsedMetadata: Record<string, unknown>;
@@ -100,7 +101,7 @@ export function BillingCouponEditor({ coupon, onClose, onSaved }: Props) {
         <Field label="Descuento sobre la ganancia (%)"><input type="number" min="0.01" max="100" step="0.01" disabled={isEditing} value={percentageOff} onChange={(e)=>setPercentageOff(e.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"/></Field>
         <Field label="Duración"><select value={duration} disabled={isEditing} onChange={(e)=>setDuration(e.target.value as CouponDuration)} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"><option value="once">Una vez</option><option value="forever">Para siempre</option><option value="repeating">Repetitivo</option></select></Field>
         {duration === "repeating" && <Field label="Meses"><input type="number" min={1} disabled={isEditing} value={durationMonths} onChange={(e)=>setDurationMonths(e.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"/></Field>}
-        <Field label="Aplica a"><select value={appliesTo} onChange={(e)=>setAppliesTo(e.target.value as typeof appliesTo)} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"><option value="token_packages">Paquetes de tokens</option><option value="free_token_purchase">Compra libre de tokens</option></select></Field>
+        <Field label="Aplica a"><div className="flex min-h-11 flex-col justify-center gap-2 rounded-xl border border-white/8 bg-black/30 px-4 py-3 text-sm text-zinc-300"><label className="flex items-center gap-2"><input type="checkbox" checked={appliesTo.includes("token_packages")} onChange={(e)=>setAppliesTo((current)=>e.target.checked ? [...new Set([...current, "token_packages" as const])] : current.filter((item)=>item!=="token_packages"))}/> Paquetes de tokens</label><label className="flex items-center gap-2"><input type="checkbox" checked={appliesTo.includes("free_token_purchase")} onChange={(e)=>setAppliesTo((current)=>e.target.checked ? [...new Set([...current, "free_token_purchase" as const])] : current.filter((item)=>item!=="free_token_purchase"))}/> Compra libre de tokens</label></div></Field>
         <Field label="Máximo de usos"><input type="number" min={1} value={maxRedemptions} onChange={(e)=>setMaxRedemptions(e.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"/></Field>
         <Field label="Compra mínima"><input type="number" min={0} step="0.01" value={minimumAmount} onChange={(e)=>setMinimumAmount(e.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"/></Field>
         <Field label="IDs elegibles"><input value={eligibleIds} onChange={(e)=>setEligibleIds(e.target.value)} placeholder="1, 2, 3" className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"/></Field>

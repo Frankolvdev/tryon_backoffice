@@ -175,7 +175,7 @@ export interface BillingCouponResponse {
   valid_from: string | null;
   valid_until: string | null;
   is_active: boolean;
-  applies_to: "token_packages" | "free_token_purchase";
+  applies_to: ("token_packages" | "free_token_purchase")[];
   eligible_item_ids: number[];
   metadata: Record<string, unknown>;
   created_at: string;
@@ -203,7 +203,7 @@ export interface BillingCouponCreate {
   valid_from?: string | null;
   valid_until?: string | null;
   is_active: boolean;
-  applies_to: "token_packages" | "free_token_purchase";
+  applies_to: ("token_packages" | "free_token_purchase")[];
   eligible_item_ids: number[];
   metadata: Record<string, unknown>;
 }
@@ -217,7 +217,7 @@ export interface BillingCouponUpdate {
   valid_from?: string | null;
   valid_until?: string | null;
   is_active?: boolean | null;
-  applies_to?: "token_packages" | "free_token_purchase" | null;
+  applies_to?: ("token_packages" | "free_token_purchase")[] | null;
   eligible_item_ids?: number[] | null;
   metadata?: Record<string, unknown> | null;
 }
