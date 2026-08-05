@@ -15,7 +15,6 @@ import {
   Eye,
   LoaderCircle,
   RefreshCcw,
-  RotateCcw,
   Search,
   ShieldAlert,
   TriangleAlert,
@@ -46,6 +45,15 @@ function formatMoney(
     style: "currency",
     currency: currency.toUpperCase(),
   }).format(amount);
+}
+
+function statusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    processing: "En proceso", pending: "En proceso", succeeded: "Pagado",
+    failed: "Fallido", canceled: "Cancelado", refunded: "Reembolsado",
+    partially_refunded: "Reembolso parcial",
+  };
+  return labels[status] ?? status;
 }
 
 function statusClass(status: string): string {
@@ -84,6 +92,7 @@ export default function BillingPaymentsPage() {
   const [paymentType, setPaymentType] =
     useState("");
   const [search, setSearch] = useState("");
+  const [recordScope, setRecordScope] = useState<"processed" | "attempts">("processed");
   const [selectedPaymentId, setSelectedPaymentId] =
     useState<number | null>(null);
   const [isLoading, setIsLoading] =
@@ -103,6 +112,8 @@ export default function BillingPaymentsPage() {
       String(PAGE_SIZE),
     );
 
+    params.set("record_scope", recordScope);
+
     if (userId.trim()) {
       params.set("user_id", userId.trim());
     }
@@ -119,7 +130,7 @@ export default function BillingPaymentsPage() {
     }
 
     return params.toString();
-  }, [page, paymentType, status, userId]);
+  }, [page, paymentType, recordScope, status, userId]);
 
   const loadPayments = useCallback(async () => {
     setIsLoading(true);
@@ -179,25 +190,12 @@ export default function BillingPaymentsPage() {
     Math.ceil(response.total / PAGE_SIZE),
   );
 
-  const metrics = useMemo(
-    () => ({
-      succeeded: response.items.filter(
-        (item) => item.status === "succeeded",
-      ).length,
-      failed: response.items.filter(
-        (item) => item.status === "failed",
-      ).length,
-      refunded: response.items.filter(
-        (item) =>
-          item.status === "refunded" ||
-          item.status === "partially_refunded",
-      ).length,
-      canceled: response.items.filter(
-        (item) => item.status === "canceled",
-      ).length,
-    }),
-    [response.items],
-  );
+  const metrics = useMemo(() => ({
+    succeeded: response.items.filter((item) => item.display_status === "succeeded").length,
+    processing: response.items.filter((item) => item.display_status === "processing").length,
+    failed: response.items.filter((item) => item.display_status === "failed").length,
+    attempts: response.items.filter((item) => item.is_payment_attempt).length,
+  }), [response.items]);
 
   const updatePayment = (
     updated: BillingPaymentHistoryResponse,
@@ -225,12 +223,11 @@ export default function BillingPaymentsPage() {
                   Comercial
                 </p>
                 <h1 className="mt-2 text-2xl font-semibold text-white">
-                  Pagos
+                  Pagos e intentos
                 </h1>
                 <p className="mt-3 max-w-3xl text-sm leading-7 text-zinc-600">
-                  Historial de pagos, identificadores de
-                  Stripe, fallos, conciliación y
-                  reembolsos administrativos.
+                  Separa pagos reales de intentos abandonados y muestra
+                  importe original, descuentos, resultado de Stripe y conciliación.
                 </p>
               </div>
             </div>
@@ -255,10 +252,10 @@ export default function BillingPaymentsPage() {
 
       <section className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          ["Exitosos en página", metrics.succeeded, CheckCircle2],
+          ["Pagos procesados", metrics.succeeded, CheckCircle2],
+          ["En proceso", metrics.processing, RefreshCcw],
           ["Fallidos", metrics.failed, ShieldAlert],
-          ["Reembolsados", metrics.refunded, RotateCcw],
-          ["Cancelados", metrics.canceled, XCircle],
+          ["Intentos visibles", metrics.attempts, XCircle],
         ].map(([label, value, Icon]) => {
           const MetricIcon = Icon as typeof CreditCard;
 
@@ -280,6 +277,13 @@ export default function BillingPaymentsPage() {
             </article>
           );
         })}
+      </section>
+
+      <section className="luxia-panel mt-5 rounded-3xl p-2">
+        <div className="grid gap-2 sm:grid-cols-2">
+          <button onClick={()=>{setRecordScope("processed");setPage(0)}} className={`rounded-2xl p-4 text-left ${recordScope==="processed"?"bg-red-950/25 text-white":"text-zinc-500"}`}><b className="block">Pagos reales</b><span className="mt-1 block text-xs">Pagados, en proceso, fallidos, cancelados o reembolsados con PaymentIntent.</span></button>
+          <button onClick={()=>{setRecordScope("attempts");setPage(0)}} className={`rounded-2xl p-4 text-left ${recordScope==="attempts"?"bg-amber-950/20 text-white":"text-zinc-500"}`}><b className="block">Intentos de checkout</b><span className="mt-1 block text-xs">El cliente abrió Stripe, pero no llegó a crear un pago real.</span></button>
+        </div>
       </section>
 
       <section className="luxia-panel mt-5 rounded-3xl p-5">
@@ -323,10 +327,10 @@ export default function BillingPaymentsPage() {
             <option value="">
               Cualquier estado
             </option>
-            <option value="pending">pending</option>
-            <option value="processing">processing</option>
-            <option value="succeeded">succeeded</option>
-            <option value="failed">failed</option>
+            <option value="pending">Pago en proceso</option>
+            <option value="processing">Pago en proceso</option>
+            <option value="succeeded">Pagado</option>
+            <option value="failed">Fallido</option>
             <option value="canceled">canceled</option>
             <option value="refunded">refunded</option>
             <option value="partially_refunded">
@@ -382,7 +386,7 @@ export default function BillingPaymentsPage() {
                     <th className="px-5 py-4">Tipo</th>
                     <th className="px-5 py-4">Estado</th>
                     <th className="px-5 py-4">Importe</th>
-                    <th className="px-5 py-4">Reembolsado</th>
+                    <th className="px-5 py-4">Descuento</th>
                     <th className="px-5 py-4">PaymentIntent</th>
                     <th className="px-5 py-4">Fecha</th>
                     <th className="px-5 py-4 text-right">Acción</th>
@@ -419,28 +423,27 @@ export default function BillingPaymentsPage() {
                             payment.status,
                           )}`}
                         >
-                          {payment.status}
+                          {payment.is_payment_attempt ? "Intento" : statusLabel(payment.display_status)}
                         </span>
                       </td>
 
                       <td className="px-5 py-4 text-sm text-zinc-300">
                         {formatMoney(
-                          payment.amount,
+                          payment.final_amount,
                           payment.currency,
                         )}
                       </td>
 
                       <td className="px-5 py-4 text-sm text-zinc-400">
-                        {formatMoney(
-                          payment.refunded_amount,
-                          payment.currency,
-                        )}
+                        {Number(payment.discount_amount) > 0
+                          ? `${payment.discount_code ? `${payment.discount_code} · ` : ""}${formatMoney(payment.discount_amount, payment.currency)}`
+                          : "Sin descuento"}
                       </td>
 
                       <td className="max-w-xs px-5 py-4">
                         <p className="truncate font-mono text-xs text-zinc-500">
                           {payment.provider_payment_intent_id ??
-                            "—"}
+                            "No aplica · intento"}
                         </p>
                       </td>
 
@@ -488,7 +491,7 @@ export default function BillingPaymentsPage() {
 
             <span className="text-xs text-zinc-600">
               Página {page + 1} de {totalPages} ·{" "}
-              {response.total.toLocaleString("es-MX")} pagos
+              {response.total.toLocaleString("es-MX")} {recordScope === "attempts" ? "intentos" : "pagos"}
             </span>
 
             <button

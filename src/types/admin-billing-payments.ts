@@ -27,6 +27,18 @@ export interface BillingPaymentHistoryResponse {
   failure_message: string | null;
   description: string | null;
   metadata: Record<string, unknown>;
+  record_kind: "payment" | "attempt" | string;
+  display_status: string;
+  is_payment_attempt: boolean;
+  can_reconcile: boolean;
+  original_amount: string;
+  discount_amount: string;
+  final_amount: string;
+  discount_type: string | null;
+  discount_percent: string | null;
+  discount_code: string | null;
+  discount_source: string | null;
+  commercial_origin: string | null;
   paid_at: string | null;
   failed_at: string | null;
   refunded_at: string | null;

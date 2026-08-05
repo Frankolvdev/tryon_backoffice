@@ -163,22 +163,22 @@ export default function GenerationFinancesPage() {
   const cards = useMemo(
     () => [
       {
-        label: "Dinero reservado para proveedores de IA",
+        label: "Costo real de IA",
         value: usd(summary?.infrastructure_cost_usd ?? 0),
       },
       {
-        label: "Lo que realmente ganó tu empresa",
+        label: "Ganancia producida por el uso",
         value: usd(summary?.gross_profit_usd ?? 0),
       },
       {
-        label: "Total económico de las generaciones",
+        label: "Dinero procesado en generaciones",
         value: usd(
           (summary?.infrastructure_cost_usd ?? 0) +
             (summary?.gross_profit_usd ?? 0),
         ),
       },
       {
-        label: "Generaciones registradas",
+        label: "Generaciones procesadas",
         value: String(summary?.total_generations ?? 0),
       },
     ],
