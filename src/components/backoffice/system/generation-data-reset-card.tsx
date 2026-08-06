@@ -13,7 +13,7 @@ const LABELS: Record<string, string> = {
   token_consumption_allocations: "Asignaciones de consumo", token_transactions: "Movimientos de tokens", token_value_lots: "Lotes contables",
   token_purchases: "Compras de tokens", billing_payments: "Pagos locales", billing_invoices: "Facturas locales", billing_events: "Eventos de facturación",
   user_subscriptions: "Suscripciones de usuarios", billing_customers: "Clientes de facturación", external_ai_jobs: "Trabajos externos IA",
-  background_jobs: "Trabajos en segundo plano", user_gallery_items: "Elementos de galería", finance_withdrawals: "Retiros de caja", legal_acceptances: "Aceptaciones ligadas a compras", storage_files: "Archivos que se eliminarán", tokens_to_zero: "Tokens que se pondrán en cero",
+  background_jobs: "Trabajos en segundo plano", user_gallery_items: "Elementos de galería", finance_withdrawals: "Retiros de caja", infrastructure_funding_movements: "Fondeos de infraestructura", infrastructure_funding_allocations: "Asignaciones FIFO de fondeos", infrastructure_provider_credit_releases: "Créditos liberados en proveedores", legal_acceptances: "Aceptaciones ligadas a compras", storage_files: "Archivos que se eliminarán", tokens_to_zero: "Tokens que se pondrán en cero",
 };
 
 export function GenerationDataResetCard() {
