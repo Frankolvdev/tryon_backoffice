@@ -4,4 +4,5 @@ export interface TokenBagList {items:TokenBag[];total:number}
 export interface BagGeneration {execution_id:string;tokens_used:number;created_at:string;infrastructure_cost_usd:number;company_profit_usd:number;rounding_surplus_usd:number;status?:string|null}
 export interface BagDetail {bag:TokenBag;generations:BagGeneration[];timeline:{type:string;at:string;label:string}[];purchase_id?:number|null}
 export interface Withdrawal {id:number;amount_usd:number;currency:string;beneficiary?:string|null;concept:string;method?:string|null;proof_url?:string|null;notes?:string|null;created_by_user_id?:number|null;withdrawn_at:string;created_at:string}
-export interface ExpirationSettings {enabled:boolean;days:number}
+export interface ExpirationSettings {enabled:boolean;days:number;simulation_enabled:boolean}
+export interface ExpirationSimulationResult {bag_id:number;previous_status:string;current_status:string;expired_tokens:number;commercial_profit_released_usd:number;infrastructure_reserve_released_usd:number;total_available_from_bag_usd:number;expires_at:string;expired_at:string}
