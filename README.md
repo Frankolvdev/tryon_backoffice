@@ -1,13 +1,5 @@
-# MegaZIP 2 — BackOffice Profit per Token UI
+# BackOffice — finanzas pendientes por generación
 
-- Pricing rules now edit **Ganancia deseada por token consumido (USD)**.
-- Pricing diagnostics show the limiting profit per token.
-- Applied pricing rules show profit/token and keep infrastructure diagnostics intact.
-- Plan/package discount simulators use the exact profit contained in their token quantity.
+Reemplaza únicamente `src/app/dashboard/finances/generations/page.tsx`.
 
-Run:
-```powershell
-Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue
-npm run build
-npm run dev
-```
+Muestra el costo del proveedor, tokens cobrados, tokens pendientes y el estado de conciliación. Caja usa el registro financiero creado por el backend, sin cambiar su algoritmo.

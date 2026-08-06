@@ -42,6 +42,16 @@ type FinanceBreakdown = {
   billing_policy_key?: string;
   termination_status?: string;
   final_tokens?: number;
+  estimated_tokens_before_execution?: number;
+  tokens_actually_charged?: number;
+  estimated_final_tokens?: number;
+  estimated_pending_tokens?: number;
+  pending_tokens_not_charged?: number;
+  estimated_final_price_usd?: number;
+  settlement_pending?: boolean;
+  settlement_reason?: string | null;
+  result_locked?: boolean;
+  billing_access_status?: string | null;
 };
 
 type FinanceItem = {
@@ -285,8 +295,22 @@ export default function GenerationFinancesPage() {
                       {item.execution_id.slice(0, 8)}
                     </td>
                     <td>{item.module_key}</td>
-                    <td>{item.status}</td>
-                    <td>{item.tokens_consumed}</td>
+                    <td>
+                      <span>{item.status}</span>
+                      {item.breakdown.settlement_pending && (
+                        <p className="mt-1 text-xs font-semibold text-amber-300">
+                          Pago pendiente · resultado bloqueado
+                        </p>
+                      )}
+                    </td>
+                    <td>
+                      <span>{item.tokens_consumed} cobrados</span>
+                      {item.breakdown.settlement_pending && (
+                        <p className="mt-1 text-xs text-amber-300">
+                          +{item.breakdown.estimated_pending_tokens ?? "?"} pendientes aprox.
+                        </p>
+                      )}
+                    </td>
                     <td>{usd(item.infrastructure_cost_usd)}</td>
                     <td>{usd(benefit)}</td>
                     <td className="text-emerald-300">
@@ -453,6 +477,18 @@ export default function GenerationFinancesPage() {
               {selected.breakdown.profit_applied === false && (
                 <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs leading-5 text-amber-100/80">
                   Esta ejecución terminó como {selected.breakdown.termination_status || selected.status}. Según tu Política por resultado, no se cobró la ganancia configurada por token; únicamente se protegió el costo del proveedor y se aplicó el redondeo necesario a tokens enteros.
+                </div>
+              )}
+              {selected.breakdown.settlement_pending && (
+                <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm leading-6 text-amber-100">
+                  <p className="font-semibold">Conciliación pendiente y resultado bloqueado</p>
+                  <p className="mt-1">
+                    Se cobraron {selected.breakdown.tokens_actually_charged ?? selected.tokens_consumed} tokens.
+                    El costo final se estima en {selected.breakdown.estimated_final_tokens ?? "?"} tokens,
+                    por lo que faltan aproximadamente {selected.breakdown.estimated_pending_tokens ?? "?"} tokens.
+                    El costo completo del proveedor ya aparece en esta generación. Cuando el usuario pague,
+                    el backend consumirá las bolsas reales mediante FIFO y actualizará este mismo movimiento.
+                  </p>
                 </div>
               )}
               <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
