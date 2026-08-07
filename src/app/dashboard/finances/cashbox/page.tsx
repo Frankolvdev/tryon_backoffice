@@ -23,6 +23,7 @@ import type {
   ExpirationSettings,
   ExpirationSimulationResult,
   InfrastructureFunding,
+  PendingRecoveryList,
   TokenBag,
   TokenBagList,
   Withdrawal,
@@ -69,6 +70,7 @@ export default function CashboxPage(){
   const [bags,setBags]=useState<TokenBag[]>([]);
   const [withdrawals,setWithdrawals]=useState<Withdrawal[]>([]);
   const [fundings,setFundings]=useState<InfrastructureFunding[]>([]);
+  const [pendingRecoveries,setPendingRecoveries]=useState<PendingRecoveryList|null>(null);
   const [expiry,setExpiry]=useState<ExpirationSettings>({
     enabled:true,
     days:730,
@@ -119,6 +121,13 @@ export default function CashboxPage(){
       help:"Transferencias registradas a Modal, RunPod, Beam u otros proveedores.",
     },
     {
+      label:"Pérdidas pendientes",
+      value:summary.pending_recovery_economic_estimated_usd,
+      icon:CircleDollarSign,
+      className:"text-orange-300",
+      help:`${summary.pending_recovery_generations} generación(es) bloqueada(s) · ${summary.pending_recovery_tokens} token(s) por recuperar. Incluye infraestructura pendiente exacta y ganancia potencial estimada.`,
+    },
+    {
       label:"Reserva de tokens vigentes",
       value:summary.protected_infrastructure_usd,
       icon:Landmark,
@@ -145,18 +154,20 @@ export default function CashboxPage(){
     setLoading(true);
     try{
       const query=status?`?status=${status}`:"";
-      const [cashbox,bagList,withdrawalList,expiration,fundingList]=await Promise.all([
+      const [cashbox,bagList,withdrawalList,expiration,fundingList,pendingList]=await Promise.all([
         browserApiRequest<CashboxSummary>("/api/admin/finances/cashbox"),
         browserApiRequest<TokenBagList>(`/api/admin/finances/token-bags${query}`),
         browserApiRequest<Withdrawal[]>("/api/admin/finances/withdrawals"),
         browserApiRequest<ExpirationSettings>("/api/admin/finances/token-bag-expiration"),
         browserApiRequest<InfrastructureFunding[]>("/api/admin/finances/infrastructure-fundings"),
+        browserApiRequest<PendingRecoveryList>("/api/admin/finances/pending-recoveries"),
       ]);
       setSummary(cashbox);
       setBags(bagList.items);
       setWithdrawals(withdrawalList);
       setExpiry(expiration);
       setFundings(fundingList);
+      setPendingRecoveries(pendingList);
     }catch(error){
       toast.error(error instanceof Error?error.message:"No fue posible cargar la caja.");
     }finally{
@@ -348,6 +359,53 @@ export default function CashboxPage(){
             <p className="mt-3 text-xs leading-5 text-zinc-600">{help}</p>
           </article>,
         )}
+      </section>}
+
+    {pendingRecoveries&&pendingRecoveries.items.length>0&&
+      <section className="luxia-panel rounded-3xl p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-orange-300">Cobros por recuperar</p>
+            <h2 className="mt-2 text-lg font-semibold text-white">Pérdidas pendientes</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">
+              Son generaciones ya producidas cuyo ajuste final todavía no fue cobrado. La infraestructura pendiente es un costo real ya incurrido; la ganancia pendiente es una estimación hasta conocer qué bolsas pagarán el ajuste.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-right text-xs">
+            <div><span className="text-zinc-600">Infraestructura pendiente</span><b className="mt-1 block text-orange-200">{money(pendingRecoveries.summary.infrastructure_pending_usd)}</b></div>
+            <div><span className="text-zinc-600">Ganancia potencial</span><b className="mt-1 block text-amber-200">{money(pendingRecoveries.summary.profit_pending_estimated_usd)}</b></div>
+          </div>
+        </div>
+        <div className="mt-5 overflow-auto">
+          <table className="w-full min-w-[1050px] text-left text-sm">
+            <thead className="text-xs uppercase text-zinc-600">
+              <tr>
+                <th className="border-b border-white/6 px-3 py-3">Generación</th>
+                <th className="border-b border-white/6 px-3 py-3">Usuario</th>
+                <th className="border-b border-white/6 px-3 py-3">Proveedor</th>
+                <th className="border-b border-white/6 px-3 py-3">Cobrado</th>
+                <th className="border-b border-white/6 px-3 py-3">Pendiente</th>
+                <th className="border-b border-white/6 px-3 py-3">Infraestructura pendiente</th>
+                <th className="border-b border-white/6 px-3 py-3">Ganancia potencial</th>
+                <th className="border-b border-white/6 px-3 py-3">Fecha</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pendingRecoveries.items.map(item=>
+                <tr key={item.execution_id} className="border-b border-white/5 text-zinc-300">
+                  <td className="px-3 py-4"><b>{item.execution_id.slice(0,8)}</b><small className="ml-2 text-zinc-600">{item.module_key}</small></td>
+                  <td className="px-3 py-4">{item.user_email||`#${item.user_id??"—"}`}</td>
+                  <td className="px-3 py-4 uppercase text-zinc-500">{item.provider||"—"}</td>
+                  <td className="px-3 py-4">{item.tokens_charged} ✦</td>
+                  <td className="px-3 py-4 font-semibold text-orange-300">+{item.pending_tokens} ✦</td>
+                  <td className="px-3 py-4 text-orange-200">{money(item.infrastructure_pending_usd)}</td>
+                  <td className="px-3 py-4 text-amber-200">{money(item.profit_pending_estimated_usd)}</td>
+                  <td className="px-3 py-4 text-xs text-zinc-600">{date(item.created_at)}</td>
+                </tr>,
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>}
 
     {summary&&summary.provider_balances.length>0&&

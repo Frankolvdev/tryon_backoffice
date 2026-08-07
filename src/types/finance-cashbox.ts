@@ -22,6 +22,11 @@ export interface CashboxSummary {
   provider_cost_unfunded_usd:number;
   provider_credit_released_usd:number;
   provider_balances:InfrastructureProviderBalance[];
+  pending_recovery_generations:number;
+  pending_recovery_tokens:number;
+  pending_recovery_infrastructure_usd:number;
+  pending_recovery_profit_estimated_usd:number;
+  pending_recovery_economic_estimated_usd:number;
   active_bags:number;
   new_bags:number;
   expired_bags:number;
@@ -114,4 +119,37 @@ export interface InfrastructureFunding {
   funded_at:string;
   created_at:string;
   allocations:InfrastructureFundingAllocation[];
+}
+
+export interface PendingRecoveryItem {
+  execution_id:string;
+  module_key:string;
+  user_id?:number|null;
+  user_email?:string|null;
+  provider?:string|null;
+  status:string;
+  billing_access_status:string;
+  tokens_charged:number;
+  pending_tokens:number;
+  estimated_final_tokens:number;
+  infrastructure_cost_usd:number;
+  infrastructure_covered_usd:number;
+  infrastructure_pending_usd:number;
+  profit_realized_usd:number;
+  profit_pending_estimated_usd:number;
+  economic_pending_estimated_usd:number;
+  created_at:string;
+}
+
+export interface PendingRecoverySummary {
+  pending_generations:number;
+  pending_tokens:number;
+  infrastructure_pending_usd:number;
+  profit_pending_estimated_usd:number;
+  economic_pending_estimated_usd:number;
+}
+
+export interface PendingRecoveryList {
+  items:PendingRecoveryItem[];
+  summary:PendingRecoverySummary;
 }
