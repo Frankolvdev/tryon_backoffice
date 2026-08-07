@@ -18,6 +18,14 @@ type TokenBag = {
   company_profit_usd?: number;
   coupon_code?: string | null;
   plan_name?: string | null;
+  effective_token_value_usd?: number;
+  infrastructure_capacity_per_token_usd?: number;
+  infrastructure_capacity_from_tokens_usd?: number;
+  operational_reserve_per_token_usd?: number;
+  operational_reserve_from_tokens_usd?: number;
+  cash_value_at_purchase_usd?: number;
+  financial_economics_schema?: string | null;
+  snapshot_source?: string | null;
 };
 
 type FinanceBreakdown = {
@@ -94,7 +102,12 @@ const usd = (value: number) =>
     maximumFractionDigits: 6,
   }).format(Number(value || 0));
 
+const isPromotionalBag = (bag: TokenBag) =>
+  String(bag.source || "").toLowerCase() === "promotional_credit" ||
+  String(bag.source_label || "").toLowerCase().includes("promotional");
+
 const sourceName = (bag: TokenBag) => {
+  if (isPromotionalBag(bag)) return "Tokens gratis";
   if (bag.plan_name) return `Plan ${bag.plan_name}`;
   if (bag.coupon_code) return `Compra con cupón ${bag.coupon_code}`;
   const source = String(bag.source_label || bag.source || "");
@@ -102,6 +115,35 @@ const sourceName = (bag: TokenBag) => {
   if (source.includes("purchase")) return "Compra de tokens";
   if (source.includes("legacy")) return "Saldo anterior sin detalle";
   return source || "Origen no identificado";
+};
+
+const bagKind = (bag: TokenBag) => {
+  if (isPromotionalBag(bag)) {
+    return {
+      label: "Gratis",
+      className: "border-violet-500/30 bg-violet-500/10 text-violet-200",
+      help: "El cliente no pagó por estos tokens. No generan ganancia ni dinero para gastos del negocio; su IA está respaldada por la caja promocional.",
+    };
+  }
+  if (bag.coupon_code) {
+    return {
+      label: "Con cupón",
+      className: "border-amber-500/30 bg-amber-500/10 text-amber-200",
+      help: "El descuento salió de tu ganancia. La parte para IA y el extra para gastos del negocio permanecen protegidos según el snapshot de la bolsa.",
+    };
+  }
+  if (bag.plan_name || String(bag.source || "").includes("subscription")) {
+    return {
+      label: "Plan",
+      className: "border-blue-500/30 bg-blue-500/10 text-blue-200",
+      help: "Estos tokens vinieron de un plan. Se usan las condiciones que quedaron congeladas cuando nació esa bolsa.",
+    };
+  }
+  return {
+    label: "Compra",
+    className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
+    help: "Tokens pagados por el cliente. Se respetan las condiciones y componentes congelados de esa bolsa.",
+  };
 };
 
 const mergeTokenBags = (bags: TokenBag[]) => {
@@ -439,7 +481,17 @@ export default function GenerationFinancesPage() {
                           <td className="py-3">
                             Bolsa #{bag.token_bag_id || index + 1}
                           </td>
-                          <td>{sourceName(bag)}</td>
+                          <td>
+                            <div className="space-y-1.5">
+                              <div>{sourceName(bag)}</div>
+                              <span
+                                className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium ${bagKind(bag).className}`}
+                                title={bagKind(bag).help}
+                              >
+                                {bagKind(bag).label}
+                              </span>
+                            </div>
+                          </td>
                           <td>{bag.tokens_used || 0}</td>
                           <td>
                             {Number(bag.benefit_percent || 0) > 0
@@ -467,6 +519,79 @@ export default function GenerationFinancesPage() {
                       ))}
                   </tbody>
                 </table>
+              </div>
+            </section>
+
+            <section className="mt-6 rounded-2xl border border-white/10 p-5">
+              <h3 className="font-semibold text-white">
+                ¿Qué tipo de dinero aportó cada bolsa?
+              </h3>
+              <p className="mt-1 text-sm leading-6 text-zinc-400">
+                Esta sección solo explica los componentes que ya quedaron registrados en cada bolsa. No recalcula el cobro ni cambia FIFO, descuentos o ganancias.
+              </p>
+              <div className="mt-4 grid gap-3">
+                {mergeTokenBags(selected.breakdown.token_bags_used || []).map((bag, index) => {
+                  const kind = bagKind(bag);
+                  const promotional = isPromotionalBag(bag);
+                  const tokensUsed = Number(bag.tokens_used || 0);
+                  const customerPaid = Number(bag.cash_value_at_purchase_usd || 0);
+                  const aiAmount = Number(bag.infrastructure_capacity_from_tokens_usd || 0);
+                  const operationalAmount = Number(bag.operational_reserve_from_tokens_usd || 0);
+                  const profitAmount = Number(bag.company_profit_usd || 0);
+
+                  return (
+                    <div
+                      key={`money-${bag.token_bag_id || index}`}
+                      className="rounded-xl border border-white/10 bg-black/20 p-4"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="font-medium text-white">
+                            Bolsa #{bag.token_bag_id || index + 1} · {sourceName(bag)}
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-zinc-500">{kind.help}</p>
+                        </div>
+                        <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${kind.className}`}>
+                          {kind.label}
+                        </span>
+                      </div>
+
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                        <MoneyPart
+                          label="Tokens usados"
+                          value={String(tokensUsed)}
+                          help="Cuántos tokens de esta bolsa participaron en esta generación."
+                        />
+                        <MoneyPart
+                          label="Pagó el cliente"
+                          value={usd(customerPaid)}
+                          help={promotional ? "USD 0 porque estos tokens fueron regalados." : "Valor histórico correspondiente a los tokens usados de esta bolsa."}
+                        />
+                        <MoneyPart
+                          label="Parte para IA"
+                          value={usd(aiAmount)}
+                          help="Respaldo de infraestructura asociado a estos tokens según el snapshot de la bolsa."
+                        />
+                        <MoneyPart
+                          label="Gastos del negocio"
+                          value={usd(operationalAmount)}
+                          help={promotional ? "USD 0: los tokens gratis no generan gasto operativo." : "Componente operativo congelado en esta bolsa para los tokens utilizados."}
+                        />
+                        <MoneyPart
+                          label="Ganancia"
+                          value={usd(profitAmount)}
+                          help={promotional ? "USD 0: regalar tokens no crea ganancia." : "Ganancia real de estos tokens después de descuentos o beneficios."}
+                        />
+                      </div>
+
+                      {promotional && (
+                        <div className="mt-3 rounded-lg border border-violet-500/20 bg-violet-500/10 p-3 text-xs leading-5 text-violet-100/80">
+                          <strong>Tokens gratis:</strong> esta bolsa es promocional. El cliente no pagó por estos tokens y por eso no genera ganancia ni gasto operativo. Su infraestructura se financia con el fondo promocional correspondiente.
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </section>
 
@@ -568,6 +693,17 @@ function FriendlyValue({
       <p className={accent === "blue" ? "text-xs uppercase text-blue-300" : "text-xs uppercase text-zinc-500"}>{label}</p>
       <p className={accent === "blue" ? "mt-2 text-xl font-semibold text-blue-200" : "mt-2 text-xl font-semibold text-white"}>{value}</p>
       <p className="mt-2 text-xs leading-5 text-zinc-500">{help}</p>
+    </div>
+  );
+}
+
+
+function MoneyPart({ label, value, help }: { label: string; value: string; help: string }) {
+  return (
+    <div className="rounded-lg bg-white/[0.04] p-3">
+      <p className="text-[11px] uppercase tracking-wide text-zinc-500">{label}</p>
+      <p className="mt-1 font-semibold text-white">{value}</p>
+      <p className="mt-1 text-xs leading-5 text-zinc-500">{help}</p>
     </div>
   );
 }
