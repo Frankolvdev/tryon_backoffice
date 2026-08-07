@@ -15,6 +15,8 @@ interface CommercialEconomyCardProps {
 
 export function CommercialEconomyCard({ onUpdated }: CommercialEconomyCardProps) {
   const [tokenValue, setTokenValue] = useState("0.10");
+  const [operationalReserve, setOperationalReserve] = useState("0");
+  const [commercialSaleValue, setCommercialSaleValue] = useState("0.10");
   const [currency, setCurrency] = useState("USD");
   const [isLoading, setIsLoading] = useState(true);
   const [isRepricing, setIsRepricing] = useState(false);
@@ -27,6 +29,8 @@ export function CommercialEconomyCard({ onUpdated }: CommercialEconomyCardProps)
           "/api/admin/commercial-settings",
         );
         setTokenValue(String(result.token_value_usd));
+        setOperationalReserve(String(result.operational_reserve_per_token_usd ?? 0));
+        setCommercialSaleValue(String(result.commercial_sale_value_per_token_usd ?? result.token_value_usd));
         setCurrency(result.currency);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "No fue posible cargar la economía global.");
@@ -51,9 +55,14 @@ export function CommercialEconomyCard({ onUpdated }: CommercialEconomyCardProps)
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const parsed = Number(tokenValue);
+    const parsedOperational = Number(operationalReserve);
     const normalizedCurrency = currency.trim().toUpperCase();
     if (!Number.isFinite(parsed) || parsed <= 0) {
       toast.error("El valor del token debe ser mayor que cero.");
+      return;
+    }
+    if (!Number.isFinite(parsedOperational) || parsedOperational < 0) {
+      toast.error("El fondo operativo por token no puede ser negativo.");
       return;
     }
     if (!/^[A-Z]{3}$/.test(normalizedCurrency)) {
@@ -64,11 +73,13 @@ export function CommercialEconomyCard({ onUpdated }: CommercialEconomyCardProps)
     try {
       const result = await browserApiRequest<CommercialSettingsResponse>(
         "/api/admin/commercial-settings",
-        { method: "PATCH", body: JSON.stringify({ token_value_usd: parsed, currency: normalizedCurrency }) },
+        { method: "PATCH", body: JSON.stringify({ token_value_usd: parsed, operational_reserve_per_token_usd: parsedOperational, currency: normalizedCurrency }) },
       );
       setTokenValue(String(result.token_value_usd));
+      setOperationalReserve(String(result.operational_reserve_per_token_usd ?? 0));
+      setCommercialSaleValue(String(result.commercial_sale_value_per_token_usd ?? result.token_value_usd));
       setCurrency(result.currency);
-      toast.success("Economía global actualizada.");
+      toast.success("Economía global actualizada. Recalcula el catálogo para aplicar el nuevo precio a ventas futuras.");
       onUpdated?.();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No fue posible guardar la economía global.");
@@ -87,7 +98,7 @@ export function CommercialEconomyCard({ onUpdated }: CommercialEconomyCardProps)
           <p className="text-[10px] font-semibold tracking-[0.2em] text-red-500 uppercase">Economía global</p>
           <h2 className="mt-2 text-lg font-semibold text-white">Una sola fuente de verdad</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-600">
-            El valor global del token se usa para calcular automáticamente el precio y los tokens requeridos por cada servicio.
+            La base del token mantiene separadas IA + ganancia. El fondo operativo es un recargo comercial independiente y nunca cambia cuántos tokens cuesta una generación.
           </p>
         </div>
       </div>
@@ -95,15 +106,24 @@ export function CommercialEconomyCard({ onUpdated }: CommercialEconomyCardProps)
       {isLoading ? (
         <div className="mt-6 flex h-24 items-center justify-center"><LoaderCircle className="animate-spin text-red-500" /></div>
       ) : (
-        <form onSubmit={submit} className="mt-6 grid gap-4 md:grid-cols-[1fr_220px_auto] md:items-end">
+        <form onSubmit={submit} className="mt-6 grid gap-4 md:grid-cols-3 md:items-end">
           <label>
-            <span className="mb-2 block text-sm text-zinc-500">Valor de 1 Token (USD)</span>
+            <span className="mb-2 block text-sm text-zinc-500">Base económica de 1 token (USD)</span>
             <input type="number" min="0.000001" step="0.000001" value={tokenValue} onChange={(e) => setTokenValue(e.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white" />
+            <small className="mt-1 block text-zinc-700">IA + ganancia. Esta base sí participa en el cálculo de tokens.</small>
+          </label>
+          <label>
+            <span className="mb-2 block text-sm text-zinc-500">Fondo operativo por token (USD)</span>
+            <input type="number" min="0" step="0.000001" value={operationalReserve} onChange={(e) => setOperationalReserve(e.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white" />
+            <small className="mt-1 block text-zinc-700">Hosting, correo, dominios, software, etc. No modifica la reserva IA.</small>
           </label>
           <label>
             <span className="mb-2 block text-sm text-zinc-500">Moneda comercial</span>
             <input maxLength={3} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 font-mono text-sm uppercase text-white" />
           </label>
+          <div className="md:col-span-3 rounded-xl border border-sky-500/15 bg-sky-950/10 p-3 text-sm text-sky-200">
+            Precio comercial antes de descuentos: <b>{Number(commercialSaleValue||0).toFixed(6)} {currency}</b> por token. Los descuentos continúan saliendo únicamente de la ganancia.
+          </div>
           <div className="flex flex-wrap gap-2 md:col-span-3">
             <button type="button" onClick={() => void repriceCatalog()} disabled={isSaving || isRepricing} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/8 px-5 text-sm font-semibold text-zinc-300 disabled:opacity-50">
               {isRepricing ? <LoaderCircle size={16} className="animate-spin" /> : <RefreshCcw size={16} />} Recalcular catálogo

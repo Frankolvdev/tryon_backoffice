@@ -1,38 +1,59 @@
-# MegaZIP 3B — BackOffice — Preparación financiera V3
+# MegaZIP 4B — BackOffice — Caja de Gastos Operativos FINAL
 
 BASE EXACTA
-tryon_backoffice-main - 2026-08-07T130407.921.zip
+tryon_backoffice-main - 2026-08-07T134137.486.zip
+(MegaZIP 1, 2 y 3 ya aplicados)
 
-OBJETIVO
-Preparar el BackOffice para que el precio comercial y la base económica de
-generación sean conceptos distintos antes del MegaZIP 4.
+ECONOMÍA GLOBAL
+Ahora separa claramente:
+- Base económica de 1 token (IA + ganancia).
+- Fondo operativo por token.
+- Precio comercial nominal resultante.
 
-CAMBIOS
-- CommercialSettingsResponse conoce:
-  * token_value_usd (base de generación)
-  * operational_reserve_per_token_usd (0 por ahora)
-  * commercial_sale_value_per_token_usd
-- Editor de paquetes usa commercial_sale_value_per_token_usd para la vista
-  del precio nominal.
-- Editor de planes usa commercial_sale_value_per_token_usd para la vista
-  del precio nominal.
+Ejemplo:
+  Base:      USD 0.110
+  Operación: USD 0.002
+  Venta:     USD 0.112 antes de descuentos.
 
-Con el componente operativo actual en 0, los importes visibles no cambian.
-Cuando MegaZIP 4 lo habilite, estos editores no confundirán el recargo
-operativo con la capacidad de IA.
+La UI advierte que el fondo operativo NO participa en el cálculo de tokens de
+una generación.
+
+CAJA OPERATIVA
+Nueva sección dentro de Caja:
+- disponible para gastar;
+- fondo operativo/token vigente;
+- fondos liberados;
+- fondos todavía bloqueados por política de reembolso;
+- gastos registrados;
+- formulario para registrar gastos/retiros operativos;
+- historial de movimientos.
+
+DETALLE DE BOLSA
+Muestra:
+- fondo operativo congelado por token;
+- fondo operativo total original;
+- fondo operativo ya liberado.
+
+Esto permite verificar que una bolsa antigua mantiene su snapshot aunque la
+configuración actual cambie.
 
 NO MODIFICA
-- Caja;
-- retiros;
+- Caja verde;
+- Caja IA;
+- fondeos a proveedores;
 - créditos promocionales;
 - pérdidas pendientes;
-- descuentos;
-- Stripe;
-- fórmulas del backend.
+- vencimientos;
+- fórmulas de tokens;
+- AppWeb.
 
 VALIDACIÓN
 Los 3 archivos modificados pasaron parser sintáctico TypeScript 5.8.3.
-El build completo debe ejecutarse localmente con node_modules del proyecto.
+El build completo debe ejecutarse localmente con node_modules.
 
-APPWEB
-MegaZIP 3 no requiere cambios de AppWeb.
+FLUJO DE CONFIGURACIÓN
+1. Configurar Fondo operativo por token.
+2. Guardar.
+3. Pulsar "Recalcular catálogo".
+4. Para planes recurrentes ya vinculados a Stripe, usar el flujo existente
+   "Sincronizar con Stripe" para aplicar el nuevo precio al siguiente periodo.

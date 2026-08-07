@@ -48,6 +48,9 @@ export interface TokenBag {
   normal_profit_per_token_usd:number;
   effective_profit_per_token_usd:number;
   infrastructure_capacity_per_token_usd:number;
+  operational_reserve_per_token_usd:number;
+  operational_reserve_total_usd:number;
+  operational_reserve_released_usd:number;
   commercial_profit_total_usd:number;
   commercial_profit_released_usd:number;
   realized_extra_profit_usd:number;
@@ -210,4 +213,31 @@ export interface PromotionalGrantResult {
   amount_reserved_usd:number;
   user_balance?:number|null;
   grant_ids:number[];
+}
+
+
+export interface OperationalCashboxSummary {
+  operational_reserve_per_token_usd:number;
+  commercial_sale_value_per_token_usd:number;
+  lifetime_operational_funds_usd:number;
+  released_operational_funds_usd:number;
+  blocked_operational_funds_usd:number;
+  spent_operational_funds_usd:number;
+  available_operational_funds_usd:number;
+  contributing_bags:number;
+}
+
+export interface OperationalExpense {
+  id:number;
+  amount_usd:number;
+  currency:string;
+  category:string;
+  beneficiary?:string|null;
+  concept:string;
+  method?:string|null;
+  proof_url?:string|null;
+  notes?:string|null;
+  created_by_user_id?:number|null;
+  spent_at:string;
+  created_at:string;
 }

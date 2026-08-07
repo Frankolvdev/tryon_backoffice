@@ -25,6 +25,8 @@ import type {
   ExpirationSettings,
   ExpirationSimulationResult,
   InfrastructureFunding,
+  OperationalCashboxSummary,
+  OperationalExpense,
   PendingRecoveryList,
   PromotionalCreditSummary,
   PromotionalGrantResult,
@@ -77,6 +79,13 @@ export default function CashboxPage(){
   const [fundings,setFundings]=useState<InfrastructureFunding[]>([]);
   const [pendingRecoveries,setPendingRecoveries]=useState<PendingRecoveryList|null>(null);
   const [promotional,setPromotional]=useState<PromotionalCreditSummary|null>(null);
+  const [operational,setOperational]=useState<OperationalCashboxSummary|null>(null);
+  const [operationalExpenses,setOperationalExpenses]=useState<OperationalExpense[]>([]);
+  const [operationalAmount,setOperationalAmount]=useState("");
+  const [operationalCategory,setOperationalCategory]=useState("hosting");
+  const [operationalBeneficiary,setOperationalBeneficiary]=useState("");
+  const [operationalConcept,setOperationalConcept]=useState("Gasto operativo");
+  const [operationalMethod,setOperationalMethod]=useState("");
   const [promoFundAmount,setPromoFundAmount]=useState("");
   const [promoFundProvider,setPromoFundProvider]=useState("modal");
   const [promoFundReference,setPromoFundReference]=useState("");
@@ -170,7 +179,7 @@ export default function CashboxPage(){
     setLoading(true);
     try{
       const query=status?`?status=${status}`:"";
-      const [cashbox,bagList,withdrawalList,expiration,fundingList,pendingList,promoSummary]=await Promise.all([
+      const [cashbox,bagList,withdrawalList,expiration,fundingList,pendingList,promoSummary,operationalSummary,operationalExpenseList]=await Promise.all([
         browserApiRequest<CashboxSummary>("/api/admin/finances/cashbox"),
         browserApiRequest<TokenBagList>(`/api/admin/finances/token-bags${query}`),
         browserApiRequest<Withdrawal[]>("/api/admin/finances/withdrawals"),
@@ -178,6 +187,8 @@ export default function CashboxPage(){
         browserApiRequest<InfrastructureFunding[]>("/api/admin/finances/infrastructure-fundings"),
         browserApiRequest<PendingRecoveryList>("/api/admin/finances/pending-recoveries"),
         browserApiRequest<PromotionalCreditSummary>("/api/admin/finances/promotional-credits"),
+        browserApiRequest<OperationalCashboxSummary>("/api/admin/finances/operational-cashbox"),
+        browserApiRequest<OperationalExpense[]>("/api/admin/finances/operational-expenses"),
       ]);
       setSummary(cashbox);
       setBags(bagList.items);
@@ -186,6 +197,8 @@ export default function CashboxPage(){
       setFundings(fundingList);
       setPendingRecoveries(pendingList);
       setPromotional(promoSummary);
+      setOperational(operationalSummary);
+      setOperationalExpenses(operationalExpenseList);
     }catch(error){
       toast.error(error instanceof Error?error.message:"No fue posible cargar la caja.");
     }finally{
@@ -324,6 +337,25 @@ export default function CashboxPage(){
       toast.success(`${result.granted_tokens} token(s) promocionales asignados.`);
       setPromoGrantOpen(false);setPromoSelectedUser(null);setPromoGrantTokens("");void load();
     }catch(error){toast.error(error instanceof Error?error.message:"No fue posible asignar los tokens promocionales.");}
+    finally{setAction(null);}
+  }
+
+  async function registerOperationalExpense(){
+    const value=Number(operationalAmount);
+    if(!Number.isFinite(value)||value<=0){toast.error("Escribe un gasto operativo válido.");return;}
+    if(!operationalCategory.trim()||!operationalConcept.trim()){toast.error("Completa categoría y concepto.");return;}
+    if(!confirm(`Registrar gasto operativo por ${money(value)}?`))return;
+    setAction("operational-expense");
+    try{
+      await browserApiRequest<OperationalExpense>("/api/admin/finances/operational-expenses",{
+        method:"POST",body:JSON.stringify({
+          amount_usd:value,category:operationalCategory.trim(),beneficiary:operationalBeneficiary||null,
+          concept:operationalConcept.trim(),method:operationalMethod||null,
+        }),
+      });
+      toast.success("Gasto registrado únicamente contra la Caja Operativa.");
+      setOperationalAmount("");void load();
+    }catch(error){toast.error(error instanceof Error?error.message:"No fue posible registrar el gasto operativo.");}
     finally{setAction(null);}
   }
 
@@ -602,6 +634,55 @@ export default function CashboxPage(){
       </article>
     </section>
 
+    {operational&&<section className="luxia-panel rounded-3xl p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-fuchsia-400">Caja operativa</p>
+          <h2 className="mt-2 text-lg font-semibold text-white">Hosting, correo, dominios y gastos del negocio</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">
+            Se alimenta únicamente del componente operativo congelado en cada bolsa. No usa Caja verde ni reserva IA.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-fuchsia-500/15 bg-fuchsia-950/10 px-5 py-4 text-right">
+          <p className="text-xs text-zinc-600">Disponible para gastar</p>
+          <p className="mt-1 text-xl font-semibold text-fuchsia-200">{money(operational.available_operational_funds_usd)}</p>
+        </div>
+      </div>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Info label="Fondo operativo / token actual" value={money(operational.operational_reserve_per_token_usd)}/>
+        <Info label="Liberado y disponible históricamente" value={money(operational.released_operational_funds_usd)}/>
+        <Info label="Todavía bloqueado por reembolso" value={money(operational.blocked_operational_funds_usd)}/>
+        <Info label="Gastos ya registrados" value={money(operational.spent_operational_funds_usd)}/>
+      </div>
+      <div className="mt-6 grid gap-6 xl:grid-cols-2">
+        <div className="rounded-2xl border border-white/6 bg-black/20 p-4">
+          <h3 className="font-semibold text-white">Registrar gasto operativo</h3>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <input value={operationalAmount} onChange={e=>setOperationalAmount(e.target.value)} type="number" step="0.01" placeholder="Importe USD" className="h-11 rounded-xl border border-white/10 bg-black/30 px-4 text-white"/>
+            <select value={operationalCategory} onChange={e=>setOperationalCategory(e.target.value)} className="h-11 rounded-xl border border-white/10 bg-black/30 px-4 text-white">
+              <option value="hosting">Hosting</option><option value="email">Correo</option><option value="domain">Dominio</option><option value="storage">Storage</option><option value="software">Software</option><option value="accounting">Contabilidad</option><option value="other">Otro</option>
+            </select>
+            <input value={operationalBeneficiary} onChange={e=>setOperationalBeneficiary(e.target.value)} placeholder="Proveedor / beneficiario" className="h-11 rounded-xl border border-white/10 bg-black/30 px-4 text-white"/>
+            <input value={operationalMethod} onChange={e=>setOperationalMethod(e.target.value)} placeholder="Método / referencia" className="h-11 rounded-xl border border-white/10 bg-black/30 px-4 text-white"/>
+            <input value={operationalConcept} onChange={e=>setOperationalConcept(e.target.value)} placeholder="Concepto" className="h-11 rounded-xl border border-white/10 bg-black/30 px-4 text-white sm:col-span-2"/>
+          </div>
+          <button disabled={action!==null} onClick={registerOperationalExpense} className="mt-4 rounded-xl bg-fuchsia-500 px-5 py-3 text-sm font-semibold text-black disabled:opacity-40">
+            {action==="operational-expense"?"Registrando…":"Registrar gasto"}
+          </button>
+        </div>
+        <div className="rounded-2xl border border-white/6 bg-black/20 p-4">
+          <h3 className="font-semibold text-white">Últimos gastos</h3>
+          <div className="mt-4 space-y-2">
+            {operationalExpenses.length===0&&<p className="text-sm text-zinc-600">Todavía no hay gastos operativos registrados.</p>}
+            {operationalExpenses.slice(0,8).map(item=><div key={item.id} className="rounded-xl border border-white/6 p-3 text-sm">
+              <div className="flex justify-between gap-4"><span className="text-zinc-400">{item.category} · {item.concept}</span><b className="text-fuchsia-300">-{money(item.amount_usd)}</b></div>
+              <p className="mt-1 text-xs text-zinc-700">{item.beneficiary||"Sin beneficiario"} · {date(item.spent_at)}</p>
+            </div>)}
+          </div>
+        </div>
+      </div>
+    </section>}
+
     <section className="luxia-panel rounded-3xl p-6">
       <h2 className="text-lg font-semibold text-white">Cuándo vencen los tokens</h2>
       <p className="mt-2 text-sm leading-6 text-zinc-500">
@@ -697,6 +778,9 @@ export default function CashboxPage(){
               ["Pendiente de transferir desde esta bolsa",detail.bag.infrastructure_unfunded_usd],
               ["Crédito liberado por vencimiento",detail.bag.provider_credit_released_usd],
               ["Precio real pagado por token",detail.bag.effective_token_value_usd],
+              ["Fondo operativo congelado por token",detail.bag.operational_reserve_per_token_usd],
+              ["Fondo operativo total de la bolsa",detail.bag.operational_reserve_total_usd],
+              ["Fondo operativo ya liberado",detail.bag.operational_reserve_released_usd],
               ["Ganancia normal por token",detail.bag.normal_profit_per_token_usd],
               ["Ganancia real por token",detail.bag.effective_profit_per_token_usd],
               ["Parte de cada token apartada para IA",detail.bag.infrastructure_capacity_per_token_usd],
