@@ -54,7 +54,12 @@ export function UserPromotionalTokensPanel({ userId, onChanged }: Props) {
     }
   }, [userId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    const refresh = () => { void load(); };
+    window.addEventListener("promotional-tokens-changed", refresh);
+    return () => window.removeEventListener("promotional-tokens-changed", refresh);
+  }, [load]);
 
   const promotionalBags = useMemo(
     () => (bags?.items ?? []).filter((bag) => bag.source === "promotional_credit"),
@@ -83,6 +88,7 @@ export function UserPromotionalTokensPanel({ userId, onChanged }: Props) {
       toast.success(`${result.granted_tokens} token(s) gratis agregados al usuario.`);
       setTokens("1");
       await load();
+      window.dispatchEvent(new Event("promotional-tokens-changed"));
       await onChanged?.();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No fue posible dar los tokens gratis.");

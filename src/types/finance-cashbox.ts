@@ -215,6 +215,14 @@ export interface PromotionalGrantResult {
   grant_ids:number[];
 }
 
+export interface PromotionalRevokeResult {
+  requested_tokens:number;
+  revoked_tokens:number;
+  amount_returned_usd:number;
+  user_balance:number;
+  affected_lot_ids:number[];
+}
+
 
 export interface OperationalCashboxSummary {
   operational_reserve_per_token_usd:number;
