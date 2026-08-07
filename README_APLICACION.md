@@ -1,79 +1,40 @@
-# MegaZIP 4C — BackOffice — Claridad UX de Precios y Caja
+# MegaZIP 4D — BackOffice — Caja más clara y tabla de bolsas explicada
 
-BASE EXACTA
-tryon_backoffice-main - 2026-08-07T142620.428.zip
-(MegaZIP 1, 2, 3 y 4 ya aplicados por el usuario)
+BASE
+tryon_backoffice-main - 2026-08-07T144104.490.zip
 
 ALCANCE
-Este ZIP es SOLO de interfaz y textos. No modifica Backend, AppWeb, base de
-datos, fórmulas, endpoints, snapshots, FIFO, descuentos ni movimientos.
+Solo UX del BackOffice. No modifica Backend, AppWeb, endpoints, fórmulas,
+snapshots, FIFO, descuentos, movimientos ni base de datos.
 
-CAMBIOS EN CONFIGURACIÓN DE TOKENS
-- "Economía global / Una sola fuente de verdad" pasa a lenguaje simple:
-  "Configuración de tokens / Cómo se forma el precio de cada token".
-- "Base económica de 1 token (USD)" pasa a "Valor base del token".
-- "Fondo operativo por token (USD)" pasa a "Extra por gastos del negocio".
-- Se elimina el campo editable "Moneda comercial". La UI sigue mostrando USD.
-  El valor de moneda recibido por API se conserva internamente por
-  compatibilidad con el contrato existente; no se altera el Backend.
-- Se muestra claramente:
-    Valor base del token
-    + Extra por gastos del negocio
-    = Precio por token antes de descuentos
-- Tooltips explican qué participa en el cálculo de generaciones y qué no.
-- Se conserva Recalcular catálogo y Guardar exactamente con los endpoints
-  existentes.
-
-CAMBIOS EN CAJA
-- Las tarjetas resumen permanecen visibles.
-- El resto se organiza en acordeones para reducir saturación visual:
-  * Promociones y tokens gratis
-  * Cobros pendientes
-  * Dinero enviado y saldo por proveedor
-  * Retiros y transferencias
-  * Gastos del negocio
-  * Vencimiento de tokens
-  * Compras y bolsas de tokens
-- No se eliminó ningún widget, formulario, tabla ni acción existente.
-- "Fondeo" se sustituye visualmente por expresiones más claras:
-  * Enviar dinero a proveedor de IA
-  * Registrar transferencia
-  * Dinero enviado
-  * Disponible para enviar
-- Se simplifican otros conceptos:
-  * Pérdidas pendientes -> Cobros pendientes en resumen
-  * Reserva de tokens vigentes -> Dinero que respalda tokens activos
-  * Ganancia todavía bloqueada -> Ganancia aún no disponible
-  * Fondo operativo -> Extra por gastos del negocio
-- Se agregan tooltips a métricas financieras delicadas del detalle de bolsa.
-- "Snapshot financiero" se presenta como "Registro financiero congelado", con
-  explicación; el dato técnico y su valor NO cambian.
-
-BLINDAJE
-NO cambia:
-- pricing_service;
-- valor ni cálculo de tokens;
-- reserva IA;
-- ganancias;
-- descuentos/cupones/planes;
-- snapshots;
-- FIFO;
-- Caja verde;
-- Caja IA;
-- créditos promocionales;
-- pérdidas/cobros pendientes;
-- vencimientos;
-- Stripe;
-- Modal / RunPod / Beam;
-- ninguna API.
+MEJORAS
+- "Compras y bolsas de tokens" queda ABIERTA por defecto.
+- Cada encabezado de la tabla incluye tooltip en lenguaje simple.
+- Se agregan 4 leyendas por color encima de la tabla:
+  Verde: dinero de la empresa.
+  Lima: dinero todavía reservado.
+  Azul: dinero para IA que sigue en caja.
+  Violeta: dinero ya transferido a un proveedor.
+- Se simplifican columnas:
+  "Reserva vigente IA" -> "Reservado para tokens"
+  "Enviado a proveedor" -> "Ya enviado a proveedor"
+  "Disponible para enviar" -> "Aún en caja para IA"
+  "Crédito liberado" -> "Crédito libre en proveedor"
+  "Expira" -> "Vencimiento"
+- Cards superiores:
+  "Dinero para IA disponible" -> "Para proveedores de IA"
+  "Dinero que respalda tokens activos" -> "Reservado para tokens activos"
+- Los cards superiores ahora tienen fondos/bordes visualmente distintos.
+  En especial, "Reservado para tokens activos" usa una identidad lima,
+  claramente diferente del azul de "Para proveedores de IA".
+- No se elimina ningún widget, dato, botón, tabla o acción.
 
 VALIDACIÓN
-Los dos TSX modificados fueron parseados con TypeScript 5.8.3 mediante
-transpileModule y ambos resultaron OK.
-No se ejecutó next build en este entorno porque el ZIP no incluye node_modules.
+El TSX modificado pasó transpileModule con TypeScript 5.8.3 sin errores
+sintácticos.
 
 APLICACIÓN
-Extraer directamente sobre la raíz del BackOffice:
+Extraer directamente sobre:
 F:\PROYECTOS PERSONALES\TRYON\backoffice
 
 VALIDACIÓN LOCAL
@@ -83,5 +44,5 @@ npm run dev
 
 GIT
 git add .
-git commit -m "ux: simplify pricing and cashbox financial concepts"
+git commit -m "ux: clarify cashbox cards and token bag table"
 git push

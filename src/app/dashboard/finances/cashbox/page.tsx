@@ -120,6 +120,33 @@ const metricHelp:Record<string,string>={
   "Parte de cada token apartada para IA":"Reserva fija por token que protege el costo de generación. Los descuentos no deben reducirla.",
 };
 
+const bagTableHelp:Record<string,string>={
+  "Bolsa":"Número interno de esta bolsa. Cada compra, plan o acreditación crea su propia bolsa de tokens.",
+  "Usuario":"Persona a la que pertenecen estos tokens.",
+  "Origen":"Cómo nació la bolsa: compra directa, plan, promoción u otro tipo de acreditación.",
+  "Estado":"Activa = todavía tiene tokens; Agotada = ya se usaron todos; Expirada = vencieron antes de usarse; Reembolsada = se devolvió la compra.",
+  "Tokens":"Primero muestra cuántos quedan y después cuántos tenía originalmente. Ejemplo: 80/100 significa que todavía quedan 80.",
+  "Pagó el cliente":"Dinero que realmente pagó el cliente por esta bolsa después de descuentos o beneficios.",
+  "Ganancia base":"Ganancia comercial de esta bolsa según las condiciones que tenía al comprarse. Los descuentos reducen esta parte, no la reserva de IA.",
+  "Dinero extra":"Ahorros ya confirmados, por ejemplo cuando la reserva para IA fue un poco mayor que el costo real del proveedor.",
+  "Total disponible":"Dinero de esta bolsa que ya quedó libre para la empresa. Incluye la ganancia liberada y otros importes que ya dejaron de estar reservados.",
+  "Reservado para tokens":"Dinero de IA que todavía debe respaldar tokens activos de esta bolsa. Si ya no quedan tokens, normalmente llega a cero.",
+  "Ya enviado a proveedor":"Parte del dinero para IA de esta bolsa que registraste como transferida físicamente a Modal, RunPod, Beam u otro proveedor.",
+  "Aún en caja para IA":"Dinero para IA de esta bolsa que todavía no has transferido a un proveedor. Sigue físicamente disponible en tu caja de infraestructura.",
+  "Crédito libre en proveedor":"Dinero que ya estaba dentro de un proveedor y dejó de estar comprometido con esta bolsa, por ejemplo al vencer tokens. No vuelve automáticamente a tu banco.",
+  "Vencimiento":"Fecha original o real de vencimiento. Si la bolsa se agotó antes, se conserva la fecha histórica para auditoría.",
+  "Acción":"Abre el detalle completo de la bolsa, sus condiciones congeladas y sus movimientos.",
+};
+
+function BagTableHead({label}:{label:string}){
+  return <th className="border-b border-white/6 px-3 py-3 align-top">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+      {label}<HelpTip text={bagTableHelp[label]||"Información de esta columna."}/>
+    </span>
+  </th>;
+}
+
+
 function Info({label,value,help}:{label:string;value:string;help?:string}){
   return <div className="rounded-2xl border border-white/6 bg-black/20 p-4">
     <p className="flex items-center text-xs text-zinc-600">{label}{help&&<HelpTip text={help}/>}</p>
@@ -177,6 +204,7 @@ export default function CashboxPage(){
     value:number;
     icon:LucideIcon;
     className:string;
+    panelClassName:string;
     help:string;
   }>=summary?[
     {
@@ -184,20 +212,23 @@ export default function CashboxPage(){
       value:summary.available_usd,
       icon:WalletCards,
       className:"text-emerald-300",
+      panelClassName:"border-emerald-500/20 bg-emerald-500/[0.045]",
       help:"Utilidad realmente libre. No incluye dinero reservado ni dinero ya enviado a proveedores.",
     },
     {
-      label:"Dinero para IA disponible",
+      label:"Para proveedores de IA",
       value:summary.infrastructure_cash_available_usd,
       icon:ShieldCheck,
       className:"text-sky-300",
-      help:"Dinero de infraestructura que todavía sigue en tu caja y puede enviarse a proveedores.",
+      panelClassName:"border-sky-500/25 bg-sky-500/[0.055]",
+      help:"Dinero que tienes en caja para enviar a Modal, RunPod, Beam u otro proveedor de IA.",
     },
     {
       label:"Dinero enviado a proveedores",
       value:summary.infrastructure_funded_usd,
       icon:ServerCog,
       className:"text-violet-300",
+      panelClassName:"border-violet-500/20 bg-violet-500/[0.045]",
       help:"Transferencias registradas a Modal, RunPod, Beam u otros proveedores.",
     },
     {
@@ -205,20 +236,23 @@ export default function CashboxPage(){
       value:summary.pending_recovery_economic_estimated_usd,
       icon:CircleDollarSign,
       className:"text-orange-300",
+      panelClassName:"border-orange-500/20 bg-orange-500/[0.045]",
       help:`${summary.pending_recovery_generations} generación(es) bloqueada(s) · ${summary.pending_recovery_tokens} token(s) por recuperar. Incluye infraestructura pendiente exacta y ganancia potencial estimada.`,
     },
     {
-      label:"Dinero que respalda tokens activos",
+      label:"Reservado para tokens activos",
       value:summary.protected_infrastructure_usd,
       icon:Landmark,
-      className:"text-cyan-300",
-      help:"Respaldo que todavía corresponde a tokens no consumidos ni vencidos.",
+      className:"text-lime-300",
+      panelClassName:"border-lime-500/25 bg-lime-500/[0.055]",
+      help:"Dinero que todavía debe quedarse apartado porque hay tokens que el usuario aún puede gastar. No está libre para retirar.",
     },
     {
       label:"Ganancia aún no disponible",
       value:summary.blocked_profit_usd,
       icon:Boxes,
       className:"text-amber-300",
+      panelClassName:"border-amber-500/20 bg-amber-500/[0.045]",
       help:"Ganancia de bolsas nuevas que aún no han sido utilizadas.",
     },
     {
@@ -226,6 +260,7 @@ export default function CashboxPage(){
       value:summary.withdrawals_usd,
       icon:Banknote,
       className:"text-rose-300",
+      panelClassName:"border-rose-500/20 bg-rose-500/[0.045]",
       help:"Retiros de utilidad. No incluye transferencias hechas a proveedores de IA.",
     },
   ]:[];
@@ -504,8 +539,8 @@ export default function CashboxPage(){
     {loading
       ? <div className="luxia-panel rounded-3xl p-10 text-center text-zinc-500">Calculando las cajas…</div>
       : summary&&<section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {summaryCards.map(({label,value,icon:Icon,className,help})=>
-          <article key={label} className="luxia-panel rounded-3xl p-5">
+        {summaryCards.map(({label,value,icon:Icon,className,panelClassName,help})=>
+          <article key={label} className={`luxia-panel rounded-3xl border p-5 ${panelClassName}`}>
             <Icon className={className} size={20}/>
             <p className="mt-5 text-xs uppercase tracking-widest text-zinc-600">{label}</p>
             <p className={`mt-2 text-2xl font-semibold ${className}`}>{money(value)}</p>
@@ -757,12 +792,12 @@ export default function CashboxPage(){
         </p>}
     </section></AccordionSection>
 
-    <AccordionSection title="Compras y bolsas de tokens" description="Consulta el historial completo de bolsas, descuentos, reservas, transferencias y vencimientos."><section className="rounded-2xl">
+    <AccordionSection defaultOpen title="Compras y bolsas de tokens" description="Historial de cada grupo de tokens. Esta sección se abre por defecto porque aquí puedes comprobar de dónde salió cada peso y qué pasó con él."><section className="rounded-2xl">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-white">Compras y bolsas de tokens</h2>
           <p className="mt-2 text-sm text-zinc-500">
-            Cada fila conserva las condiciones con las que nació la bolsa: descuento, reservas, transferencias a proveedores y dinero todavía disponible para enviar.
+            Cada fila conserva las condiciones originales de la bolsa. Pasa el cursor por el <CircleHelp size={13} className="mx-1 inline text-zinc-500"/> de cualquier columna para ver qué significa en palabras simples.
           </p>
         </div>
         <select value={status} onChange={event=>setStatus(event.target.value)} className="h-10 rounded-xl border border-white/10 bg-black px-3 text-sm text-white">
@@ -770,15 +805,23 @@ export default function CashboxPage(){
           {Object.entries(labels).map(([value,label])=><option key={value} value={value}>{label}</option>)}
         </select>
       </div>
+
+      <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] px-3 py-2 text-xs text-emerald-200"><b>Verde · dinero de la empresa</b><span className="mt-1 block text-zinc-500">Ganancia y dinero que ya quedó libre.</span></div>
+        <div className="rounded-xl border border-lime-500/20 bg-lime-500/[0.04] px-3 py-2 text-xs text-lime-200"><b>Lima · todavía reservado</b><span className="mt-1 block text-zinc-500">Respalda tokens que el usuario aún puede gastar.</span></div>
+        <div className="rounded-xl border border-sky-500/20 bg-sky-500/[0.04] px-3 py-2 text-xs text-sky-200"><b>Azul · dinero para IA</b><span className="mt-1 block text-zinc-500">Sigue en caja o está listo para enviarse al proveedor.</span></div>
+        <div className="rounded-xl border border-violet-500/20 bg-violet-500/[0.04] px-3 py-2 text-xs text-violet-200"><b>Violeta · ya salió de caja</b><span className="mt-1 block text-zinc-500">Dinero registrado como transferido a un proveedor.</span></div>
+      </div>
+
       <div className="mt-5 overflow-auto">
         <table className="w-full min-w-[1750px] text-left text-sm">
           <thead className="text-xs uppercase text-zinc-600">
             <tr>
               {[
                 "Bolsa","Usuario","Origen","Estado","Tokens","Pagó el cliente",
-                "Ganancia base","Dinero extra","Total disponible","Reserva vigente IA",
-                "Enviado a proveedor","Disponible para enviar","Crédito liberado","Expira","Acción",
-              ].map(label=><th key={label} className="border-b border-white/6 px-3 py-3">{label}</th>)}
+                "Ganancia base","Dinero extra","Total disponible","Reservado para tokens",
+                "Ya enviado a proveedor","Aún en caja para IA","Crédito libre en proveedor","Vencimiento","Acción",
+              ].map(label=><BagTableHead key={label} label={label}/>)}
             </tr>
           </thead>
           <tbody>
@@ -792,10 +835,10 @@ export default function CashboxPage(){
               <td className="px-3 py-4 text-emerald-200">{money(bag.commercial_profit_released_usd)}</td>
               <td className="px-3 py-4 text-amber-200">{money(bag.realized_extra_profit_usd)}</td>
               <td className="px-3 py-4 font-semibold text-emerald-300">{money(bag.total_available_from_bag_usd)}</td>
-              <td className="px-3 py-4 text-cyan-300">{money(bag.protected_infrastructure_remaining_usd)}</td>
+              <td className="px-3 py-4 text-lime-300">{money(bag.protected_infrastructure_remaining_usd)}</td>
               <td className="px-3 py-4 text-violet-300">{money(bag.infrastructure_funded_usd)}</td>
               <td className="px-3 py-4 text-sky-300">{money(bag.infrastructure_unfunded_usd)}</td>
-              <td className="px-3 py-4 text-blue-300">{money(bag.provider_credit_released_usd)}</td>
+              <td className="px-3 py-4 text-indigo-300">{money(bag.provider_credit_released_usd)}</td>
               <td className="max-w-[240px] px-3 py-4 text-xs leading-5">{expirationText(bag)}</td>
               <td className="px-3 py-4">
                 <button onClick={()=>void openBag(bag.id)} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white">Ver detalle</button>
