@@ -94,6 +94,7 @@ export interface ExpirationSimulationResult {
   infrastructure_cash_released_usd:number;
   provider_credit_released_usd:number;
   provider_credit_released_by_provider:Record<string,number>;
+  promotional_credit_returned_usd:number;
   total_available_from_bag_usd:number;
   expires_at:string;
   expired_at:string;
@@ -152,4 +153,61 @@ export interface PendingRecoverySummary {
 export interface PendingRecoveryList {
   items:PendingRecoveryItem[];
   summary:PendingRecoverySummary;
+}
+
+export interface PromotionalCreditSettings {
+  signup_enabled:boolean;
+  signup_tokens:number;
+  signup_provider:string;
+  allow_pending_settlement:boolean;
+}
+
+export interface PromotionalProviderBalance {
+  provider:string;
+  funded_usd:number;
+  available_usd:number;
+  available_tokens:number;
+}
+
+export interface PromotionalFund {
+  id:number;
+  provider:string;
+  original_usd:number;
+  remaining_usd:number;
+  reference?:string|null;
+  description?:string|null;
+  created_at:string;
+}
+
+export interface PromotionalGrantHistory {
+  id:number;
+  fund_id:number;
+  lot_id:number;
+  user_id:number;
+  user_email?:string|null;
+  tokens_granted:number;
+  reserve_per_token_usd:number;
+  amount_reserved_usd:number;
+  grant_type:string;
+  created_at:string;
+}
+
+export interface PromotionalCreditSummary {
+  reserve_per_token_usd:number;
+  generation_infrastructure_reserve_per_token_usd:number;
+  total_funded_usd:number;
+  total_available_usd:number;
+  provider_balances:PromotionalProviderBalance[];
+  settings:PromotionalCreditSettings;
+  funds:PromotionalFund[];
+  grants:PromotionalGrantHistory[];
+}
+
+export interface PromotionalGrantResult {
+  requested_tokens:number;
+  granted_tokens:number;
+  provider:string;
+  amount_reserved_usd:number;
+  user_balance?:number|null;
+  grant_ids:number[];
 }

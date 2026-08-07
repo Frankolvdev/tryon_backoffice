@@ -6,6 +6,8 @@ import {
   Boxes,
   CircleDollarSign,
   Landmark,
+  Gift,
+  UserPlus,
   RefreshCcw,
   RotateCcw,
   ServerCog,
@@ -24,10 +26,13 @@ import type {
   ExpirationSimulationResult,
   InfrastructureFunding,
   PendingRecoveryList,
+  PromotionalCreditSummary,
+  PromotionalGrantResult,
   TokenBag,
   TokenBagList,
   Withdrawal,
 } from "@/types/finance-cashbox";
+import type {AdminUser} from "@/types/admin-users";
 
 const money=(value:number)=>`USD ${Number(value||0).toFixed(6)}`;
 const date=(value?:string|null)=>value
@@ -71,6 +76,17 @@ export default function CashboxPage(){
   const [withdrawals,setWithdrawals]=useState<Withdrawal[]>([]);
   const [fundings,setFundings]=useState<InfrastructureFunding[]>([]);
   const [pendingRecoveries,setPendingRecoveries]=useState<PendingRecoveryList|null>(null);
+  const [promotional,setPromotional]=useState<PromotionalCreditSummary|null>(null);
+  const [promoFundAmount,setPromoFundAmount]=useState("");
+  const [promoFundProvider,setPromoFundProvider]=useState("modal");
+  const [promoFundReference,setPromoFundReference]=useState("");
+  const [promoFundDescription,setPromoFundDescription]=useState("Crédito promocional de infraestructura");
+  const [promoGrantOpen,setPromoGrantOpen]=useState(false);
+  const [promoUsers,setPromoUsers]=useState<AdminUser[]>([]);
+  const [promoUserSearch,setPromoUserSearch]=useState("");
+  const [promoSelectedUser,setPromoSelectedUser]=useState<AdminUser|null>(null);
+  const [promoGrantTokens,setPromoGrantTokens]=useState("");
+  const [promoGrantProvider,setPromoGrantProvider]=useState("modal");
   const [expiry,setExpiry]=useState<ExpirationSettings>({
     enabled:true,
     days:730,
@@ -154,13 +170,14 @@ export default function CashboxPage(){
     setLoading(true);
     try{
       const query=status?`?status=${status}`:"";
-      const [cashbox,bagList,withdrawalList,expiration,fundingList,pendingList]=await Promise.all([
+      const [cashbox,bagList,withdrawalList,expiration,fundingList,pendingList,promoSummary]=await Promise.all([
         browserApiRequest<CashboxSummary>("/api/admin/finances/cashbox"),
         browserApiRequest<TokenBagList>(`/api/admin/finances/token-bags${query}`),
         browserApiRequest<Withdrawal[]>("/api/admin/finances/withdrawals"),
         browserApiRequest<ExpirationSettings>("/api/admin/finances/token-bag-expiration"),
         browserApiRequest<InfrastructureFunding[]>("/api/admin/finances/infrastructure-fundings"),
         browserApiRequest<PendingRecoveryList>("/api/admin/finances/pending-recoveries"),
+        browserApiRequest<PromotionalCreditSummary>("/api/admin/finances/promotional-credits"),
       ]);
       setSummary(cashbox);
       setBags(bagList.items);
@@ -168,6 +185,7 @@ export default function CashboxPage(){
       setExpiry(expiration);
       setFundings(fundingList);
       setPendingRecoveries(pendingList);
+      setPromotional(promoSummary);
     }catch(error){
       toast.error(error instanceof Error?error.message:"No fue posible cargar la caja.");
     }finally{
@@ -262,6 +280,53 @@ export default function CashboxPage(){
     }
   }
 
+  async function addPromotionalFund(){
+    const value=Number(promoFundAmount);
+    if(!Number.isFinite(value)||value<=0){toast.error("Escribe un importe promocional válido.");return;}
+    setAction("promo-fund");
+    try{
+      await browserApiRequest("/api/admin/finances/promotional-credits/funds",{
+        method:"POST",body:JSON.stringify({amount_usd:value,provider:promoFundProvider,reference:promoFundReference||null,description:promoFundDescription||null}),
+      });
+      toast.success("Crédito promocional agregado sin tocar Caja verde ni Caja IA comercial.");
+      setPromoFundAmount(""); setPromoFundReference(""); void load();
+    }catch(error){toast.error(error instanceof Error?error.message:"No fue posible agregar el crédito promocional.");}
+    finally{setAction(null);}
+  }
+
+  async function savePromotionalSettings(){
+    if(!promotional)return;
+    setAction("promo-settings");
+    try{
+      const settings=await browserApiRequest<PromotionalCreditSummary["settings"]>("/api/admin/finances/promotional-credits/settings",{
+        method:"PUT",body:JSON.stringify(promotional.settings),
+      });
+      setPromotional({...promotional,settings}); toast.success("Política promocional guardada.");
+    }catch(error){toast.error(error instanceof Error?error.message:"No fue posible guardar la política promocional.");}
+    finally{setAction(null);}
+  }
+
+  async function openPromotionalGrant(){
+    setPromoGrantOpen(true);
+    if(promoUsers.length)return;
+    try{setPromoUsers(await browserApiRequest<AdminUser[]>("/api/admin/users?skip=0&limit=100&include_deleted=false"));}
+    catch(error){toast.error(error instanceof Error?error.message:"No fue posible cargar los usuarios.");}
+  }
+
+  async function grantPromotionalTokens(){
+    const tokens=Number(promoGrantTokens);
+    if(!promoSelectedUser||!Number.isInteger(tokens)||tokens<=0){toast.error("Selecciona un usuario y una cantidad válida.");return;}
+    setAction("promo-grant");
+    try{
+      const result=await browserApiRequest<PromotionalGrantResult>("/api/admin/finances/promotional-credits/grants",{
+        method:"POST",body:JSON.stringify({user_id:promoSelectedUser.id,tokens,provider:promoGrantProvider}),
+      });
+      toast.success(`${result.granted_tokens} token(s) promocionales asignados.`);
+      setPromoGrantOpen(false);setPromoSelectedUser(null);setPromoGrantTokens("");void load();
+    }catch(error){toast.error(error instanceof Error?error.message:"No fue posible asignar los tokens promocionales.");}
+    finally{setAction(null);}
+  }
+
   async function reconcile(){
     if(!detail?.purchase_id)return;
     setAction("reconcile");
@@ -317,10 +382,12 @@ export default function CashboxPage(){
         .map(([provider,value])=>`${provider}: ${money(value)}`)
         .join(" · ");
       toast.success(
-        `${result.expired_tokens} tokens vencieron. ${money(result.infrastructure_cash_released_usd)} pasó a utilidad`
-        + (result.provider_credit_released_usd>0
-          ? ` y ${money(result.provider_credit_released_usd)} quedó como crédito fondeado${providers?` (${providers})`:""}.`
-          : "."),
+        result.promotional_credit_returned_usd>0
+          ? `${result.expired_tokens} tokens promocionales vencieron. ${money(result.promotional_credit_returned_usd)} regresó a la caja promocional y USD 0 pasó a utilidad.`
+          : `${result.expired_tokens} tokens vencieron. ${money(result.infrastructure_cash_released_usd)} pasó a utilidad`
+            + (result.provider_credit_released_usd>0
+              ? ` y ${money(result.provider_credit_released_usd)} quedó como crédito fondeado${providers?` (${providers})`:""}.`
+              : "."),
       );
       setDetail(await browserApiRequest<BagDetail>(`/api/admin/finances/token-bags/${detail.bag.id}`));
       void load();
@@ -360,6 +427,49 @@ export default function CashboxPage(){
           </article>,
         )}
       </section>}
+
+    {promotional&&<section className="luxia-panel rounded-3xl p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-fuchsia-300">Infraestructura patrocinada</p>
+          <h2 className="mt-2 text-lg font-semibold text-white">Créditos promocionales</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">
+            Dinero o crédito gratuito aportado por proveedores para financiar tokens sin ganancia. No entra a Caja verde ni a la Caja IA comercial.
+          </p>
+        </div>
+        <div className="text-right"><p className="text-xs text-zinc-600">Disponible</p><p className="mt-1 text-2xl font-semibold text-fuchsia-300">{money(promotional.total_available_usd)}</p><p className="mt-1 text-xs text-zinc-600">Crédito promocional reservado: {money(promotional.reserve_per_token_usd)} / token</p><p className="mt-1 text-xs text-zinc-700">La regla de generación conserva {money(promotional.generation_infrastructure_reserve_per_token_usd)} de capacidad IA por token; el crédito promocional no utilizado regresa a esta caja.</p></div>
+      </div>
+
+      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {promotional.provider_balances.map(item=><article key={item.provider} className="rounded-2xl border border-white/6 bg-black/20 p-4"><p className="text-xs font-semibold uppercase text-fuchsia-300">{item.provider}</p><p className="mt-3 text-xl font-semibold text-white">{money(item.available_usd)}</p><p className="mt-1 text-xs text-zinc-600">≈ {item.available_tokens} tokens financiables</p></article>)}
+      </div>
+
+      <div className="mt-6 grid gap-5 xl:grid-cols-2">
+        <div className="rounded-2xl border border-white/6 p-5">
+          <h3 className="font-semibold text-white">Agregar crédito gratuito</h3>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <input value={promoFundAmount} onChange={e=>setPromoFundAmount(e.target.value)} type="number" min="0" step="0.01" placeholder="USD" className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"/>
+            <select value={promoFundProvider} onChange={e=>setPromoFundProvider(e.target.value)} className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"><option value="modal">Modal</option><option value="runpod">RunPod</option><option value="beam">Beam</option><option value="general">General</option></select>
+            <input value={promoFundReference} onChange={e=>setPromoFundReference(e.target.value)} placeholder="Referencia opcional" className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"/>
+            <input value={promoFundDescription} onChange={e=>setPromoFundDescription(e.target.value)} placeholder="Concepto" className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"/>
+          </div>
+          <button disabled={action!==null} onClick={()=>void addPromotionalFund()} className="mt-4 rounded-xl bg-fuchsia-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">Registrar crédito</button>
+        </div>
+
+        <div className="rounded-2xl border border-white/6 p-5">
+          <h3 className="font-semibold text-white">Política de entrega</h3>
+          <div className="mt-4 space-y-4 text-sm">
+            <label className="flex items-center justify-between gap-4 text-zinc-300"><span>Dar tokens al registrarse</span><input type="checkbox" checked={promotional.settings.signup_enabled} onChange={e=>setPromotional({...promotional,settings:{...promotional.settings,signup_enabled:e.target.checked}})}/></label>
+            <label className="block text-zinc-400"><span>Tokens por nuevo usuario</span><input type="number" min="0" value={promotional.settings.signup_tokens} onChange={e=>setPromotional({...promotional,settings:{...promotional.settings,signup_tokens:Number(e.target.value)||0}})} className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"/></label>
+            <label className="block text-zinc-400"><span>Proveedor que respalda el bono</span><select value={promotional.settings.signup_provider} onChange={e=>setPromotional({...promotional,settings:{...promotional.settings,signup_provider:e.target.value}})} className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"><option value="modal">Modal</option><option value="runpod">RunPod</option><option value="beam">Beam</option><option value="general">General</option></select></label>
+            <label className="flex items-start justify-between gap-4 text-zinc-300"><span><b>Permitir promocionales para deudas anteriores</b><small className="mt-1 block max-w-md text-zinc-600">Apagado por defecto: los tokens gratis sirven para generaciones nuevas, pero no para desbloquear resultados que ya debían tokens.</small></span><input type="checkbox" checked={promotional.settings.allow_pending_settlement} onChange={e=>setPromotional({...promotional,settings:{...promotional.settings,allow_pending_settlement:e.target.checked}})}/></label>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-3"><button disabled={action!==null} onClick={()=>void savePromotionalSettings()} className="rounded-xl border border-fuchsia-500/30 px-4 py-2 text-sm text-fuchsia-200 disabled:opacity-40">Guardar política</button><button onClick={()=>void openPromotionalGrant()} className="flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-white"><UserPlus size={15}/>Asignar a usuario</button></div>
+        </div>
+      </div>
+
+      {promotional.grants.length>0&&<div className="mt-6 overflow-auto"><table className="w-full min-w-[850px] text-left text-sm"><thead className="text-xs uppercase text-zinc-600"><tr><th className="p-3">Usuario</th><th>Tokens</th><th>Proveedor</th><th>Reserva utilizada</th><th>Tipo</th><th>Fecha</th></tr></thead><tbody>{promotional.grants.slice(0,20).map(grant=><tr key={grant.id} className="border-t border-white/5"><td className="p-3 text-zinc-300">{grant.user_email||`#${grant.user_id}`}</td><td>{grant.tokens_granted}</td><td className="uppercase">{promotional.funds.find(f=>f.id===grant.fund_id)?.provider||"—"}</td><td>{money(grant.amount_reserved_usd)}</td><td>{grant.grant_type}</td><td className="text-xs text-zinc-600">{date(grant.created_at)}</td></tr>)}</tbody></table></div>}
+    </section>}
 
     {pendingRecoveries&&pendingRecoveries.items.length>0&&
       <section className="luxia-panel rounded-3xl p-6">
@@ -560,6 +670,8 @@ export default function CashboxPage(){
         </table>
       </div>
     </section>
+
+    {promoGrantOpen&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><article className="w-full max-w-2xl rounded-3xl border border-white/10 bg-[#09090a] p-6"><header className="flex items-center justify-between"><div><p className="text-xs uppercase tracking-widest text-fuchsia-300">Créditos promocionales</p><h2 className="mt-2 text-xl font-semibold text-white">Asignar tokens a un usuario</h2></div><button onClick={()=>setPromoGrantOpen(false)}><X className="text-zinc-400"/></button></header><input value={promoUserSearch} onChange={e=>setPromoUserSearch(e.target.value)} placeholder="Buscar por correo o nombre" className="mt-5 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"/><div className="mt-3 max-h-52 overflow-auto rounded-xl border border-white/6">{promoUsers.filter(user=>`${user.email} ${user.full_name||""}`.toLowerCase().includes(promoUserSearch.toLowerCase())).slice(0,30).map(user=><button key={user.id} onClick={()=>setPromoSelectedUser(user)} className={`block w-full border-b border-white/5 p-3 text-left text-sm ${promoSelectedUser?.id===user.id?"bg-fuchsia-500/10 text-fuchsia-200":"text-zinc-300"}`}>{user.email}<small className="ml-2 text-zinc-600">#{user.id}</small></button>)}</div><div className="mt-4 grid gap-3 sm:grid-cols-2"><input value={promoGrantTokens} onChange={e=>setPromoGrantTokens(e.target.value)} type="number" min="1" placeholder="Tokens" className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"/><select value={promoGrantProvider} onChange={e=>setPromoGrantProvider(e.target.value)} className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"><option value="modal">Modal</option><option value="runpod">RunPod</option><option value="beam">Beam</option><option value="general">General</option></select></div><p className="mt-3 text-xs leading-5 text-zinc-600">La asignación manual exige respaldo completo. Si la caja elegida no alcanza, no se crea ningún token.</p><button disabled={action!==null||!promoSelectedUser} onClick={()=>void grantPromotionalTokens()} className="mt-5 rounded-xl bg-fuchsia-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"><Gift className="mr-2 inline" size={15}/>Asignar tokens</button></article></div>}
 
     {detail&&
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">

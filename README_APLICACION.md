@@ -1,19 +1,37 @@
-# MegaZIP 1B — BackOffice — Pérdidas pendientes
+# MegaZIP 2B — BackOffice — Créditos promocionales
 
-BASE:
-tryon_backoffice-main - 2026-08-07T114604.488.zip
+BASE EXACTA:
+tryon_backoffice-main - 2026-08-07T123538.374.zip
+(con MegaZIP 1 ya aplicado por el usuario)
 
-CAMBIOS:
-- Nueva tarjeta "Pérdidas pendientes" dentro de Caja.
-- Muestra número de generaciones bloqueadas y tokens por recuperar.
-- Separa infraestructura pendiente exacta de ganancia potencial estimada.
-- Tabla de ejecuciones pendientes con usuario, proveedor, tokens y fecha.
-- No modifica la caja verde, retiros, fondeos, expiraciones ni bolsas.
+INCLUYE
+- Nueva sección "Créditos promocionales" en Caja.
+- Saldo total promocional y saldos por proveedor.
+- Alta manual de fondo promocional en USD.
+- Proveedores: Modal / RunPod / Beam / General.
+- Switch "Dar tokens al registrarse".
+- Campo "Tokens por nuevo usuario" (usa el setting existente free_signup_tokens).
+- Proveedor que respalda el bono de registro.
+- Switch "Permitir promocionales para deudas anteriores".
+  Está apagado por defecto.
+- Modal para asignar manualmente tokens a un usuario.
+- Historial de grants.
+- Vencimiento promocional muestra que el crédito regresó al fondo y USD 0 pasó
+  a utilidad.
+- Diferencia visual entre:
+  * crédito promocional temporal reservado por token;
+  * capacidad IA normal que conserva la regla de generación.
 
-VALIDACIÓN:
-Los dos archivos modificados pasaron el parser sintáctico TypeScript 5.8.3.
-No se pudo ejecutar el typecheck/build completo en el entorno porque el ZIP no
-incluye node_modules/dependencias instaladas.
+NO MODIFICA
+- Caja verde;
+- retiros de utilidad;
+- Caja IA comercial;
+- fondeos comerciales;
+- fórmulas;
+- descuentos;
+- snapshots comerciales;
+- generaciones.
 
-No hay cambios de AppWeb en MegaZIP 1: el botón manual existente sigue siendo
-el fallback y el auto-desbloqueo se ejecuta en Backend.
+VALIDACIÓN
+Los archivos TypeScript modificados pasaron parser sintáctico con TypeScript.
+El build completo debe ejecutarse localmente con las dependencias del proyecto.
