@@ -1,13 +1,13 @@
 "use client";
 
 import {useCallback,useEffect,useState,type ReactNode} from "react";
+import {createPortal} from "react-dom";
 import {
   Banknote,
   Boxes,
   CircleDollarSign,
   CircleHelp,
   ChevronDown,
-  Landmark,
   Gift,
   UserPlus,
   RefreshCcw,
@@ -51,6 +51,22 @@ const labels:Record<string,string>={
   refunded:"Reembolsada",
 };
 
+const sourceNames:Record<string,string>={
+  stripe_token_purchase:"Compra directa",
+  subscription_period_grant:"Plan / suscripción",
+  promotional_credit:"Tokens gratis",
+  admin_grant:"Asignación manual",
+  free_signup:"Regalo de bienvenida",
+};
+
+function sourceText(value?:string|null){
+  if(!value)return "—";
+  if(sourceNames[value])return sourceNames[value];
+  if(!value.includes("_"))return value;
+  const readable=value.replaceAll("_"," ");
+  return readable.charAt(0).toUpperCase()+readable.slice(1);
+}
+
 function expirationText(bag:TokenBag){
   if(bag.status==="expired")return `Venció ${date(bag.expired_at||bag.expires_at)}`;
   if(bag.status==="exhausted"){
@@ -69,19 +85,78 @@ function expirationLabel(bag:TokenBag){
 
 
 function HelpTip({text}:{text:string}){
-  return <span className="group/help relative ml-1 inline-flex align-middle">
-    <span
-      tabIndex={0}
-      role="note"
-      aria-label={text}
-      className="inline-flex cursor-help items-center text-zinc-600 outline-none transition hover:text-zinc-300 focus:text-zinc-300"
+  const [open,setOpen]=useState(false);
+  const [pinned,setPinned]=useState(false);
+  const [position,setPosition]=useState({top:0,left:0,above:false});
+
+  function place(target:HTMLElement){
+    const rect=target.getBoundingClientRect();
+    const tooltipWidth=288;
+    const left=Math.min(
+      Math.max(12,rect.left+(rect.width/2)-(tooltipWidth/2)),
+      Math.max(12,window.innerWidth-tooltipWidth-12),
+    );
+    const above=rect.bottom+170>window.innerHeight;
+    setPosition({
+      left,
+      top:above?rect.top-10:rect.bottom+10,
+      above,
+    });
+  }
+
+  function show(target:HTMLElement){
+    place(target);
+    setOpen(true);
+  }
+
+  function hide(){
+    if(!pinned)setOpen(false);
+  }
+
+  const tooltip=open&&typeof document!=="undefined"
+    ? createPortal(
+      <div
+        role="tooltip"
+        style={{
+          position:"fixed",
+          left:position.left,
+          top:position.top,
+          transform:position.above?"translateY(-100%)":"none",
+          width:288,
+        }}
+        className="pointer-events-none z-[9999] rounded-xl border border-white/15 bg-zinc-950 px-3 py-2.5 text-left text-xs font-normal normal-case leading-5 tracking-normal text-zinc-200 shadow-2xl"
+      >
+        {text}
+      </div>,
+      document.body,
+    )
+    : null;
+
+  return <>
+    <button
+      type="button"
+      aria-label={`Ayuda: ${text}`}
+      aria-expanded={open}
+      className="ml-1 inline-flex size-5 shrink-0 cursor-help items-center justify-center rounded-full text-zinc-500 outline-none transition hover:bg-white/5 hover:text-white focus:bg-white/5 focus:text-white"
+      onMouseEnter={event=>show(event.currentTarget)}
+      onMouseLeave={hide}
+      onFocus={event=>show(event.currentTarget)}
+      onBlur={hide}
+      onClick={event=>{
+        event.preventDefault();
+        event.stopPropagation();
+        place(event.currentTarget);
+        setPinned(current=>{
+          const next=!current;
+          setOpen(next);
+          return next;
+        });
+      }}
     >
-      <CircleHelp size={13}/>
-    </span>
-    <span className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 hidden w-64 -translate-x-1/2 rounded-xl border border-white/10 bg-zinc-950 p-3 text-left text-xs font-normal normal-case leading-5 tracking-normal text-zinc-300 shadow-2xl group-hover/help:block group-focus-within/help:block">
-      {text}
-    </span>
-  </span>;
+      <CircleHelp size={14}/>
+    </button>
+    {tooltip}
+  </>;
 }
 
 function AccordionSection({
@@ -107,35 +182,33 @@ function AccordionSection({
 }
 
 const metricHelp:Record<string,string>={
-  "Ganancia base ya disponible":"Parte de la ganancia de esta bolsa que ya quedó liberada para la empresa.",
+  "Ganancia que ya está disponible":"Parte de tu ganancia que ya puedes contar como disponible.",
   "Dinero extra ya confirmado":"Ahorros o redondeos ya confirmados después de pagar el costo real de infraestructura.",
-  "Reserva de tokens vigentes":"Dinero que todavía debe mantenerse separado porque respalda tokens que el usuario aún puede gastar.",
-  "Costo atribuido a proveedores":"Costo real de IA que las generaciones de esta bolsa ya produjeron.",
-  "Enviado a proveedores desde esta bolsa":"Parte del dinero para IA que ya registraste como transferida físicamente a Modal, RunPod, Beam u otro proveedor.",
-  "Disponible para enviar desde esta bolsa":"Dinero de IA de esta bolsa que sigue en tu caja y todavía puede enviarse a un proveedor.",
-  "Crédito liberado por vencimiento":"Dinero que ya estaba depositado en un proveedor y quedó libre cuando vencieron tokens; sigue dentro del proveedor, no en tu caja verde.",
-  "Extra por gastos del negocio / token":"Cantidad adicional por token congelada en esta bolsa para hosting, correo, dominios y otros gastos.",
-  "Extra para gastos total de la bolsa":"Total reservado originalmente por esta bolsa para gastos del negocio.",
+  "Respaldo IA de tokens que quedan":"Dato de control: cuánto respaldo de IA corresponde a los tokens que todavía quedan en esta bolsa. No es una caja adicional.",
+  "Costo real de IA generado":"Lo que las generaciones hechas con esta bolsa ya costaron realmente en IA.",
+  "Dinero enviado al proveedor desde esta bolsa":"Dinero de esta bolsa que ya registraste como enviado a Modal, RunPod, Beam u otro proveedor.",
+  "Dinero de IA que aún tienes en caja":"Dinero de esta bolsa que todavía está contigo y puedes enviar a Modal, RunPod, Beam u otro proveedor.",
+  "Dinero que quedó dentro del proveedor":"Parte del dinero que ya habías enviado a Modal, RunPod o Beam y que, al vencer tokens, ya no pudo regresar a tu caja. No es dinero nuevo ni dinero que puedas retirar.",
+  "Extra para gastos por token":"Lo extra que se cobró por cada token de esta bolsa para pagar hosting, correo, dominios y otros gastos.",
+  "Extra total para gastos":"Total que esta bolsa separó para los gastos del negocio.",
   "Extra para gastos ya disponible":"Parte del fondo de gastos de esta bolsa que ya dejó de estar bloqueada por reembolso.",
-  "Parte de cada token apartada para IA":"Reserva fija por token que protege el costo de generación. Los descuentos no deben reducirla.",
+  "IA protegida por cada token":"Dinero de IA protegido por cada token. Los descuentos salen de tu ganancia y no reducen esta parte.",
 };
 
 const bagTableHelp:Record<string,string>={
-  "Bolsa":"Número interno de esta bolsa. Cada compra, plan o acreditación crea su propia bolsa de tokens.",
-  "Usuario":"Persona a la que pertenecen estos tokens.",
-  "Origen":"Cómo nació la bolsa: compra directa, plan, promoción u otro tipo de acreditación.",
-  "Estado":"Activa = todavía tiene tokens; Agotada = ya se usaron todos; Expirada = vencieron antes de usarse; Reembolsada = se devolvió la compra.",
-  "Tokens":"Primero muestra cuántos quedan y después cuántos tenía originalmente. Ejemplo: 80/100 significa que todavía quedan 80.",
-  "Pagó el cliente":"Dinero que realmente pagó el cliente por esta bolsa después de descuentos o beneficios.",
-  "Ganancia base":"Ganancia comercial de esta bolsa según las condiciones que tenía al comprarse. Los descuentos reducen esta parte, no la reserva de IA.",
-  "Dinero extra":"Ahorros ya confirmados, por ejemplo cuando la reserva para IA fue un poco mayor que el costo real del proveedor.",
-  "Total disponible":"Dinero de esta bolsa que ya quedó libre para la empresa. Incluye la ganancia liberada y otros importes que ya dejaron de estar reservados.",
-  "Reservado para tokens":"Dinero de IA que todavía debe respaldar tokens activos de esta bolsa. Si ya no quedan tokens, normalmente llega a cero.",
-  "Ya enviado a proveedor":"Parte del dinero para IA de esta bolsa que registraste como transferida físicamente a Modal, RunPod, Beam u otro proveedor.",
-  "Aún en caja para IA":"Dinero para IA de esta bolsa que todavía no has transferido a un proveedor. Sigue físicamente disponible en tu caja de infraestructura.",
-  "Crédito libre en proveedor":"Dinero que ya estaba dentro de un proveedor y dejó de estar comprometido con esta bolsa, por ejemplo al vencer tokens. No vuelve automáticamente a tu banco.",
-  "Vencimiento":"Fecha original o real de vencimiento. Si la bolsa se agotó antes, se conserva la fecha histórica para auditoría.",
-  "Acción":"Abre el detalle completo de la bolsa, sus condiciones congeladas y sus movimientos.",
+  "Bolsa":"Identificador de este grupo de tokens. Cada compra, plan o regalo crea su propia bolsa.",
+  "Usuario":"Persona dueña de estos tokens.",
+  "Origen":"De dónde salieron los tokens: compra directa, plan, promoción u otra acreditación.",
+  "Estado":"Activa = todavía tiene tokens. Agotada = ya los gastó todos. Expirada = quedaron tokens sin usar y vencieron. Reembolsada = se devolvió la compra.",
+  "Tokens":"Muestra cuántos quedan de los que tenía originalmente. Ejemplo: 80/100 significa que todavía puede gastar 80.",
+  "Pagó el cliente":"Lo que realmente pagó el cliente por esta bolsa, después de descuentos o beneficios.",
+  "Ganancia":"Tu ganancia de esta bolsa según las condiciones con las que se vendió. Si hubo descuento, se descuenta de aquí.",
+  "Dinero extra":"Dinero que terminó sobrando a tu favor, por ejemplo por redondeos o porque el costo real de IA fue un poco menor.",
+  "Disponible para ti":"Lo que esta bolsa ya aportó a tu dinero libre. Es ganancia más extras ya confirmados.",
+  "IA aún en tu caja":"Dinero de esta bolsa destinado a IA que todavía no has enviado físicamente a Modal, RunPod, Beam u otro proveedor.",
+  "IA ya enviada":"Dinero de esta bolsa que ya registraste como enviado físicamente a un proveedor de IA.",
+  "Vencimiento":"Indica cuándo vence o venció la bolsa. Si se agotó antes, conserva la fecha original solo como historial.",
+  "Acción":"Abre todos los detalles financieros de esta bolsa.",
 };
 
 function BagTableHead({label}:{label:string}){
@@ -166,7 +239,7 @@ export default function CashboxPage(){
   const [operationalAmount,setOperationalAmount]=useState("");
   const [operationalCategory,setOperationalCategory]=useState("hosting");
   const [operationalBeneficiary,setOperationalBeneficiary]=useState("");
-  const [operationalConcept,setOperationalConcept]=useState("Gasto operativo");
+  const [operationalConcept,setOperationalConcept]=useState("Gasto del negocio");
   const [operationalMethod,setOperationalMethod]=useState("");
   const [promoFundAmount,setPromoFundAmount]=useState("");
   const [promoFundProvider,setPromoFundProvider]=useState("modal");
@@ -208,28 +281,28 @@ export default function CashboxPage(){
     help:string;
   }>=summary?[
     {
-      label:"Puedes gastar o retirar",
+      label:"Dinero libre para ti",
       value:summary.available_usd,
       icon:WalletCards,
       className:"text-emerald-300",
       panelClassName:"border-emerald-500/20 bg-emerald-500/[0.045]",
-      help:"Utilidad realmente libre. No incluye dinero reservado ni dinero ya enviado a proveedores.",
+      help:"Dinero que ya puedes usar o retirar. No incluye dinero destinado a IA ni importes que ya mandaste a proveedores.",
     },
     {
-      label:"Para proveedores de IA",
+      label:"IA aún en tu caja",
       value:summary.infrastructure_cash_available_usd,
       icon:ShieldCheck,
       className:"text-sky-300",
       panelClassName:"border-sky-500/25 bg-sky-500/[0.055]",
-      help:"Dinero que tienes en caja para enviar a Modal, RunPod, Beam u otro proveedor de IA.",
+      help:"Dinero destinado a pagar IA que todavía está contigo. Puedes enviarlo a Modal, RunPod, Beam u otro proveedor.",
     },
     {
-      label:"Dinero enviado a proveedores",
+      label:"IA ya enviada",
       value:summary.infrastructure_funded_usd,
       icon:ServerCog,
       className:"text-violet-300",
       panelClassName:"border-violet-500/20 bg-violet-500/[0.045]",
-      help:"Transferencias registradas a Modal, RunPod, Beam u otros proveedores.",
+      help:"Dinero que ya registraste como enviado físicamente a Modal, RunPod, Beam u otros proveedores.",
     },
     {
       label:"Cobros pendientes",
@@ -240,20 +313,12 @@ export default function CashboxPage(){
       help:`${summary.pending_recovery_generations} generación(es) bloqueada(s) · ${summary.pending_recovery_tokens} token(s) por recuperar. Incluye infraestructura pendiente exacta y ganancia potencial estimada.`,
     },
     {
-      label:"Reservado para tokens activos",
-      value:summary.protected_infrastructure_usd,
-      icon:Landmark,
-      className:"text-lime-300",
-      panelClassName:"border-lime-500/25 bg-lime-500/[0.055]",
-      help:"Dinero que todavía debe quedarse apartado porque hay tokens que el usuario aún puede gastar. No está libre para retirar.",
-    },
-    {
-      label:"Ganancia aún no disponible",
+      label:"Ganancia todavía en espera",
       value:summary.blocked_profit_usd,
       icon:Boxes,
       className:"text-amber-300",
       panelClassName:"border-amber-500/20 bg-amber-500/[0.045]",
-      help:"Ganancia de bolsas nuevas que aún no han sido utilizadas.",
+      help:"Ganancia de compras que todavía sigue bloqueada por las reglas de reembolso. Aún no la cuentes como dinero libre.",
     },
     {
       label:"Dinero ya retirado",
@@ -432,9 +497,9 @@ export default function CashboxPage(){
 
   async function registerOperationalExpense(){
     const value=Number(operationalAmount);
-    if(!Number.isFinite(value)||value<=0){toast.error("Escribe un gasto operativo válido.");return;}
+    if(!Number.isFinite(value)||value<=0){toast.error("Escribe un importe válido.");return;}
     if(!operationalCategory.trim()||!operationalConcept.trim()){toast.error("Completa categoría y concepto.");return;}
-    if(!confirm(`Registrar gasto operativo por ${money(value)}?`))return;
+    if(!confirm(`Registrar gasto del negocio por ${money(value)}?`))return;
     setAction("operational-expense");
     try{
       await browserApiRequest<OperationalExpense>("/api/admin/finances/operational-expenses",{
@@ -443,9 +508,9 @@ export default function CashboxPage(){
           concept:operationalConcept.trim(),method:operationalMethod||null,
         }),
       });
-      toast.success("Gasto registrado únicamente contra la Caja Operativa.");
+      toast.success("Gasto registrado. Solo se descontó del dinero para gastos del negocio.");
       setOperationalAmount("");void load();
-    }catch(error){toast.error(error instanceof Error?error.message:"No fue posible registrar el gasto operativo.");}
+    }catch(error){toast.error(error instanceof Error?error.message:"No fue posible registrar el gasto.");}
     finally{setAction(null);}
   }
 
@@ -508,7 +573,7 @@ export default function CashboxPage(){
           ? `${result.expired_tokens} tokens promocionales vencieron. ${money(result.promotional_credit_returned_usd)} regresó a la caja promocional y USD 0 pasó a utilidad.`
           : `${result.expired_tokens} tokens vencieron. ${money(result.infrastructure_cash_released_usd)} pasó a utilidad`
             + (result.provider_credit_released_usd>0
-              ? ` y ${money(result.provider_credit_released_usd)} quedó como crédito ya depositado en el proveedor${providers?` (${providers})`:""}.`
+              ? ` y ${money(result.provider_credit_released_usd)} quedó dentro del proveedor y no regresó a tu caja${providers?` (${providers})`:""}.`
               : "."),
       );
       setDetail(await browserApiRequest<BagDetail>(`/api/admin/finances/token-bags/${detail.bag.id}`));
@@ -525,9 +590,9 @@ export default function CashboxPage(){
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-emerald-400">Dinero de la empresa</p>
-          <h1 className="mt-2 text-2xl font-semibold text-white">Utilidad e infraestructura, sin mezclar</h1>
+          <h1 className="mt-2 text-2xl font-semibold text-white">Tu dinero, separado y fácil de revisar</h1>
           <p className="mt-3 max-w-4xl text-sm leading-7 text-zinc-500">
-            Arriba tienes el resumen. Debajo, cada tema está separado para que abras solo lo que necesitas: ganancias, IA, promociones, gastos, vencimientos y bolsas.
+            Arriba ves lo importante de un vistazo. Debajo puedes abrir compras, dinero para IA, tokens gratis, gastos y vencimientos por separado.
           </p>
         </div>
         <button onClick={()=>void load()} className="rounded-xl border border-white/10 p-3 text-zinc-400 hover:text-white">
@@ -549,47 +614,47 @@ export default function CashboxPage(){
         )}
       </section>}
 
-    {promotional&&<AccordionSection title="Promociones y tokens gratis" description="Administra el crédito gratuito de Modal, RunPod, Beam o fondos generales y decide cómo se entregan los tokens promocionales."><section className="rounded-2xl">
+    {promotional&&<AccordionSection title="Promociones y tokens gratis" description="Controla el dinero que respalda los tokens gratis y decide cuántos regalar y a quién."><section className="rounded-2xl">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-fuchsia-300">Infraestructura patrocinada</p>
-          <h2 className="mt-2 text-lg font-semibold text-white">Créditos promocionales</h2>
+          <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-fuchsia-300">Tokens gratis respaldados</p>
+          <h2 className="mt-2 text-lg font-semibold text-white">Dinero para tokens gratis</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">
-            Dinero o crédito gratuito aportado por proveedores para financiar tokens sin ganancia. No entra a Caja verde ni a la Caja IA comercial.
+            Aquí registras el dinero o crédito que usarás para regalar tokens. Esos tokens no generan ganancia ni gastos operativos.
           </p>
         </div>
-        <div className="text-right"><p className="text-xs text-zinc-600">Disponible</p><p className="mt-1 text-2xl font-semibold text-fuchsia-300">{money(promotional.total_available_usd)}</p><p className="mt-1 text-xs text-zinc-600">Crédito promocional reservado: {money(promotional.reserve_per_token_usd)} / token</p><p className="mt-1 text-xs text-zinc-700">La regla de generación conserva {money(promotional.generation_infrastructure_reserve_per_token_usd)} de capacidad IA por token; el crédito promocional no utilizado regresa a esta caja.</p></div>
+        <div className="text-right"><p className="text-xs text-zinc-600">Disponible</p><p className="mt-1 text-2xl font-semibold text-fuchsia-300">{money(promotional.total_available_usd)}</p><p className="mt-1 text-xs text-zinc-600">Dinero apartado por token gratis: {money(promotional.reserve_per_token_usd)} / token</p><p className="mt-1 text-xs text-zinc-700">La regla de generación conserva {money(promotional.generation_infrastructure_reserve_per_token_usd)} de capacidad IA por token; el crédito promocional no utilizado regresa a esta caja.</p></div>
       </div>
 
       <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {promotional.provider_balances.map(item=><article key={item.provider} className="rounded-2xl border border-white/6 bg-black/20 p-4"><p className="text-xs font-semibold uppercase text-fuchsia-300">{item.provider}</p><p className="mt-3 text-xl font-semibold text-white">{money(item.available_usd)}</p><p className="mt-1 text-xs text-zinc-600">≈ {item.available_tokens} tokens financiables</p></article>)}
+        {promotional.provider_balances.map(item=><article key={item.provider} className="rounded-2xl border border-white/6 bg-black/20 p-4"><p className="text-xs font-semibold uppercase text-fuchsia-300">{item.provider}</p><p className="mt-3 text-xl font-semibold text-white">{money(item.available_usd)}</p><p className="mt-1 text-xs text-zinc-600">≈ {item.available_tokens} tokens que puedes regalar</p></article>)}
       </div>
 
       <div className="mt-6 grid gap-5 xl:grid-cols-2">
         <div className="rounded-2xl border border-white/6 p-5">
-          <h3 className="font-semibold text-white">Agregar crédito gratuito</h3>
+          <h3 className="font-semibold text-white">Agregar dinero para tokens gratis</h3>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <input value={promoFundAmount} onChange={e=>setPromoFundAmount(e.target.value)} type="number" min="0" step="0.01" placeholder="USD" className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"/>
             <select value={promoFundProvider} onChange={e=>setPromoFundProvider(e.target.value)} className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"><option value="modal">Modal</option><option value="runpod">RunPod</option><option value="beam">Beam</option><option value="general">General</option></select>
             <input value={promoFundReference} onChange={e=>setPromoFundReference(e.target.value)} placeholder="Referencia opcional" className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"/>
             <input value={promoFundDescription} onChange={e=>setPromoFundDescription(e.target.value)} placeholder="Concepto" className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"/>
           </div>
-          <button disabled={action!==null} onClick={()=>void addPromotionalFund()} className="mt-4 rounded-xl bg-fuchsia-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">Registrar crédito</button>
+          <button disabled={action!==null} onClick={()=>void addPromotionalFund()} className="mt-4 rounded-xl bg-fuchsia-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">Agregar dinero</button>
         </div>
 
         <div className="rounded-2xl border border-white/6 p-5">
-          <h3 className="font-semibold text-white">Política de entrega</h3>
+          <h3 className="font-semibold text-white">Cómo se reparten los tokens gratis</h3>
           <div className="mt-4 space-y-4 text-sm">
             <label className="flex items-center justify-between gap-4 text-zinc-300"><span>Dar tokens al registrarse</span><input type="checkbox" checked={promotional.settings.signup_enabled} onChange={e=>setPromotional({...promotional,settings:{...promotional.settings,signup_enabled:e.target.checked}})}/></label>
             <label className="block text-zinc-400"><span>Tokens por nuevo usuario</span><input type="number" min="0" value={promotional.settings.signup_tokens} onChange={e=>setPromotional({...promotional,settings:{...promotional.settings,signup_tokens:Number(e.target.value)||0}})} className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"/></label>
-            <label className="block text-zinc-400"><span>Proveedor que respalda el bono</span><select value={promotional.settings.signup_provider} onChange={e=>setPromotional({...promotional,settings:{...promotional.settings,signup_provider:e.target.value}})} className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"><option value="modal">Modal</option><option value="runpod">RunPod</option><option value="beam">Beam</option><option value="general">General</option></select></label>
+            <label className="block text-zinc-400"><span>De qué proveedor sale el dinero</span><select value={promotional.settings.signup_provider} onChange={e=>setPromotional({...promotional,settings:{...promotional.settings,signup_provider:e.target.value}})} className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"><option value="modal">Modal</option><option value="runpod">RunPod</option><option value="beam">Beam</option><option value="general">General</option></select></label>
             <label className="flex items-start justify-between gap-4 text-zinc-300"><span><b>Permitir promocionales para deudas anteriores</b><small className="mt-1 block max-w-md text-zinc-600">Apagado por defecto: los tokens gratis sirven para generaciones nuevas, pero no para desbloquear resultados que ya debían tokens.</small></span><input type="checkbox" checked={promotional.settings.allow_pending_settlement} onChange={e=>setPromotional({...promotional,settings:{...promotional.settings,allow_pending_settlement:e.target.checked}})}/></label>
           </div>
           <div className="mt-4 flex flex-wrap gap-3"><button disabled={action!==null} onClick={()=>void savePromotionalSettings()} className="rounded-xl border border-fuchsia-500/30 px-4 py-2 text-sm text-fuchsia-200 disabled:opacity-40">Guardar política</button><button onClick={()=>void openPromotionalGrant()} className="flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-white"><UserPlus size={15}/>Asignar a usuario</button></div>
         </div>
       </div>
 
-      {promotional.grants.length>0&&<div className="mt-6 overflow-auto"><table className="w-full min-w-[850px] text-left text-sm"><thead className="text-xs uppercase text-zinc-600"><tr><th className="p-3">Usuario</th><th>Tokens</th><th>Proveedor</th><th>Reserva utilizada</th><th>Tipo</th><th>Fecha</th></tr></thead><tbody>{promotional.grants.slice(0,20).map(grant=><tr key={grant.id} className="border-t border-white/5"><td className="p-3 text-zinc-300">{grant.user_email||`#${grant.user_id}`}</td><td>{grant.tokens_granted}</td><td className="uppercase">{promotional.funds.find(f=>f.id===grant.fund_id)?.provider||"—"}</td><td>{money(grant.amount_reserved_usd)}</td><td>{grant.grant_type}</td><td className="text-xs text-zinc-600">{date(grant.created_at)}</td></tr>)}</tbody></table></div>}
+      {promotional.grants.length>0&&<div className="mt-6 overflow-auto"><table className="w-full min-w-[850px] text-left text-sm"><thead className="text-xs uppercase text-zinc-600"><tr><th className="p-3">Usuario</th><th>Tokens</th><th>Proveedor</th><th>Dinero usado</th><th>Tipo</th><th>Fecha</th></tr></thead><tbody>{promotional.grants.slice(0,20).map(grant=><tr key={grant.id} className="border-t border-white/5"><td className="p-3 text-zinc-300">{grant.user_email||`#${grant.user_id}`}</td><td>{grant.tokens_granted}</td><td className="uppercase">{promotional.funds.find(f=>f.id===grant.fund_id)?.provider||"—"}</td><td>{money(grant.amount_reserved_usd)}</td><td>{grant.grant_type}</td><td className="text-xs text-zinc-600">{date(grant.created_at)}</td></tr>)}</tbody></table></div>}
     </section></AccordionSection>}
 
     {pendingRecoveries&&pendingRecoveries.items.length>0&&
@@ -597,14 +662,14 @@ export default function CashboxPage(){
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-orange-300">Cobros por recuperar</p>
-            <h2 className="mt-2 text-lg font-semibold text-white">Pérdidas pendientes</h2>
+            <h2 className="mt-2 text-lg font-semibold text-white">Generaciones que todavía deben pagarse</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">
-              Son generaciones ya producidas cuyo ajuste final todavía no fue cobrado. El costo de IA pendiente ya ocurrió; la ganancia pendiente sigue siendo estimada hasta saber qué bolsas pagarán el ajuste.
+              La imagen ya se generó, pero faltaron tokens para cubrir el costo final. El resultado sigue bloqueado hasta recuperar esos tokens.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3 text-right text-xs">
-            <div><span className="text-zinc-600">Costo de IA pendiente</span><b className="mt-1 block text-orange-200">{money(pendingRecoveries.summary.infrastructure_pending_usd)}</b></div>
-            <div><span className="text-zinc-600">Ganancia potencial</span><b className="mt-1 block text-amber-200">{money(pendingRecoveries.summary.profit_pending_estimated_usd)}</b></div>
+            <div><span className="text-zinc-600">IA que falta recuperar</span><b className="mt-1 block text-orange-200">{money(pendingRecoveries.summary.infrastructure_pending_usd)}</b></div>
+            <div><span className="text-zinc-600">Ganancia si se cobra</span><b className="mt-1 block text-amber-200">{money(pendingRecoveries.summary.profit_pending_estimated_usd)}</b></div>
           </div>
         </div>
         <div className="mt-5 overflow-auto">
@@ -616,8 +681,8 @@ export default function CashboxPage(){
                 <th className="border-b border-white/6 px-3 py-3">Proveedor</th>
                 <th className="border-b border-white/6 px-3 py-3">Cobrado</th>
                 <th className="border-b border-white/6 px-3 py-3">Pendiente</th>
-                <th className="border-b border-white/6 px-3 py-3">Costo de IA pendiente</th>
-                <th className="border-b border-white/6 px-3 py-3">Ganancia potencial</th>
+                <th className="border-b border-white/6 px-3 py-3">IA que falta recuperar</th>
+                <th className="border-b border-white/6 px-3 py-3">Ganancia si se cobra</th>
                 <th className="border-b border-white/6 px-3 py-3">Fecha</th>
               </tr>
             </thead>
@@ -640,32 +705,32 @@ export default function CashboxPage(){
       </section></AccordionSection>}
 
     {summary&&summary.provider_balances.length>0&&
-      <AccordionSection title="Dinero enviado y saldo por proveedor" description="Consulta cuánto registraste como enviado a cada proveedor, cuánto costo ya se generó y cuánto crédito estimado debería quedar."><section className="rounded-2xl">
-        <h2 className="text-lg font-semibold text-white">Saldo por proveedor</h2>
+      <AccordionSection title="Dinero en proveedores de IA" description="Mira cuánto dinero registraste como enviado a Modal, RunPod o Beam y cuánto se ha usado en generaciones."><section className="rounded-2xl">
+        <h2 className="text-lg font-semibold text-white">Qué pasó con el dinero enviado</h2>
         <p className="mt-2 text-sm text-zinc-500">
-          Un proveedor puede tener crédito disponible y otro costo pendiente; el sistema no los mezcla.
+          Aquí comparas lo que enviaste con el costo real de las generaciones. Los importes son registros internos; no consultan automáticamente el saldo real del proveedor.
         </p>
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {summary.provider_balances.map(provider=>
             <article key={provider.provider} className="rounded-2xl border border-white/6 bg-black/20 p-4">
               <p className="text-xs font-semibold uppercase tracking-widest text-violet-300">{provider.provider}</p>
               <dl className="mt-4 space-y-2 text-sm">
-                <div className="flex justify-between gap-4"><dt className="text-zinc-600">Dinero enviado</dt><dd className="text-zinc-200">{money(provider.funded_usd)}</dd></div>
-                <div className="flex justify-between gap-4"><dt className="text-zinc-600">Costo generado</dt><dd className="text-zinc-200">{money(provider.infrastructure_cost_usd)}</dd></div>
-                <div className="flex justify-between gap-4"><dt className="text-zinc-600">Crédito estimado</dt><dd className="text-emerald-300">{money(provider.credit_available_usd)}</dd></div>
-                <div className="flex justify-between gap-4"><dt className="text-zinc-600">Costo pendiente de cubrir</dt><dd className="text-amber-300">{money(provider.unfunded_cost_usd)}</dd></div>
-                <div className="flex justify-between gap-4"><dt className="text-zinc-600">Crédito liberado por vencimientos</dt><dd className="text-sky-300">{money(provider.released_credit_usd)}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="flex items-center text-zinc-600">Dinero enviado<HelpTip text="Todo lo que registraste como transferido físicamente a este proveedor."/></dt><dd className="text-zinc-200">{money(provider.funded_usd)}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="flex items-center text-zinc-600">Costo de generaciones<HelpTip text="Lo que las generaciones realmente han costado en este proveedor según tus registros."/></dt><dd className="text-zinc-200">{money(provider.infrastructure_cost_usd)}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="flex items-center text-zinc-600">Saldo estimado dentro<HelpTip text="Estimación interna: dinero enviado menos costos registrados. No consulta automáticamente la cuenta real del proveedor."/></dt><dd className="text-emerald-300">{money(provider.credit_available_usd)}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="flex items-center text-zinc-600">Costo aún sin cubrir<HelpTip text="Costo de IA registrado que todavía no está cubierto por el dinero que marcaste como enviado a este proveedor."/></dt><dd className="text-amber-300">{money(provider.unfunded_cost_usd)}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="flex items-center text-zinc-600">Quedó dentro al vencer<HelpTip text="Dinero que ya habías enviado al proveedor y no pudo volver a tu utilidad cuando vencieron tokens. No es dinero nuevo ni retirable."/></dt><dd className="text-sky-300">{money(provider.released_credit_usd)}</dd></div>
               </dl>
             </article>,
           )}
         </div>
       </section></AccordionSection>}
 
-    <AccordionSection title="Retiros y transferencias" description="Registra retiros de utilidad o dinero enviado a proveedores de IA. Son movimientos separados y nunca se mezclan."><section className="grid gap-6 xl:grid-cols-2">
+    <AccordionSection title="Sacar dinero o enviarlo a IA" description="Aquí registras dos cosas distintas: dinero que retiras para ti y dinero que mandas a Modal, RunPod, Beam u otro proveedor."><section className="grid gap-6 xl:grid-cols-2">
       <article className="luxia-panel rounded-3xl p-6">
         <h2 className="text-lg font-semibold text-white">Registrar retiro de utilidad</h2>
         <p className="mt-2 text-sm text-zinc-500">
-          Solo descuenta la caja verde. Nunca utiliza reserva ni crédito de proveedores.
+          Solo descuenta tu dinero libre. Nunca toma dinero destinado a IA ni dinero que ya mandaste a proveedores.
         </p>
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <input value={amount} onChange={event=>setAmount(event.target.value)} placeholder="Importe USD" type="number" step="0.01" className="h-11 rounded-xl border border-white/10 bg-black/30 px-4 text-white"/>
@@ -688,7 +753,7 @@ export default function CashboxPage(){
       <article className="luxia-panel rounded-3xl p-6">
         <h2 className="text-lg font-semibold text-white">Enviar dinero a proveedor de IA</h2>
         <p className="mt-2 text-sm leading-6 text-zinc-500">
-          Usa únicamente el dinero apartado para IA. El sistema reparte automáticamente la transferencia entre las bolsas correspondientes para conservar la trazabilidad.
+          Usa únicamente el dinero para IA que todavía está contigo. El sistema registra de qué bolsas salió para que después los vencimientos cuadren correctamente.
         </p>
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <input value={fundingAmount} onChange={event=>setFundingAmount(event.target.value)} placeholder="Importe USD" type="number" step="0.01" className="h-11 rounded-xl border border-white/10 bg-black/30 px-4 text-white"/>
@@ -726,7 +791,7 @@ export default function CashboxPage(){
     {operational&&<AccordionSection title="Gastos del negocio" description="Dinero separado para hosting, correo, dominios, storage, software y otros costos operativos."><section className="rounded-2xl">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-fuchsia-400">Caja operativa</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-fuchsia-400">Dinero para gastos</p>
           <h2 className="mt-2 text-lg font-semibold text-white">Hosting, correo, dominios y gastos del negocio</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">
             Aquí registras los pagos de hosting, correo, dominios y otros gastos. El dinero disponible proviene únicamente del extra por gastos del negocio que quedó congelado en cada bolsa.
@@ -738,14 +803,14 @@ export default function CashboxPage(){
         </div>
       </div>
       <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Info label="Extra por gastos del negocio / token" value={money(operational.operational_reserve_per_token_usd)} help="Cantidad adicional que se cobra por cada token para formar esta caja. Se configura en la vista de precios/configuración de tokens."/>
-        <Info label="Dinero para gastos ya liberado" value={money(operational.released_operational_funds_usd)} help="Total histórico que ya dejó de estar bloqueado por reembolso y pudo entrar a la Caja Operativa."/>
-        <Info label="Todavía reservado por posibles reembolsos" value={money(operational.blocked_operational_funds_usd)} help="Dinero para gastos que todavía no puedes usar porque pertenece a compras que aún podrían reembolsarse."/>
+        <Info label="Extra para gastos por token" value={money(operational.operational_reserve_per_token_usd)} help="Cantidad adicional que se cobra por cada token para formar esta caja. Se configura en la vista de precios/configuración de tokens."/>
+        <Info label="Total que ya estuvo disponible" value={money(operational.released_operational_funds_usd)} help="Todo el dinero para gastos que, con el tiempo, dejó de estar bloqueado por posibles reembolsos."/>
+        <Info label="Todavía reservado por posibles reembolsos" value={money(operational.blocked_operational_funds_usd)} help="Esta parte todavía no se puede gastar porque corresponde a compras que aún podrían devolverse al cliente."/>
         <Info label="Ya gastado" value={money(operational.spent_operational_funds_usd)} help="Suma de los gastos del negocio que ya registraste desde esta caja."/>
       </div>
       <div className="mt-6 grid gap-6 xl:grid-cols-2">
         <div className="rounded-2xl border border-white/6 bg-black/20 p-4">
-          <h3 className="font-semibold text-white">Registrar gasto operativo</h3>
+          <h3 className="font-semibold text-white">Registrar gasto del negocio</h3>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <input value={operationalAmount} onChange={e=>setOperationalAmount(e.target.value)} type="number" step="0.01" placeholder="Importe USD" className="h-11 rounded-xl border border-white/10 bg-black/30 px-4 text-white"/>
             <select value={operationalCategory} onChange={e=>setOperationalCategory(e.target.value)} className="h-11 rounded-xl border border-white/10 bg-black/30 px-4 text-white">
@@ -762,7 +827,7 @@ export default function CashboxPage(){
         <div className="rounded-2xl border border-white/6 bg-black/20 p-4">
           <h3 className="font-semibold text-white">Últimos gastos</h3>
           <div className="mt-4 space-y-2">
-            {operationalExpenses.length===0&&<p className="text-sm text-zinc-600">Todavía no hay gastos operativos registrados.</p>}
+            {operationalExpenses.length===0&&<p className="text-sm text-zinc-600">Todavía no hay gastos del negocio registrados.</p>}
             {operationalExpenses.slice(0,8).map(item=><div key={item.id} className="rounded-xl border border-white/6 p-3 text-sm">
               <div className="flex justify-between gap-4"><span className="text-zinc-400">{item.category} · {item.concept}</span><b className="text-fuchsia-300">-{money(item.amount_usd)}</b></div>
               <p className="mt-1 text-xs text-zinc-700">{item.beneficiary||"Sin beneficiario"} · {date(item.spent_at)}</p>
@@ -772,11 +837,10 @@ export default function CashboxPage(){
       </div>
     </section></AccordionSection>}
 
-    <AccordionSection title="Vencimiento de tokens" description="Configura si los tokens vencen y qué debe ocurrir con el dinero que todavía los respalda."><section className="rounded-2xl">
+    <AccordionSection title="Cuándo vencen los tokens" description="Decide si los tokens caducan. Cuando vencen, el sistema aplica automáticamente las reglas financieras de esa bolsa."><section className="rounded-2xl">
       <h2 className="text-lg font-semibold text-white">Cuándo vencen los tokens</h2>
       <p className="mt-2 text-sm leading-6 text-zinc-500">
-        Al vencer, solo el dinero de infraestructura que todavía sigue en caja pasa a utilidad.
-        Lo que ya enviaste permanece como crédito del proveedor y queda registrado por bolsa.
+        Al vencer, solo el dinero para IA que todavía tienes contigo puede pasar a tu utilidad. Lo que ya habías enviado a Modal, RunPod o Beam no puede regresar a tu caja y queda registrado como dinero que permaneció dentro del proveedor.
       </p>
       <label className="mt-5 flex items-center gap-3 text-sm text-zinc-300">
         <input type="checkbox" checked={expiry.enabled} onChange={event=>setExpiry({...expiry,enabled:event.target.checked})}/>
@@ -797,7 +861,7 @@ export default function CashboxPage(){
         <div>
           <h2 className="text-lg font-semibold text-white">Compras y bolsas de tokens</h2>
           <p className="mt-2 text-sm text-zinc-500">
-            Cada fila conserva las condiciones originales de la bolsa. Pasa el cursor por el <CircleHelp size={13} className="mx-1 inline text-zinc-500"/> de cualquier columna para ver qué significa en palabras simples.
+            Cada fila resume una bolsa. Usa el botón <CircleHelp size={13} className="mx-1 inline text-zinc-500"/> de cada columna: funciona al pasar el mouse, con teclado y también al hacer clic.
           </p>
         </div>
         <select value={status} onChange={event=>setStatus(event.target.value)} className="h-10 rounded-xl border border-white/10 bg-black px-3 text-sm text-white">
@@ -806,21 +870,29 @@ export default function CashboxPage(){
         </select>
       </div>
 
-      <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] px-3 py-2 text-xs text-emerald-200"><b>Verde · dinero de la empresa</b><span className="mt-1 block text-zinc-500">Ganancia y dinero que ya quedó libre.</span></div>
-        <div className="rounded-xl border border-lime-500/20 bg-lime-500/[0.04] px-3 py-2 text-xs text-lime-200"><b>Lima · todavía reservado</b><span className="mt-1 block text-zinc-500">Respalda tokens que el usuario aún puede gastar.</span></div>
-        <div className="rounded-xl border border-sky-500/20 bg-sky-500/[0.04] px-3 py-2 text-xs text-sky-200"><b>Azul · dinero para IA</b><span className="mt-1 block text-zinc-500">Sigue en caja o está listo para enviarse al proveedor.</span></div>
-        <div className="rounded-xl border border-violet-500/20 bg-violet-500/[0.04] px-3 py-2 text-xs text-violet-200"><b>Violeta · ya salió de caja</b><span className="mt-1 block text-zinc-500">Dinero registrado como transferido a un proveedor.</span></div>
+      <div className="mt-5 rounded-2xl border border-white/8 bg-white/[0.025] p-4">
+        <div className="flex items-start gap-3">
+          <CircleHelp className="mt-0.5 shrink-0 text-zinc-400" size={18}/>
+          <div>
+            <p className="text-sm font-semibold text-white">Cómo leer esta tabla</p>
+            <p className="mt-1 text-xs leading-5 text-zinc-500">
+              <b className="text-emerald-300">Disponible para ti</b> es dinero ya libre para la empresa.{" "}
+              <b className="text-sky-300">IA aún en tu caja</b> todavía está contigo para pagar proveedores.{" "}
+              <b className="text-violet-300">IA ya enviada</b> ya salió físicamente hacia Modal, RunPod, Beam u otro proveedor.
+              Los datos más técnicos quedan dentro de <b className="text-zinc-300">Ver detalle</b>.
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="mt-5 overflow-auto">
-        <table className="w-full min-w-[1750px] text-left text-sm">
+        <table className="w-full min-w-[1480px] text-left text-sm">
           <thead className="text-xs uppercase text-zinc-600">
             <tr>
               {[
                 "Bolsa","Usuario","Origen","Estado","Tokens","Pagó el cliente",
-                "Ganancia base","Dinero extra","Total disponible","Reservado para tokens",
-                "Ya enviado a proveedor","Aún en caja para IA","Crédito libre en proveedor","Vencimiento","Acción",
+                "Ganancia","Dinero extra","Disponible para ti",
+                "IA aún en tu caja","IA ya enviada","Vencimiento","Acción",
               ].map(label=><BagTableHead key={label} label={label}/>)}
             </tr>
           </thead>
@@ -828,17 +900,15 @@ export default function CashboxPage(){
             {bags.map(bag=><tr key={bag.id} className="border-b border-white/5 text-zinc-300">
               <td className="px-3 py-4">#{bag.id}</td>
               <td className="px-3 py-4">{bag.user_email||`#${bag.user_id}`}</td>
-              <td className="px-3 py-4">{bag.source_label}</td>
+              <td className="px-3 py-4">{sourceText(bag.source_label)}</td>
               <td className="px-3 py-4">{labels[bag.status]||bag.status}</td>
               <td className="px-3 py-4">{bag.remaining_tokens}/{bag.original_tokens}</td>
               <td className="px-3 py-4">{money(bag.amount_paid_usd)}</td>
               <td className="px-3 py-4 text-emerald-200">{money(bag.commercial_profit_released_usd)}</td>
               <td className="px-3 py-4 text-amber-200">{money(bag.realized_extra_profit_usd)}</td>
               <td className="px-3 py-4 font-semibold text-emerald-300">{money(bag.total_available_from_bag_usd)}</td>
-              <td className="px-3 py-4 text-lime-300">{money(bag.protected_infrastructure_remaining_usd)}</td>
-              <td className="px-3 py-4 text-violet-300">{money(bag.infrastructure_funded_usd)}</td>
               <td className="px-3 py-4 text-sky-300">{money(bag.infrastructure_unfunded_usd)}</td>
-              <td className="px-3 py-4 text-indigo-300">{money(bag.provider_credit_released_usd)}</td>
+              <td className="px-3 py-4 text-violet-300">{money(bag.infrastructure_funded_usd)}</td>
               <td className="max-w-[240px] px-3 py-4 text-xs leading-5">{expirationText(bag)}</td>
               <td className="px-3 py-4">
                 <button onClick={()=>void openBag(bag.id)} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white">Ver detalle</button>
@@ -849,7 +919,7 @@ export default function CashboxPage(){
       </div>
     </section></AccordionSection>
 
-    {promoGrantOpen&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><article className="w-full max-w-2xl rounded-3xl border border-white/10 bg-[#09090a] p-6"><header className="flex items-center justify-between"><div><p className="text-xs uppercase tracking-widest text-fuchsia-300">Créditos promocionales</p><h2 className="mt-2 text-xl font-semibold text-white">Asignar tokens a un usuario</h2></div><button onClick={()=>setPromoGrantOpen(false)}><X className="text-zinc-400"/></button></header><input value={promoUserSearch} onChange={e=>setPromoUserSearch(e.target.value)} placeholder="Buscar por correo o nombre" className="mt-5 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"/><div className="mt-3 max-h-52 overflow-auto rounded-xl border border-white/6">{promoUsers.filter(user=>`${user.email} ${user.full_name||""}`.toLowerCase().includes(promoUserSearch.toLowerCase())).slice(0,30).map(user=><button key={user.id} onClick={()=>setPromoSelectedUser(user)} className={`block w-full border-b border-white/5 p-3 text-left text-sm ${promoSelectedUser?.id===user.id?"bg-fuchsia-500/10 text-fuchsia-200":"text-zinc-300"}`}>{user.email}<small className="ml-2 text-zinc-600">#{user.id}</small></button>)}</div><div className="mt-4 grid gap-3 sm:grid-cols-2"><input value={promoGrantTokens} onChange={e=>setPromoGrantTokens(e.target.value)} type="number" min="1" placeholder="Tokens" className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"/><select value={promoGrantProvider} onChange={e=>setPromoGrantProvider(e.target.value)} className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"><option value="modal">Modal</option><option value="runpod">RunPod</option><option value="beam">Beam</option><option value="general">General</option></select></div><p className="mt-3 text-xs leading-5 text-zinc-600">La asignación manual exige respaldo completo. Si la caja elegida no alcanza, no se crea ningún token.</p><button disabled={action!==null||!promoSelectedUser} onClick={()=>void grantPromotionalTokens()} className="mt-5 rounded-xl bg-fuchsia-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"><Gift className="mr-2 inline" size={15}/>Asignar tokens</button></article></div>}
+    {promoGrantOpen&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><article className="w-full max-w-2xl rounded-3xl border border-white/10 bg-[#09090a] p-6"><header className="flex items-center justify-between"><div><p className="text-xs uppercase tracking-widest text-fuchsia-300">Tokens gratis</p><h2 className="mt-2 text-xl font-semibold text-white">Asignar tokens a un usuario</h2></div><button onClick={()=>setPromoGrantOpen(false)}><X className="text-zinc-400"/></button></header><input value={promoUserSearch} onChange={e=>setPromoUserSearch(e.target.value)} placeholder="Buscar por correo o nombre" className="mt-5 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"/><div className="mt-3 max-h-52 overflow-auto rounded-xl border border-white/6">{promoUsers.filter(user=>`${user.email} ${user.full_name||""}`.toLowerCase().includes(promoUserSearch.toLowerCase())).slice(0,30).map(user=><button key={user.id} onClick={()=>setPromoSelectedUser(user)} className={`block w-full border-b border-white/5 p-3 text-left text-sm ${promoSelectedUser?.id===user.id?"bg-fuchsia-500/10 text-fuchsia-200":"text-zinc-300"}`}>{user.email}<small className="ml-2 text-zinc-600">#{user.id}</small></button>)}</div><div className="mt-4 grid gap-3 sm:grid-cols-2"><input value={promoGrantTokens} onChange={e=>setPromoGrantTokens(e.target.value)} type="number" min="1" placeholder="Tokens" className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"/><select value={promoGrantProvider} onChange={e=>setPromoGrantProvider(e.target.value)} className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"><option value="modal">Modal</option><option value="runpod">RunPod</option><option value="beam">Beam</option><option value="general">General</option></select></div><p className="mt-3 text-xs leading-5 text-zinc-600">La asignación manual exige respaldo completo. Si la caja elegida no alcanza, no se crea ningún token.</p><button disabled={action!==null||!promoSelectedUser} onClick={()=>void grantPromotionalTokens()} className="mt-5 rounded-xl bg-fuchsia-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"><Gift className="mr-2 inline" size={15}/>Asignar tokens</button></article></div>}
 
     {detail&&
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
@@ -857,7 +927,7 @@ export default function CashboxPage(){
           <header className="flex justify-between">
             <div>
               <p className="text-xs uppercase tracking-widest text-sky-400">Bolsa #{detail.bag.id}</p>
-              <h2 className="mt-2 text-2xl font-semibold text-white">{detail.bag.source_label}</h2>
+              <h2 className="mt-2 text-2xl font-semibold text-white">{sourceText(detail.bag.source_label)}</h2>
             </div>
             <button onClick={()=>setDetail(null)}><X className="text-zinc-400"/></button>
           </header>
@@ -865,24 +935,24 @@ export default function CashboxPage(){
           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[
               ["Dinero pagado por el cliente",detail.bag.amount_paid_usd],
-              ["Ganancia base de la compra",detail.bag.commercial_profit_total_usd],
-              ["Ganancia base ya disponible",detail.bag.commercial_profit_released_usd],
+              ["Ganancia original de la compra",detail.bag.commercial_profit_total_usd],
+              ["Ganancia que ya está disponible",detail.bag.commercial_profit_released_usd],
               ["Dinero extra ya confirmado",detail.bag.realized_extra_profit_usd],
               ["Total que puedes retirar de esta bolsa",detail.bag.total_available_from_bag_usd],
-              ["Reserva de tokens vigentes",detail.bag.protected_infrastructure_remaining_usd],
-              ["Costo atribuido a proveedores",detail.bag.infrastructure_used_usd],
-              ["Enviado a proveedores desde esta bolsa",detail.bag.infrastructure_funded_usd],
-              ["Disponible para enviar desde esta bolsa",detail.bag.infrastructure_unfunded_usd],
-              ["Crédito liberado por vencimiento",detail.bag.provider_credit_released_usd],
+              ["Respaldo IA de tokens que quedan",detail.bag.protected_infrastructure_remaining_usd],
+              ["Costo real de IA generado",detail.bag.infrastructure_used_usd],
+              ["Dinero enviado al proveedor desde esta bolsa",detail.bag.infrastructure_funded_usd],
+              ["Dinero de IA que aún tienes en caja",detail.bag.infrastructure_unfunded_usd],
+              ["Dinero que quedó dentro del proveedor",detail.bag.provider_credit_released_usd],
               ["Precio real pagado por token",detail.bag.effective_token_value_usd],
-              ["Extra por gastos del negocio / token",detail.bag.operational_reserve_per_token_usd],
-              ["Extra para gastos total de la bolsa",detail.bag.operational_reserve_total_usd],
+              ["Extra para gastos por token",detail.bag.operational_reserve_per_token_usd],
+              ["Extra total para gastos",detail.bag.operational_reserve_total_usd],
               ["Extra para gastos ya disponible",detail.bag.operational_reserve_released_usd],
               ["Ganancia normal por token",detail.bag.normal_profit_per_token_usd],
               ["Ganancia real por token",detail.bag.effective_profit_per_token_usd],
-              ["Parte de cada token apartada para IA",detail.bag.infrastructure_capacity_per_token_usd],
-              ["Dinero extra por redondeo disponible",detail.bag.rounding_surplus_usd],
-              ["Redondeo retenido como crédito de proveedor",detail.bag.provider_rounding_credit_usd],
+              ["IA protegida por cada token",detail.bag.infrastructure_capacity_per_token_usd],
+              ["Extra por redondeo disponible",detail.bag.rounding_surplus_usd],
+              ["Redondeo que quedó dentro del proveedor",detail.bag.provider_rounding_credit_usd],
             ].map(([label,value])=>
               <div key={String(label)} className="rounded-2xl border border-white/6 p-4">
                 <p className="flex items-center text-xs text-zinc-600">{String(label)}{metricHelp[String(label)]&&<HelpTip text={metricHelp[String(label)]}/>}</p>
@@ -892,7 +962,7 @@ export default function CashboxPage(){
           </div>
 
           <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <Info label="Cómo se compró" value={detail.bag.source_label}/>
+            <Info label="Cómo se obtuvieron estos tokens" value={sourceText(detail.bag.source_label)}/>
             <Info label="Beneficio aplicado" value={detail.bag.profit_discount_percent>0?`${detail.bag.profit_discount_percent.toFixed(2)} %${detail.bag.benefit_label?` · ${detail.bag.benefit_label}`:""}`:"Sin descuento"}/>
             <Info label="Cupón" value={detail.bag.coupon_code||"No se utilizó"}/>
             <Info label="Plan o paquete" value={detail.bag.plan_name||detail.bag.package_name||"Compra libre"}/>
@@ -905,8 +975,7 @@ export default function CashboxPage(){
           <div className="mt-4 rounded-2xl border border-emerald-500/15 bg-emerald-500/5 p-4 text-sm leading-6 text-zinc-400">
             <b className="text-emerald-300">Así cuadra esta bolsa:</b>{" "}
             el descuento solo modifica su ganancia. La reserva congelada conserva su trazabilidad.
-            Las transferencias a proveedores se asignan automáticamente a esta bolsa y, al vencer, solo el efectivo que aún no se había enviado pasa a utilidad;
-            el resto permanece como crédito del proveedor.
+            Las transferencias a proveedores se asignan automáticamente a esta bolsa. Si después vencen tokens, solo el dinero que todavía seguía en tu caja puede pasar a utilidad; lo que ya estaba dentro del proveedor se registra aparte para no fingir que todavía puedes retirarlo.
           </div>
 
           <div className="mt-6 rounded-2xl border border-white/6 p-4">
@@ -914,7 +983,7 @@ export default function CashboxPage(){
             <p className={`mt-2 font-semibold ${detail.bag.refundable?"text-emerald-300":"text-amber-300"}`}>{detail.bag.refund_reason}</p>
             <div className="mt-4 flex flex-wrap gap-3">
               <button disabled={!detail.purchase_id||action!==null} onClick={reconcile} className="flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-white disabled:opacity-40">
-                <RotateCcw size={15}/>Conciliar con Stripe
+                <RotateCcw size={15}/>Comprobar con Stripe
               </button>
               <button disabled={!detail.bag.refundable||!detail.purchase_id||action!==null} onClick={refund} className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">
                 Reembolsar
