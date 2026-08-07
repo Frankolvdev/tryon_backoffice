@@ -1,82 +1,64 @@
-# MegaZIP 4F — BackOffice — Finanzas por generación + bolsas promocionales
+# MegaZIP — BackOffice — Simulador + Administración de usuario + Almacenamiento
 
 BASE EXACTA
-tryon_backoffice-main - 2026-08-07T155806.901.zip
+tryon_backoffice-main - 2026-08-07T163455.185.zip
 
-ALCANCE
-Cambio exclusivamente visual/explicativo en:
-src/app/dashboard/finances/generations/page.tsx
+1. SIMULADOR DE GANANCIAS
+NO se rediseña.
+Se conserva el diseño actual y se añaden únicamente datos necesarios:
+- muestra "Gastos del negocio" en cada escenario;
+- aclara que el simulador es comercial y no mezcla tokens gratis;
+- recomendaciones muestran Base / Gastos por token / Ganancia por token.
+No se recalcula ninguna fórmula en frontend.
 
-NO modifica:
-- Backend
-- AppWeb
-- endpoints
-- fórmulas
-- FIFO
-- snapshots
-- descuentos
-- cupones
-- planes
-- conciliaciones
-- Caja
-- vencimientos
-- movimientos
-- Stripe
-- Modal / RunPod / Beam
+2. DETALLE / ADMINISTRAR USUARIO
+Se conserva toda la administración existente y se revisan textos.
 
-QUÉ SE AGREGA
-1. La vista reconoce visualmente bolsas:
-   - Compra
-   - Plan
-   - Con cupón
-   - Gratis / promotional_credit
+Resumen:
+- nombres más simples: Tokens disponibles, Correo verificado, Inicio de sesión.
+- roles/estados visibles en lenguaje amigable.
 
-2. Se conserva la tabla existente de "¿De dónde salieron los tokens?".
-   Solo se añade una insignia de tipo de bolsa.
+Movimientos de tokens:
+- nueva tarjeta "Dar tokens gratis" usando la Caja Promocional EXISTENTE;
+- muestra tokens gratis que conserva el usuario;
+- muestra saldo promocional disponible y capacidad por proveedor;
+- permite elegir proveedor y cantidad exacta;
+- utiliza el endpoint existente de promotional grants;
+- no crea lógica financiera nueva.
+- nueva tarjeta de "Ajuste administrativo de tokens" usando el endpoint existente;
+  se diferencia explícitamente de regalar tokens.
+- conserva el historial existente.
 
-3. Nueva sección explicativa:
-   "¿Qué tipo de dinero aportó cada bolsa?"
+Nueva pestaña: ALMACENAMIENTO
+- Generaciones con miniaturas.
+- Archivos subidos (inputs).
+- Resultados.
+- Librería.
+- Otros archivos.
+- búsqueda y filtros.
+- muestra tamaño total.
+- previews mediante signed-url del storage existente.
+- respeta el provider almacenado en cada archivo aunque la configuración activa cambie.
+- permite eliminar una generación terminada y sus resultados.
+- NO borra inputs automáticamente.
+- aclara que el historial financiero se conserva.
+- si hay más de 1000 archivos avisa que muestra solo los recientes.
 
-   Para cada bolsa muestra, usando exclusivamente valores que YA entrega
-   token_bags_used:
-   - Tokens usados
-   - Pagó el cliente
-   - Parte para IA
-   - Gastos del negocio
-   - Ganancia
-
-4. Para promotional_credit explica explícitamente:
-   - Cliente pagó = USD 0
-   - Ganancia = USD 0
-   - Gastos del negocio = USD 0
-   - La infraestructura está respaldada por el fondo promocional
-
-5. Las bolsas con cupón conservan y explican que el descuento sale de la
-   ganancia; no se recalcula absolutamente nada en el frontend.
-
-IMPORTANTE
-La vista NO infiere ni reconstruye fórmulas. Lee los campos ya calculados por
-el backend:
-- cash_value_at_purchase_usd
-- infrastructure_capacity_from_tokens_usd
-- operational_reserve_from_tokens_usd
-- company_profit_usd
-- source / source_label
+3. CONFIGURACIÓN / ECONOMÍA
+- se elimina del formulario el manejo innecesario de moneda configurable;
+  la plataforma continúa mostrando USD.
+- el resto de la configuración sigue usando los mismos endpoints.
 
 VALIDACIÓN
-El TSX pasó TypeScript 5.8.3 transpileModule:
-0 diagnostics.
+Los 8 archivos TS/TSX modificados pasaron TypeScript 5.8.3 transpileModule:
+0 errores sintácticos.
 
-APLICACIÓN
-Extraer directamente sobre:
-F:\PROYECTOS PERSONALES\TRYON\backoffice
+No se ejecutó next build en este entorno porque el ZIP fuente no incluye
+node_modules. Ejecutarlo localmente.
 
-PRUEBA LOCAL
-Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue
-npm run build
-npm run dev
+NO HAY APPWEB EN ESTE MEGAZIP.
 
 GIT
 git add .
-git commit -m "ux: explain promotional and mixed token bags in generation finances"
+git commit -m "feat: upgrade simulator and user administration"
 git push

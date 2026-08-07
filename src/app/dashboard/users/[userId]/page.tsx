@@ -10,6 +10,7 @@ import {
   Coins,
   CreditCard,
   KeyRound,
+  HardDrive,
   LoaderCircle,
   MonitorSmartphone,
   Pencil,
@@ -25,6 +26,9 @@ import { UserRbacPanel } from "@/components/backoffice/user-rbac-panel";
 import { UserSessionsPanel } from "@/components/backoffice/user-sessions-panel";
 import { UserSubscriptionPanel } from "@/components/backoffice/user-subscription-panel";
 import { UserTokenPurchasesPanel } from "@/components/backoffice/user-token-purchases-panel";
+import { UserPromotionalTokensPanel } from "@/components/backoffice/user-promotional-tokens-panel";
+import { UserStoragePanel } from "@/components/backoffice/user-storage-panel";
+import { UserTokenAdjustmentPanel } from "@/components/backoffice/user-token-adjustment-panel";
 import { browserApiRequest } from "@/lib/api/browser-api";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +45,7 @@ type DetailTab =
   | "rbac"
   | "sessions"
   | "tokens"
+  | "storage"
   | "subscription"
   | "purchases"
   | "api-keys"
@@ -68,6 +73,29 @@ function formatDate(
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+
+function friendlyRole(value: string): string {
+  const normalized=value.toLowerCase();
+  if(normalized==="superadmin") return "Superadministrador";
+  if(normalized==="admin") return "Administrador";
+  if(normalized==="user") return "Usuario";
+  return value;
+}
+function friendlyUserStatus(value: string): string {
+  const normalized=value.toLowerCase();
+  if(normalized==="active") return "Activo";
+  if(normalized==="suspended") return "Suspendido";
+  if(normalized==="deleted") return "Eliminado";
+  if(normalized==="inactive") return "Inactivo";
+  return value;
+}
+function friendlyAuthProvider(value: string): string {
+  const normalized=value.toLowerCase();
+  if(normalized==="local"||normalized==="email") return "Correo y contraseña";
+  if(normalized==="google") return "Google";
+  return value;
 }
 
 export default function UserDetailPage() {
@@ -214,6 +242,11 @@ export default function UserDetailPage() {
       count: data.transactions.length,
     },
     {
+      key: "storage",
+      label: "Almacenamiento",
+      icon: HardDrive,
+    },
+    {
       key: "subscription",
       label: "Suscripción",
       icon: CreditCard,
@@ -291,16 +324,16 @@ export default function UserDetailPage() {
 
       <section className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          ["Rol", user.role],
-          ["Estado", user.status],
+          ["Rol", friendlyRole(user.role)],
+          ["Estado", friendlyUserStatus(user.status)],
           [
-            "Balance",
+            "Tokens disponibles",
             user.token_balance.toLocaleString(
               "es-MX",
             ),
           ],
           [
-            "Verificado",
+            "Correo verificado",
             user.is_verified ? "Sí" : "No",
           ],
         ].map(([label, value]) => (
@@ -367,8 +400,8 @@ export default function UserDetailPage() {
                       "Sin nombre",
                   ],
                   [
-                    "Proveedor",
-                    user.auth_provider,
+                    "Inicio de sesión",
+                    friendlyAuthProvider(user.auth_provider),
                   ],
                   [
                     "Activo",
@@ -477,10 +510,14 @@ export default function UserDetailPage() {
         )}
 
         {activeTab === "tokens" && (
-          <section className="luxia-panel rounded-3xl p-6">
+          <div className="space-y-5">
+            <UserPromotionalTokensPanel userId={user.id} onChanged={loadUser} />
+            <UserTokenAdjustmentPanel userId={user.id} onChanged={async () => { await loadUser(); }} />
+            <section className="luxia-panel rounded-3xl p-6">
             <h2 className="font-semibold text-white">
-              Movimientos de tokens
+              Historial de tokens
             </h2>
+            <p className="mt-2 text-sm text-zinc-600">Aquí puedes revisar cuándo recibió o gastó tokens y cuál fue su saldo después de cada movimiento.</p>
 
             <div className="mt-5 space-y-3">
               {data.transactions.length ===
@@ -531,7 +568,12 @@ export default function UserDetailPage() {
                 )
               )}
             </div>
-          </section>
+            </section>
+          </div>
+        )}
+
+        {activeTab === "storage" && (
+          <UserStoragePanel userId={user.id} />
         )}
 
         {activeTab === "api-keys" && (

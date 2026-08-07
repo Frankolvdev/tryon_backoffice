@@ -320,3 +320,10 @@ export interface SuccessResponse {
 }
 
 export type AdminUser = User;
+
+export interface AdminUserGenerationDeleteResponse {
+  execution_id: string;
+  deleted_result_files: number;
+  deleted_gallery_items: number;
+  financial_history_preserved: boolean;
+}

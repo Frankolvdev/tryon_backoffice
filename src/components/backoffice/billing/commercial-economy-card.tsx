@@ -34,8 +34,6 @@ export function CommercialEconomyCard({ onUpdated }: CommercialEconomyCardProps)
   const [tokenValue, setTokenValue] = useState("0.10");
   const [operationalReserve, setOperationalReserve] = useState("0");
   const [commercialSaleValue, setCommercialSaleValue] = useState("0.10");
-  // Currency is still preserved for API/backward compatibility, but the product UI is USD-only.
-  const [currency, setCurrency] = useState("USD");
   const [isLoading, setIsLoading] = useState(true);
   const [isRepricing, setIsRepricing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -49,7 +47,6 @@ export function CommercialEconomyCard({ onUpdated }: CommercialEconomyCardProps)
         setTokenValue(String(result.token_value_usd));
         setOperationalReserve(String(result.operational_reserve_per_token_usd ?? 0));
         setCommercialSaleValue(String(result.commercial_sale_value_per_token_usd ?? result.token_value_usd));
-        setCurrency(result.currency || "USD");
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "No fue posible cargar la configuración de tokens.");
       } finally {
@@ -93,14 +90,12 @@ export function CommercialEconomyCard({ onUpdated }: CommercialEconomyCardProps)
           body: JSON.stringify({
             token_value_usd: parsed,
             operational_reserve_per_token_usd: parsedOperational,
-            currency,
           }),
         },
       );
       setTokenValue(String(result.token_value_usd));
       setOperationalReserve(String(result.operational_reserve_per_token_usd ?? 0));
       setCommercialSaleValue(String(result.commercial_sale_value_per_token_usd ?? result.token_value_usd));
-      setCurrency(result.currency || "USD");
       toast.success("Precio de los tokens actualizado. Recalcula el catálogo para aplicarlo a ventas futuras.");
       onUpdated?.();
     } catch (error) {
