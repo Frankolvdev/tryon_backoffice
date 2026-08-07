@@ -1,10 +1,12 @@
 "use client";
 
-import {useCallback,useEffect,useState} from "react";
+import {useCallback,useEffect,useState,type ReactNode} from "react";
 import {
   Banknote,
   Boxes,
   CircleDollarSign,
+  CircleHelp,
+  ChevronDown,
   Landmark,
   Gift,
   UserPlus,
@@ -65,9 +67,62 @@ function expirationLabel(bag:TokenBag){
   return "Vencimiento";
 }
 
-function Info({label,value}:{label:string;value:string}){
+
+function HelpTip({text}:{text:string}){
+  return <span className="group/help relative ml-1 inline-flex align-middle">
+    <span
+      tabIndex={0}
+      role="note"
+      aria-label={text}
+      className="inline-flex cursor-help items-center text-zinc-600 outline-none transition hover:text-zinc-300 focus:text-zinc-300"
+    >
+      <CircleHelp size={13}/>
+    </span>
+    <span className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 hidden w-64 -translate-x-1/2 rounded-xl border border-white/10 bg-zinc-950 p-3 text-left text-xs font-normal normal-case leading-5 tracking-normal text-zinc-300 shadow-2xl group-hover/help:block group-focus-within/help:block">
+      {text}
+    </span>
+  </span>;
+}
+
+function AccordionSection({
+  title,
+  description,
+  children,
+  defaultOpen=false,
+}:{title:string;description:string;children?:ReactNode;defaultOpen?:boolean}){
+  return <details open={defaultOpen} className="group luxia-panel overflow-visible rounded-3xl">
+    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-6 [&::-webkit-details-marker]:hidden">
+      <div>
+        <h2 className="text-lg font-semibold text-white">{title}</h2>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-zinc-500">{description}</p>
+      </div>
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-white/8 text-zinc-500 transition group-open:text-white">
+        <ChevronDown size={18} className="transition-transform duration-200 group-open:rotate-180"/>
+      </div>
+    </summary>
+    <div className="border-t border-white/6 p-6">
+      {children}
+    </div>
+  </details>;
+}
+
+const metricHelp:Record<string,string>={
+  "Ganancia base ya disponible":"Parte de la ganancia de esta bolsa que ya quedó liberada para la empresa.",
+  "Dinero extra ya confirmado":"Ahorros o redondeos ya confirmados después de pagar el costo real de infraestructura.",
+  "Reserva de tokens vigentes":"Dinero que todavía debe mantenerse separado porque respalda tokens que el usuario aún puede gastar.",
+  "Costo atribuido a proveedores":"Costo real de IA que las generaciones de esta bolsa ya produjeron.",
+  "Enviado a proveedores desde esta bolsa":"Parte del dinero para IA que ya registraste como transferida físicamente a Modal, RunPod, Beam u otro proveedor.",
+  "Disponible para enviar desde esta bolsa":"Dinero de IA de esta bolsa que sigue en tu caja y todavía puede enviarse a un proveedor.",
+  "Crédito liberado por vencimiento":"Dinero que ya estaba depositado en un proveedor y quedó libre cuando vencieron tokens; sigue dentro del proveedor, no en tu caja verde.",
+  "Extra por gastos del negocio / token":"Cantidad adicional por token congelada en esta bolsa para hosting, correo, dominios y otros gastos.",
+  "Extra para gastos total de la bolsa":"Total reservado originalmente por esta bolsa para gastos del negocio.",
+  "Extra para gastos ya disponible":"Parte del fondo de gastos de esta bolsa que ya dejó de estar bloqueada por reembolso.",
+  "Parte de cada token apartada para IA":"Reserva fija por token que protege el costo de generación. Los descuentos no deben reducirla.",
+};
+
+function Info({label,value,help}:{label:string;value:string;help?:string}){
   return <div className="rounded-2xl border border-white/6 bg-black/20 p-4">
-    <p className="text-xs text-zinc-600">{label}</p>
+    <p className="flex items-center text-xs text-zinc-600">{label}{help&&<HelpTip text={help}/>}</p>
     <p className="mt-2 text-sm font-medium text-zinc-200">{value}</p>
   </div>;
 }
@@ -112,7 +167,7 @@ export default function CashboxPage(){
   const [fundingAmount,setFundingAmount]=useState("");
   const [fundingProvider,setFundingProvider]=useState("modal");
   const [fundingBeneficiary,setFundingBeneficiary]=useState("");
-  const [fundingConcept,setFundingConcept]=useState("Fondeo de infraestructura");
+  const [fundingConcept,setFundingConcept]=useState("Transferencia para infraestructura");
   const [fundingMethod,setFundingMethod]=useState("");
 
   const [action,setAction]=useState<string|null>(null);
@@ -129,38 +184,38 @@ export default function CashboxPage(){
       value:summary.available_usd,
       icon:WalletCards,
       className:"text-emerald-300",
-      help:"Utilidad realmente libre. No incluye dinero reservado ni fondeado.",
+      help:"Utilidad realmente libre. No incluye dinero reservado ni dinero ya enviado a proveedores.",
     },
     {
-      label:"Caja IA sin transferir",
+      label:"Dinero para IA disponible",
       value:summary.infrastructure_cash_available_usd,
       icon:ShieldCheck,
       className:"text-sky-300",
       help:"Dinero de infraestructura que todavía sigue en tu caja y puede enviarse a proveedores.",
     },
     {
-      label:"Fondeado en proveedores",
+      label:"Dinero enviado a proveedores",
       value:summary.infrastructure_funded_usd,
       icon:ServerCog,
       className:"text-violet-300",
       help:"Transferencias registradas a Modal, RunPod, Beam u otros proveedores.",
     },
     {
-      label:"Pérdidas pendientes",
+      label:"Cobros pendientes",
       value:summary.pending_recovery_economic_estimated_usd,
       icon:CircleDollarSign,
       className:"text-orange-300",
       help:`${summary.pending_recovery_generations} generación(es) bloqueada(s) · ${summary.pending_recovery_tokens} token(s) por recuperar. Incluye infraestructura pendiente exacta y ganancia potencial estimada.`,
     },
     {
-      label:"Reserva de tokens vigentes",
+      label:"Dinero que respalda tokens activos",
       value:summary.protected_infrastructure_usd,
       icon:Landmark,
       className:"text-cyan-300",
       help:"Respaldo que todavía corresponde a tokens no consumidos ni vencidos.",
     },
     {
-      label:"Ganancia todavía bloqueada",
+      label:"Ganancia aún no disponible",
       value:summary.blocked_profit_usd,
       icon:Boxes,
       className:"text-amber-300",
@@ -171,7 +226,7 @@ export default function CashboxPage(){
       value:summary.withdrawals_usd,
       icon:Banknote,
       className:"text-rose-300",
-      help:"Retiros de utilidad. No incluye fondeos a proveedores.",
+      help:"Retiros de utilidad. No incluye transferencias hechas a proveedores de IA.",
     },
   ]:[];
 
@@ -265,7 +320,7 @@ export default function CashboxPage(){
       toast.error("Escribe el proveedor que recibirá el dinero.");
       return;
     }
-    if(!confirm(`Registrar fondeo de ${money(value)} a ${provider}? El sistema lo asignará FIFO a las bolsas exactas.`))return;
+    if(!confirm(`Registrar transferencia de ${money(value)} a ${provider}? El sistema la repartirá automáticamente entre las bolsas correspondientes.`))return;
     setAction("fund-provider");
     try{
       const result=await browserApiRequest<InfrastructureFunding>(
@@ -282,12 +337,12 @@ export default function CashboxPage(){
         },
       );
       toast.success(
-        `Fondeo registrado y repartido entre ${result.allocations.length} bolsa(s).`,
+        `Transferencia registrada y repartida entre ${result.allocations.length} bolsa(s).`,
       );
       setFundingAmount("");
       void load();
     }catch(error){
-      toast.error(error instanceof Error?error.message:"No fue posible registrar el fondeo.");
+      toast.error(error instanceof Error?error.message:"No fue posible registrar la transferencia.");
     }finally{
       setAction(null);
     }
@@ -418,7 +473,7 @@ export default function CashboxPage(){
           ? `${result.expired_tokens} tokens promocionales vencieron. ${money(result.promotional_credit_returned_usd)} regresó a la caja promocional y USD 0 pasó a utilidad.`
           : `${result.expired_tokens} tokens vencieron. ${money(result.infrastructure_cash_released_usd)} pasó a utilidad`
             + (result.provider_credit_released_usd>0
-              ? ` y ${money(result.provider_credit_released_usd)} quedó como crédito fondeado${providers?` (${providers})`:""}.`
+              ? ` y ${money(result.provider_credit_released_usd)} quedó como crédito ya depositado en el proveedor${providers?` (${providers})`:""}.`
               : "."),
       );
       setDetail(await browserApiRequest<BagDetail>(`/api/admin/finances/token-bags/${detail.bag.id}`));
@@ -437,8 +492,7 @@ export default function CashboxPage(){
           <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-emerald-400">Dinero de la empresa</p>
           <h1 className="mt-2 text-2xl font-semibold text-white">Utilidad e infraestructura, sin mezclar</h1>
           <p className="mt-3 max-w-4xl text-sm leading-7 text-zinc-500">
-            La caja verde conserva la utilidad. La caja de IA registra el dinero cobrado para infraestructura,
-            lo que sigue en banco y lo que ya fue fondeado a cada proveedor.
+            Arriba tienes el resumen. Debajo, cada tema está separado para que abras solo lo que necesitas: ganancias, IA, promociones, gastos, vencimientos y bolsas.
           </p>
         </div>
         <button onClick={()=>void load()} className="rounded-xl border border-white/10 p-3 text-zinc-400 hover:text-white">
@@ -460,7 +514,7 @@ export default function CashboxPage(){
         )}
       </section>}
 
-    {promotional&&<section className="luxia-panel rounded-3xl p-6">
+    {promotional&&<AccordionSection title="Promociones y tokens gratis" description="Administra el crédito gratuito de Modal, RunPod, Beam o fondos generales y decide cómo se entregan los tokens promocionales."><section className="rounded-2xl">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-fuchsia-300">Infraestructura patrocinada</p>
@@ -501,20 +555,20 @@ export default function CashboxPage(){
       </div>
 
       {promotional.grants.length>0&&<div className="mt-6 overflow-auto"><table className="w-full min-w-[850px] text-left text-sm"><thead className="text-xs uppercase text-zinc-600"><tr><th className="p-3">Usuario</th><th>Tokens</th><th>Proveedor</th><th>Reserva utilizada</th><th>Tipo</th><th>Fecha</th></tr></thead><tbody>{promotional.grants.slice(0,20).map(grant=><tr key={grant.id} className="border-t border-white/5"><td className="p-3 text-zinc-300">{grant.user_email||`#${grant.user_id}`}</td><td>{grant.tokens_granted}</td><td className="uppercase">{promotional.funds.find(f=>f.id===grant.fund_id)?.provider||"—"}</td><td>{money(grant.amount_reserved_usd)}</td><td>{grant.grant_type}</td><td className="text-xs text-zinc-600">{date(grant.created_at)}</td></tr>)}</tbody></table></div>}
-    </section>}
+    </section></AccordionSection>}
 
     {pendingRecoveries&&pendingRecoveries.items.length>0&&
-      <section className="luxia-panel rounded-3xl p-6">
+      <AccordionSection title="Cobros pendientes" description="Generaciones que ya terminaron pero todavía tienen tokens por cobrar. Aquí puedes ver cuánto falta recuperar."><section className="rounded-2xl">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-orange-300">Cobros por recuperar</p>
             <h2 className="mt-2 text-lg font-semibold text-white">Pérdidas pendientes</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">
-              Son generaciones ya producidas cuyo ajuste final todavía no fue cobrado. La infraestructura pendiente es un costo real ya incurrido; la ganancia pendiente es una estimación hasta conocer qué bolsas pagarán el ajuste.
+              Son generaciones ya producidas cuyo ajuste final todavía no fue cobrado. El costo de IA pendiente ya ocurrió; la ganancia pendiente sigue siendo estimada hasta saber qué bolsas pagarán el ajuste.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3 text-right text-xs">
-            <div><span className="text-zinc-600">Infraestructura pendiente</span><b className="mt-1 block text-orange-200">{money(pendingRecoveries.summary.infrastructure_pending_usd)}</b></div>
+            <div><span className="text-zinc-600">Costo de IA pendiente</span><b className="mt-1 block text-orange-200">{money(pendingRecoveries.summary.infrastructure_pending_usd)}</b></div>
             <div><span className="text-zinc-600">Ganancia potencial</span><b className="mt-1 block text-amber-200">{money(pendingRecoveries.summary.profit_pending_estimated_usd)}</b></div>
           </div>
         </div>
@@ -527,7 +581,7 @@ export default function CashboxPage(){
                 <th className="border-b border-white/6 px-3 py-3">Proveedor</th>
                 <th className="border-b border-white/6 px-3 py-3">Cobrado</th>
                 <th className="border-b border-white/6 px-3 py-3">Pendiente</th>
-                <th className="border-b border-white/6 px-3 py-3">Infraestructura pendiente</th>
+                <th className="border-b border-white/6 px-3 py-3">Costo de IA pendiente</th>
                 <th className="border-b border-white/6 px-3 py-3">Ganancia potencial</th>
                 <th className="border-b border-white/6 px-3 py-3">Fecha</th>
               </tr>
@@ -548,10 +602,10 @@ export default function CashboxPage(){
             </tbody>
           </table>
         </div>
-      </section>}
+      </section></AccordionSection>}
 
     {summary&&summary.provider_balances.length>0&&
-      <section className="luxia-panel rounded-3xl p-6">
+      <AccordionSection title="Dinero enviado y saldo por proveedor" description="Consulta cuánto registraste como enviado a cada proveedor, cuánto costo ya se generó y cuánto crédito estimado debería quedar."><section className="rounded-2xl">
         <h2 className="text-lg font-semibold text-white">Saldo por proveedor</h2>
         <p className="mt-2 text-sm text-zinc-500">
           Un proveedor puede tener crédito disponible y otro costo pendiente; el sistema no los mezcla.
@@ -561,18 +615,18 @@ export default function CashboxPage(){
             <article key={provider.provider} className="rounded-2xl border border-white/6 bg-black/20 p-4">
               <p className="text-xs font-semibold uppercase tracking-widest text-violet-300">{provider.provider}</p>
               <dl className="mt-4 space-y-2 text-sm">
-                <div className="flex justify-between gap-4"><dt className="text-zinc-600">Fondeado</dt><dd className="text-zinc-200">{money(provider.funded_usd)}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-zinc-600">Dinero enviado</dt><dd className="text-zinc-200">{money(provider.funded_usd)}</dd></div>
                 <div className="flex justify-between gap-4"><dt className="text-zinc-600">Costo generado</dt><dd className="text-zinc-200">{money(provider.infrastructure_cost_usd)}</dd></div>
                 <div className="flex justify-between gap-4"><dt className="text-zinc-600">Crédito estimado</dt><dd className="text-emerald-300">{money(provider.credit_available_usd)}</dd></div>
-                <div className="flex justify-between gap-4"><dt className="text-zinc-600">Costo sin fondear</dt><dd className="text-amber-300">{money(provider.unfunded_cost_usd)}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-zinc-600">Costo pendiente de cubrir</dt><dd className="text-amber-300">{money(provider.unfunded_cost_usd)}</dd></div>
                 <div className="flex justify-between gap-4"><dt className="text-zinc-600">Crédito liberado por vencimientos</dt><dd className="text-sky-300">{money(provider.released_credit_usd)}</dd></div>
               </dl>
             </article>,
           )}
         </div>
-      </section>}
+      </section></AccordionSection>}
 
-    <section className="grid gap-6 xl:grid-cols-2">
+    <AccordionSection title="Retiros y transferencias" description="Registra retiros de utilidad o dinero enviado a proveedores de IA. Son movimientos separados y nunca se mezclan."><section className="grid gap-6 xl:grid-cols-2">
       <article className="luxia-panel rounded-3xl p-6">
         <h2 className="text-lg font-semibold text-white">Registrar retiro de utilidad</h2>
         <p className="mt-2 text-sm text-zinc-500">
@@ -597,9 +651,9 @@ export default function CashboxPage(){
       </article>
 
       <article className="luxia-panel rounded-3xl p-6">
-        <h2 className="text-lg font-semibold text-white">Fondear proveedor de IA</h2>
+        <h2 className="text-lg font-semibold text-white">Enviar dinero a proveedor de IA</h2>
         <p className="mt-2 text-sm leading-6 text-zinc-500">
-          Descuenta únicamente la caja de infraestructura y reparte el movimiento FIFO entre las bolsas exactas.
+          Usa únicamente el dinero apartado para IA. El sistema reparte automáticamente la transferencia entre las bolsas correspondientes para conservar la trazabilidad.
         </p>
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <input value={fundingAmount} onChange={event=>setFundingAmount(event.target.value)} placeholder="Importe USD" type="number" step="0.01" className="h-11 rounded-xl border border-white/10 bg-black/30 px-4 text-white"/>
@@ -616,7 +670,7 @@ export default function CashboxPage(){
           <input value={fundingConcept} onChange={event=>setFundingConcept(event.target.value)} placeholder="Concepto" className="h-11 rounded-xl border border-white/10 bg-black/30 px-4 text-white sm:col-span-2"/>
         </div>
         <button disabled={action!==null} onClick={fundProvider} className="mt-4 rounded-xl bg-sky-500 px-5 py-3 text-sm font-semibold text-black disabled:opacity-40">
-          {action==="fund-provider"?"Asignando bolsas…":"Registrar fondeo FIFO"}
+          {action==="fund-provider"?"Asignando bolsas…":"Registrar transferencia"}
         </button>
         <div className="mt-6 space-y-2">
           {fundings.slice(0,6).map(item=>
@@ -632,15 +686,15 @@ export default function CashboxPage(){
           )}
         </div>
       </article>
-    </section>
+    </section></AccordionSection>
 
-    {operational&&<section className="luxia-panel rounded-3xl p-6">
+    {operational&&<AccordionSection title="Gastos del negocio" description="Dinero separado para hosting, correo, dominios, storage, software y otros costos operativos."><section className="rounded-2xl">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-fuchsia-400">Caja operativa</p>
           <h2 className="mt-2 text-lg font-semibold text-white">Hosting, correo, dominios y gastos del negocio</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">
-            Se alimenta únicamente del componente operativo congelado en cada bolsa. No usa Caja verde ni reserva IA.
+            Aquí registras los pagos de hosting, correo, dominios y otros gastos. El dinero disponible proviene únicamente del extra por gastos del negocio que quedó congelado en cada bolsa.
           </p>
         </div>
         <div className="rounded-2xl border border-fuchsia-500/15 bg-fuchsia-950/10 px-5 py-4 text-right">
@@ -649,10 +703,10 @@ export default function CashboxPage(){
         </div>
       </div>
       <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Info label="Fondo operativo / token actual" value={money(operational.operational_reserve_per_token_usd)}/>
-        <Info label="Liberado y disponible históricamente" value={money(operational.released_operational_funds_usd)}/>
-        <Info label="Todavía bloqueado por reembolso" value={money(operational.blocked_operational_funds_usd)}/>
-        <Info label="Gastos ya registrados" value={money(operational.spent_operational_funds_usd)}/>
+        <Info label="Extra por gastos del negocio / token" value={money(operational.operational_reserve_per_token_usd)} help="Cantidad adicional que se cobra por cada token para formar esta caja. Se configura en la vista de precios/configuración de tokens."/>
+        <Info label="Dinero para gastos ya liberado" value={money(operational.released_operational_funds_usd)} help="Total histórico que ya dejó de estar bloqueado por reembolso y pudo entrar a la Caja Operativa."/>
+        <Info label="Todavía reservado por posibles reembolsos" value={money(operational.blocked_operational_funds_usd)} help="Dinero para gastos que todavía no puedes usar porque pertenece a compras que aún podrían reembolsarse."/>
+        <Info label="Ya gastado" value={money(operational.spent_operational_funds_usd)} help="Suma de los gastos del negocio que ya registraste desde esta caja."/>
       </div>
       <div className="mt-6 grid gap-6 xl:grid-cols-2">
         <div className="rounded-2xl border border-white/6 bg-black/20 p-4">
@@ -681,13 +735,13 @@ export default function CashboxPage(){
           </div>
         </div>
       </div>
-    </section>}
+    </section></AccordionSection>}
 
-    <section className="luxia-panel rounded-3xl p-6">
+    <AccordionSection title="Vencimiento de tokens" description="Configura si los tokens vencen y qué debe ocurrir con el dinero que todavía los respalda."><section className="rounded-2xl">
       <h2 className="text-lg font-semibold text-white">Cuándo vencen los tokens</h2>
       <p className="mt-2 text-sm leading-6 text-zinc-500">
         Al vencer, solo el dinero de infraestructura que todavía sigue en caja pasa a utilidad.
-        Lo ya fondeado permanece como crédito del proveedor y queda registrado por bolsa.
+        Lo que ya enviaste permanece como crédito del proveedor y queda registrado por bolsa.
       </p>
       <label className="mt-5 flex items-center gap-3 text-sm text-zinc-300">
         <input type="checkbox" checked={expiry.enabled} onChange={event=>setExpiry({...expiry,enabled:event.target.checked})}/>
@@ -699,16 +753,16 @@ export default function CashboxPage(){
       {expiry.simulation_enabled&&
         <p className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs leading-5 text-amber-200">
           Modo de prueba activo: abre una bolsa con tokens y usa “Simular vencimiento”.
-          El movimiento es real, auditable y respeta sus fondeos FIFO.
+          El movimiento es real, auditable y respeta las transferencias ya registradas por bolsa.
         </p>}
-    </section>
+    </section></AccordionSection>
 
-    <section className="luxia-panel rounded-3xl p-6">
+    <AccordionSection title="Compras y bolsas de tokens" description="Consulta el historial completo de bolsas, descuentos, reservas, transferencias y vencimientos."><section className="rounded-2xl">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-white">Compras y bolsas de tokens</h2>
           <p className="mt-2 text-sm text-zinc-500">
-            Cada fila conserva su snapshot, descuento, reserva, fondeos y saldo pendiente de transferir.
+            Cada fila conserva las condiciones con las que nació la bolsa: descuento, reservas, transferencias a proveedores y dinero todavía disponible para enviar.
           </p>
         </div>
         <select value={status} onChange={event=>setStatus(event.target.value)} className="h-10 rounded-xl border border-white/10 bg-black px-3 text-sm text-white">
@@ -723,7 +777,7 @@ export default function CashboxPage(){
               {[
                 "Bolsa","Usuario","Origen","Estado","Tokens","Pagó el cliente",
                 "Ganancia base","Dinero extra","Total disponible","Reserva vigente IA",
-                "Fondeado","Pendiente de fondear","Crédito liberado","Expira","Acción",
+                "Enviado a proveedor","Disponible para enviar","Crédito liberado","Expira","Acción",
               ].map(label=><th key={label} className="border-b border-white/6 px-3 py-3">{label}</th>)}
             </tr>
           </thead>
@@ -750,7 +804,7 @@ export default function CashboxPage(){
           </tbody>
         </table>
       </div>
-    </section>
+    </section></AccordionSection>
 
     {promoGrantOpen&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><article className="w-full max-w-2xl rounded-3xl border border-white/10 bg-[#09090a] p-6"><header className="flex items-center justify-between"><div><p className="text-xs uppercase tracking-widest text-fuchsia-300">Créditos promocionales</p><h2 className="mt-2 text-xl font-semibold text-white">Asignar tokens a un usuario</h2></div><button onClick={()=>setPromoGrantOpen(false)}><X className="text-zinc-400"/></button></header><input value={promoUserSearch} onChange={e=>setPromoUserSearch(e.target.value)} placeholder="Buscar por correo o nombre" className="mt-5 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"/><div className="mt-3 max-h-52 overflow-auto rounded-xl border border-white/6">{promoUsers.filter(user=>`${user.email} ${user.full_name||""}`.toLowerCase().includes(promoUserSearch.toLowerCase())).slice(0,30).map(user=><button key={user.id} onClick={()=>setPromoSelectedUser(user)} className={`block w-full border-b border-white/5 p-3 text-left text-sm ${promoSelectedUser?.id===user.id?"bg-fuchsia-500/10 text-fuchsia-200":"text-zinc-300"}`}>{user.email}<small className="ml-2 text-zinc-600">#{user.id}</small></button>)}</div><div className="mt-4 grid gap-3 sm:grid-cols-2"><input value={promoGrantTokens} onChange={e=>setPromoGrantTokens(e.target.value)} type="number" min="1" placeholder="Tokens" className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"/><select value={promoGrantProvider} onChange={e=>setPromoGrantProvider(e.target.value)} className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"><option value="modal">Modal</option><option value="runpod">RunPod</option><option value="beam">Beam</option><option value="general">General</option></select></div><p className="mt-3 text-xs leading-5 text-zinc-600">La asignación manual exige respaldo completo. Si la caja elegida no alcanza, no se crea ningún token.</p><button disabled={action!==null||!promoSelectedUser} onClick={()=>void grantPromotionalTokens()} className="mt-5 rounded-xl bg-fuchsia-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"><Gift className="mr-2 inline" size={15}/>Asignar tokens</button></article></div>}
 
@@ -774,13 +828,13 @@ export default function CashboxPage(){
               ["Total que puedes retirar de esta bolsa",detail.bag.total_available_from_bag_usd],
               ["Reserva de tokens vigentes",detail.bag.protected_infrastructure_remaining_usd],
               ["Costo atribuido a proveedores",detail.bag.infrastructure_used_usd],
-              ["Fondeado desde esta bolsa",detail.bag.infrastructure_funded_usd],
-              ["Pendiente de transferir desde esta bolsa",detail.bag.infrastructure_unfunded_usd],
+              ["Enviado a proveedores desde esta bolsa",detail.bag.infrastructure_funded_usd],
+              ["Disponible para enviar desde esta bolsa",detail.bag.infrastructure_unfunded_usd],
               ["Crédito liberado por vencimiento",detail.bag.provider_credit_released_usd],
               ["Precio real pagado por token",detail.bag.effective_token_value_usd],
-              ["Fondo operativo congelado por token",detail.bag.operational_reserve_per_token_usd],
-              ["Fondo operativo total de la bolsa",detail.bag.operational_reserve_total_usd],
-              ["Fondo operativo ya liberado",detail.bag.operational_reserve_released_usd],
+              ["Extra por gastos del negocio / token",detail.bag.operational_reserve_per_token_usd],
+              ["Extra para gastos total de la bolsa",detail.bag.operational_reserve_total_usd],
+              ["Extra para gastos ya disponible",detail.bag.operational_reserve_released_usd],
               ["Ganancia normal por token",detail.bag.normal_profit_per_token_usd],
               ["Ganancia real por token",detail.bag.effective_profit_per_token_usd],
               ["Parte de cada token apartada para IA",detail.bag.infrastructure_capacity_per_token_usd],
@@ -788,7 +842,7 @@ export default function CashboxPage(){
               ["Redondeo retenido como crédito de proveedor",detail.bag.provider_rounding_credit_usd],
             ].map(([label,value])=>
               <div key={String(label)} className="rounded-2xl border border-white/6 p-4">
-                <p className="text-xs text-zinc-600">{String(label)}</p>
+                <p className="flex items-center text-xs text-zinc-600">{String(label)}{metricHelp[String(label)]&&<HelpTip text={metricHelp[String(label)]}/>}</p>
                 <p className="mt-2 font-semibold text-white">{money(Number(value))}</p>
               </div>,
             )}
@@ -799,7 +853,7 @@ export default function CashboxPage(){
             <Info label="Beneficio aplicado" value={detail.bag.profit_discount_percent>0?`${detail.bag.profit_discount_percent.toFixed(2)} %${detail.bag.benefit_label?` · ${detail.bag.benefit_label}`:""}`:"Sin descuento"}/>
             <Info label="Cupón" value={detail.bag.coupon_code||"No se utilizó"}/>
             <Info label="Plan o paquete" value={detail.bag.plan_name||detail.bag.package_name||"Compra libre"}/>
-            <Info label="Snapshot financiero" value={`v${detail.bag.snapshot_version||1} · ${detail.bag.snapshot_source||"histórico"}`}/>
+            <Info label="Registro financiero congelado" value={`v${detail.bag.snapshot_version||1} · ${detail.bag.snapshot_source||"histórico"}`} help="Guarda las reglas, descuentos y valores que tenía esta bolsa al momento de crearse. Cambios futuros no modifican este registro."/>
             <Info label="Estado del pago" value={detail.bag.payment_status||"Sin estado"}/>
             <Info label="Tokens utilizados" value={`${detail.bag.consumed_tokens} de ${detail.bag.original_tokens}`}/>
             <Info label={expirationLabel(detail.bag)} value={expirationText(detail.bag)}/>
@@ -808,7 +862,7 @@ export default function CashboxPage(){
           <div className="mt-4 rounded-2xl border border-emerald-500/15 bg-emerald-500/5 p-4 text-sm leading-6 text-zinc-400">
             <b className="text-emerald-300">Así cuadra esta bolsa:</b>{" "}
             el descuento solo modifica su ganancia. La reserva congelada conserva su trazabilidad.
-            Los fondeos se asignan FIFO a esta bolsa y, al vencer, solo el efectivo no transferido pasa a utilidad;
+            Las transferencias a proveedores se asignan automáticamente a esta bolsa y, al vencer, solo el efectivo que aún no se había enviado pasa a utilidad;
             el resto permanece como crédito del proveedor.
           </div>
 
