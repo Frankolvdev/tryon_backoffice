@@ -102,7 +102,7 @@ export function TokenPackageEditor({
 
   const calculatedPrice = useMemo(() => {
     const tokens = Number(tokensAmount);
-    const tokenValue = commercialSettings?.token_value_usd;
+    const tokenValue = commercialSettings?.commercial_sale_value_per_token_usd ?? commercialSettings?.token_value_usd;
 
     if (
       !Number.isFinite(tokens) ||

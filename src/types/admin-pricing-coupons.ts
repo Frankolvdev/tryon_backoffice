@@ -12,7 +12,12 @@ export type QualityMode =
   | string;
 
 export interface CommercialSettingsResponse {
+  /** Economic base used by generation pricing (AI reserve + protected profit). */
   token_value_usd: number;
+  /** Explicit non-AI operating reserve. Zero until the operational cashbox is enabled. */
+  operational_reserve_per_token_usd: number;
+  /** Catalog sale value before profit discounts. */
+  commercial_sale_value_per_token_usd: number;
   currency: string;
 }
 
@@ -237,6 +242,7 @@ export interface PricingSimulatorScenario {
   tokens: number;
   customer_value_usd: number;
   infrastructure_cost_usd: number;
+  operational_reserve_usd: number;
   normal_profit_usd: number;
   discount_given_usd: number;
   profit_after_discount_usd: number;
@@ -272,8 +278,10 @@ export interface PricingSimulatorResponse {
   billable_seconds: number;
   infrastructure_cost_usd: number;
   current_token_value_usd: number;
+  current_operational_reserve_per_token_usd: number;
   current_profit_per_token_usd: number;
   simulated_token_value_usd: number;
+  simulated_operational_reserve_per_token_usd: number;
   simulated_profit_per_token_usd: number;
   scenarios: PricingSimulatorScenario[];
   recommendations: PricingSimulatorRecommendation[];

@@ -219,7 +219,7 @@ export function SubscriptionPlanEditor({
 
   const calculatedPrice = useMemo(() => {
     const tokens = Number(tokensPerPeriod);
-    const tokenValue = commercialSettings?.token_value_usd;
+    const tokenValue = commercialSettings?.commercial_sale_value_per_token_usd ?? commercialSettings?.token_value_usd;
 
     if (!Number.isFinite(tokens) || tokens < 0 || !tokenValue || tokenValue <= 0) {
       return null;
