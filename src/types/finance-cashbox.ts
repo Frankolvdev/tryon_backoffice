@@ -207,7 +207,24 @@ export interface PromotionalRecurringSource {
   current_cycle_end:string;
   current_available_usd:number;
   active:boolean;
+  simulation_enabled:boolean;
   cycles:PromotionalFundingCycle[];
+}
+
+
+export interface PromotionalCycleWebhookResult {
+  source_id:number;
+  source_name:string;
+  simulation:boolean;
+  effective_date:string;
+  changed_cycles:number;
+  would_roll_cycles:number;
+  current_cycle_start:string;
+  current_cycle_end:string;
+  projected_cycle_start:string;
+  projected_cycle_end:string;
+  projected_opening_usd?:number|null;
+  message:string;
 }
 
 export interface PromotionalGrantHistory {

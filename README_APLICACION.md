@@ -1,96 +1,54 @@
-# MegaZIP BackOffice — Crédito recurrente + dinero propio para tokens gratis
+# FIX BackOffice — Webhook + Simular +1 ciclo + acordeón cerrado
 
-BASE EXACTA
-tryon_backoffice-main - 2026-08-07T173758.826(1).zip
+BASE
+tryon_backoffice-main - 2026-08-07T182326.800.zip
 
-ALCANCE
-Solo amplía la sección existente:
-Caja -> Promociones y tokens gratis
+CORRECCIÓN DEL DESFASE
+El backend ya tenía periodicidad/webhook, pero el page.tsx recibido todavía
+mostraba el formulario antiguo con Inicio + Fin y no renderizaba los botones.
 
-NO cambia diseño general de Caja ni otras vistas.
-
-NUEVO DESGLOSE
-La Caja Promocional muestra:
-- Total disponible
-- Crédito recurrente de proveedores
-- Dinero propio
-
-Por proveedor también muestra:
-- saldo recurrente;
-- saldo propio;
-- total;
-- tokens aproximados que puede respaldar.
-
-CRÉDITO RECURRENTE
-Formulario:
+AHORA AL CREAR UNA FUENTE
 - Nombre
 - Proveedor
 - Saldo real de ESTE ciclo
 - Inicio del ciclo actual
-- Fin del ciclo actual
-- Monto completo de CADA ciclo siguiente
+- Periodicidad
+- Monto completo de próximos ciclos
+- Permitir simulaciones
 
-Ejemplo Modal:
-- Saldo actual: 19.76
-- Inicio: 2026-08-01
-- Fin: 2026-09-01
-- Próximos ciclos: 30
+NO se pide fecha final. Backend la calcula.
 
-La UI NO asume USD 30.
+EJEMPLO MODAL
+Saldo actual: USD 19.76
+Inicio: 01/08/2026
+Periodicidad: Mensual
+Próximos ciclos: USD 30
 
-Cada fuente muestra:
-- disponible ahora;
-- ciclo actual;
-- saldo con el que empezó a registrarse;
-- cuánto ya se había utilizado antes de registrarlo;
-- cuánto se asignó desde que se registró;
-- monto de próximos ciclos;
-- activar/pausar.
+Backend calcula:
+01/08/2026 -> 01/09/2026
 
-DINERO PROPIO
-El formulario anterior de "Agregar dinero para tokens gratis" se conserva,
-pero ahora queda explicado como:
-"Agregar tu propio dinero para tokens gratis".
+BOTONES POR FUENTE
+- Revisar ciclo ahora (webhook)
+- Simular +1 ciclo (solo si Permitir simulaciones está activo)
+- Guardar próximo monto
+- Pausar/Activar
 
-Ese saldo:
-- no se reinicia;
-- no vence por esta capa;
-- funciona como respaldo cuando se acaba el crédito recurrente.
+SIMULAR +1 CICLO
+No pide fecha.
+Mensual:
+ciclo actual 01/08 -> 01/09
+simula 01/09 -> 01/10 con el monto configurado.
+No cambia nada real.
 
-Los fondos promocionales históricos se conservan como dinero propio para no
-reinterpretar datos anteriores.
-
-PRIORIDAD
-La UI explica que el sistema usa:
-1. crédito recurrente que puede vencer;
-2. dinero propio.
-
-TOKENS / BOLSAS
-No cambia:
-- asignación a usuarios;
-- tokens gratis de registro;
-- switch para deudas anteriores;
-- bolsas promocionales;
-- retiro de tokens gratis;
-- ganancia 0;
-- gasto operativo 0.
+ACORDEÓN
+"Promociones y tokens gratis" queda CERRADO al entrar a Caja.
+"Compras y bolsas de tokens" conserva su comportamiento abierto por defecto.
 
 VALIDACIÓN
-Los 2 archivos TS/TSX modificados pasaron TypeScript 5.8.3 transpileModule:
-0 diagnostics.
-
-npm run build no pudo ejecutarse aquí porque el ZIP fuente no incluye el
-binario Next.js en node_modules ("next: not found"). Ejecutarlo localmente.
-
-APLICACIÓN
-Extraer directamente sobre la raíz del BackOffice.
-
-COMANDOS
-Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue
-npm run build
-npm run dev
+- page.tsx: TypeScript 5.8.3 transpileModule, 0 diagnostics
+- finance-cashbox.ts: TypeScript 5.8.3 transpileModule, 0 diagnostics
 
 GIT
 git add .
-git commit -m "feat: separate recurring provider credits from own promotional funds"
+git commit -m "fix: show promotional cycle webhook and one-cycle simulation"
 git push

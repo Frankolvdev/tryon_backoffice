@@ -31,6 +31,7 @@ import type {
   OperationalExpense,
   PendingRecoveryList,
   PromotionalCreditSummary,
+  PromotionalCycleWebhookResult,
   PromotionalGrantResult,
   TokenBag,
   TokenBagList,
@@ -45,6 +46,7 @@ const date=(value?:string|null)=>value
 const dateOnly=(value?:string|null)=>value
   ? new Intl.DateTimeFormat("es-MX",{dateStyle:"medium",timeZone:"UTC"}).format(new Date(`${value}T00:00:00Z`))
   : "—";
+const recurrenceText=(value?:string|null)=>({weekly:"Semanal",monthly:"Mensual",quarterly:"Trimestral",yearly:"Anual"}[String(value||"")]||"Mensual");
 
 const labels:Record<string,string>={
   new:"Nueva",
@@ -253,7 +255,8 @@ export default function CashboxPage(){
   const [promoRecurringCurrent,setPromoRecurringCurrent]=useState("");
   const [promoRecurringNext,setPromoRecurringNext]=useState("");
   const [promoRecurringStart,setPromoRecurringStart]=useState("");
-  const [promoRecurringEnd,setPromoRecurringEnd]=useState("");
+  const [promoRecurringRecurrence,setPromoRecurringRecurrence]=useState("monthly");
+  const [promoRecurringSimulation,setPromoRecurringSimulation]=useState(false);
   const [promoRecurringDrafts,setPromoRecurringDrafts]=useState<Record<number,string>>({});
   const [promoGrantOpen,setPromoGrantOpen]=useState(false);
   const [promoUsers,setPromoUsers]=useState<AdminUser[]>([]);
@@ -478,35 +481,53 @@ export default function CashboxPage(){
     if(!promoRecurringName.trim()){toast.error("Escribe un nombre para este crédito, por ejemplo Modal mensual.");return;}
     if(!Number.isFinite(current)||current<0){toast.error("Escribe cuánto crédito te queda realmente en el ciclo actual.");return;}
     if(!Number.isFinite(recurring)||recurring<=0){toast.error("Escribe cuánto crédito recibes al comenzar cada nuevo ciclo.");return;}
-    if(!promoRecurringStart||!promoRecurringEnd){toast.error("Selecciona el inicio y fin del ciclo actual.");return;}
+    if(!promoRecurringStart){toast.error("Selecciona cuándo empezó el ciclo actual.");return;}
     setAction("promo-recurring-create");
     try{
       await browserApiRequest("/api/admin/finances/promotional-credits/recurring-sources",{
         method:"POST",body:JSON.stringify({
           name:promoRecurringName.trim(),provider:promoRecurringProvider,
           current_available_usd:current,recurring_amount_usd:recurring,
-          cycle_start:promoRecurringStart,cycle_end:promoRecurringEnd,
+          cycle_start:promoRecurringStart,recurrence:promoRecurringRecurrence,
+          simulation_enabled:promoRecurringSimulation,
         }),
       });
-      toast.success("Crédito recurrente guardado. El saldo actual se respeta y los siguientes ciclos usarán el monto completo configurado.");
+      toast.success("Crédito recurrente guardado. La fecha final se calcula sola según la periodicidad.");
       setPromoRecurringName("");setPromoRecurringCurrent("");setPromoRecurringNext("");
+      setPromoRecurringRecurrence("monthly");setPromoRecurringSimulation(false);
       void load();
     }catch(error){toast.error(error instanceof Error?error.message:"No fue posible guardar el crédito recurrente.");}
     finally{setAction(null);}
   }
 
-  async function updateRecurringPromotionalSource(sourceId:number,active:boolean,currentAmount:number){
+  async function updateRecurringPromotionalSource(sourceId:number,active:boolean,currentAmount:number,recurrence?:string,simulationEnabled?:boolean){
     const draft=promoRecurringDrafts[sourceId];
     const amount=draft===undefined?currentAmount:Number(draft);
     if(!Number.isFinite(amount)||amount<=0){toast.error("El monto del próximo ciclo debe ser mayor que cero.");return;}
     setAction(`promo-recurring-${sourceId}`);
     try{
       await browserApiRequest(`/api/admin/finances/promotional-credits/recurring-sources/${sourceId}`,{
-        method:"PUT",body:JSON.stringify({recurring_amount_usd:amount,active}),
+        method:"PUT",body:JSON.stringify({recurring_amount_usd:amount,active,recurrence,simulation_enabled:simulationEnabled}),
       });
       toast.success(active?"Crédito recurrente actualizado.":"Crédito recurrente pausado.");
       void load();
     }catch(error){toast.error(error instanceof Error?error.message:"No fue posible actualizar el crédito recurrente.");}
+    finally{setAction(null);}
+  }
+
+  async function triggerRecurringCycle(sourceId:number,simulation:boolean){
+    setAction(`${simulation?"promo-cycle-simulate":"promo-cycle-webhook"}-${sourceId}`);
+    try{
+      const result=await browserApiRequest<PromotionalCycleWebhookResult>(`/api/admin/finances/promotional-credits/recurring-sources/${sourceId}/cycle-webhook`,{
+        method:"POST",body:JSON.stringify({simulation}),
+      });
+      if(simulation){
+        toast.success(`Simulación: ${dateOnly(result.projected_cycle_start)} → ${dateOnly(result.projected_cycle_end)} · ${money(result.projected_opening_usd||0)}. No se cambió nada real.`);
+      }else{
+        toast.success(result.changed_cycles>0?`Ciclo revisado: se renovaron ${result.changed_cycles} ciclo(s).`:"Ciclo revisado: todavía sigue vigente y no se movió dinero.");
+        void load();
+      }
+    }catch(error){toast.error(error instanceof Error?error.message:"No fue posible revisar el ciclo.");}
     finally{setAction(null);}
   }
 
@@ -662,7 +683,7 @@ export default function CashboxPage(){
         )}
       </section>}
 
-    {promotional&&<AccordionSection title="Promociones y tokens gratis" description="Separa el crédito que te regala un proveedor del dinero que tú decides poner para seguir regalando tokens. El motor de tokens gratis sigue siendo el mismo." defaultOpen><section className="rounded-2xl">
+    {promotional&&<AccordionSection title="Promociones y tokens gratis" description="Separa el crédito que te regala un proveedor del dinero que tú decides poner para seguir regalando tokens. El motor de tokens gratis sigue siendo el mismo."><section className="rounded-2xl">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-fuchsia-300">Tokens gratis respaldados</p>
@@ -708,8 +729,9 @@ export default function CashboxPage(){
               <select value={promoRecurringProvider} onChange={e=>setPromoRecurringProvider(e.target.value)} className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"><option value="modal">Modal</option><option value="runpod">RunPod</option><option value="beam">Beam</option><option value="general">General</option></select>
               <input value={promoRecurringCurrent} onChange={e=>setPromoRecurringCurrent(e.target.value)} type="number" min="0" step="0.01" placeholder="Saldo real de este ciclo" className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"/>
               <label className="text-xs text-zinc-500"><span>Inicio del ciclo actual</span><input value={promoRecurringStart} onChange={e=>setPromoRecurringStart(e.target.value)} type="date" className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"/></label>
-              <label className="text-xs text-zinc-500"><span>Fin del ciclo actual</span><input value={promoRecurringEnd} onChange={e=>setPromoRecurringEnd(e.target.value)} type="date" className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"/></label>
+              <label className="text-xs text-zinc-500"><span>Periodicidad</span><select value={promoRecurringRecurrence} onChange={e=>setPromoRecurringRecurrence(e.target.value)} className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"><option value="weekly">Semanal</option><option value="monthly">Mensual</option><option value="quarterly">Trimestral</option><option value="yearly">Anual</option></select></label>
               <label className="text-xs text-zinc-500 sm:col-span-2"><span>Monto completo que inicia cada ciclo siguiente</span><input value={promoRecurringNext} onChange={e=>setPromoRecurringNext(e.target.value)} type="number" min="0.01" step="0.01" placeholder="Ej. 30" className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"/></label>
+              <label className="flex items-start gap-3 rounded-xl border border-white/8 p-3 text-xs text-zinc-400 sm:col-span-2"><input type="checkbox" checked={promoRecurringSimulation} onChange={e=>setPromoRecurringSimulation(e.target.checked)}/><span><b className="text-zinc-200">Permitir simulaciones</b><small className="mt-1 block text-zinc-600">Permite probar cómo sería el siguiente ciclo sin mover dinero real.</small></span></label>
             </div>
             <button disabled={action!==null} onClick={()=>void addRecurringPromotionalSource()} className="mt-4 rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-40">Guardar crédito recurrente</button>
           </div>
@@ -723,7 +745,7 @@ export default function CashboxPage(){
               const draft=promoRecurringDrafts[source.id]??String(source.recurring_amount_usd);
               return <article key={source.id} className={`rounded-2xl border p-4 ${source.active?"border-cyan-500/15 bg-black/20":"border-white/6 bg-black/10 opacity-70"}`}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div><p className="font-semibold text-white">{source.name}</p><p className="mt-1 text-xs uppercase text-zinc-600">{source.provider} · mensual · {source.active?"activo":"pausado"}</p></div>
+                  <div><p className="font-semibold text-white">{source.name}</p><p className="mt-1 text-xs uppercase text-zinc-600">{source.provider} · {recurrenceText(source.recurrence)} · {source.active?"activo":"pausado"}</p></div>
                   <div className="text-right"><p className="text-xs text-zinc-600">Disponible ahora</p><p className="text-xl font-semibold text-cyan-300">{money(source.current_available_usd)}</p></div>
                 </div>
                 <div className="mt-4 grid gap-2 text-xs sm:grid-cols-2">
@@ -732,10 +754,16 @@ export default function CashboxPage(){
                   <div className="rounded-xl border border-white/6 p-3"><p className="text-zinc-600">Ya usado antes de registrarlo aquí</p><p className="mt-1 text-zinc-300">{money(beforeTracking)}</p></div>
                   <div className="rounded-xl border border-white/6 p-3"><p className="text-zinc-600">Usado/asignado desde que lo registraste</p><p className="mt-1 text-zinc-300">{money(usedHere)}</p></div>
                 </div>
-                <div className="mt-4 flex flex-wrap items-end gap-3">
-                  <label className="min-w-[220px] flex-1 text-xs text-zinc-500"><span>Monto que tendrá cada nuevo ciclo</span><input value={draft} onChange={e=>setPromoRecurringDrafts(current=>({...current,[source.id]:e.target.value}))} type="number" min="0.01" step="0.01" className="mt-2 h-10 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"/></label>
-                  <button disabled={action!==null} onClick={()=>void updateRecurringPromotionalSource(source.id,source.active,source.recurring_amount_usd)} className="rounded-xl border border-cyan-500/25 px-4 py-2 text-xs text-cyan-200 disabled:opacity-40">Guardar próximo monto</button>
-                  <button disabled={action!==null} onClick={()=>void updateRecurringPromotionalSource(source.id,!source.active,source.recurring_amount_usd)} className="rounded-xl border border-white/10 px-4 py-2 text-xs text-zinc-300 disabled:opacity-40">{source.active?"Pausar":"Activar"}</button>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <label className="text-xs text-zinc-500"><span>Monto de cada nuevo ciclo</span><input value={draft} onChange={e=>setPromoRecurringDrafts(current=>({...current,[source.id]:e.target.value}))} type="number" min="0.01" step="0.01" className="mt-2 h-10 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"/></label>
+                  <label className="text-xs text-zinc-500"><span>Periodicidad de próximos ciclos</span><select value={source.recurrence} onChange={e=>void updateRecurringPromotionalSource(source.id,source.active,source.recurring_amount_usd,e.target.value,source.simulation_enabled)} className="mt-2 h-10 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"><option value="weekly">Semanal</option><option value="monthly">Mensual</option><option value="quarterly">Trimestral</option><option value="yearly">Anual</option></select></label>
+                </div>
+                <label className="mt-3 flex items-center gap-3 text-xs text-zinc-400"><input type="checkbox" checked={source.simulation_enabled} onChange={e=>void updateRecurringPromotionalSource(source.id,source.active,source.recurring_amount_usd,source.recurrence,e.target.checked)}/><span>Permitir simulaciones de este crédito</span></label>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button disabled={action!==null} onClick={()=>void updateRecurringPromotionalSource(source.id,source.active,source.recurring_amount_usd,source.recurrence,source.simulation_enabled)} className="rounded-xl border border-cyan-500/25 px-4 py-2 text-xs text-cyan-200 disabled:opacity-40">Guardar próximo monto</button>
+                  <button disabled={action!==null||!source.active} onClick={()=>void triggerRecurringCycle(source.id,false)} className="rounded-xl border border-emerald-500/25 px-4 py-2 text-xs text-emerald-200 disabled:opacity-40">Revisar ciclo ahora (webhook)</button>
+                  {source.simulation_enabled&&<button disabled={action!==null} onClick={()=>void triggerRecurringCycle(source.id,true)} className="rounded-xl border border-fuchsia-500/25 px-4 py-2 text-xs text-fuchsia-200 disabled:opacity-40">Simular +1 ciclo</button>}
+                  <button disabled={action!==null} onClick={()=>void updateRecurringPromotionalSource(source.id,!source.active,source.recurring_amount_usd,source.recurrence,source.simulation_enabled)} className="rounded-xl border border-white/10 px-4 py-2 text-xs text-zinc-300 disabled:opacity-40">{source.active?"Pausar":"Activar"}</button>
                 </div>
                 {!source.active&&<p className="mt-3 text-xs leading-5 text-zinc-600">Pausado: este crédito no se utilizará ni abrirá ciclos nuevos. Tu dinero propio sigue disponible.</p>}
               </article>;
