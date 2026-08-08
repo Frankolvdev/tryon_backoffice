@@ -39,6 +39,7 @@ export default function GenerationModulesPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingModule, setDeletingModule] = useState(false);
   const [editor, setEditor] = useState<EditorTarget>(null);
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -81,6 +82,25 @@ export default function GenerationModulesPage() {
     finally { setSaving(false); }
   };
 
+  const deleteSelectedModule = async () => {
+    if (!selected) return;
+    const accepted = window.confirm(
+      `¿Eliminar definitivamente el módulo "${selected.name}"? Solo puede borrarse si nunca tuvo ejecuciones. Si tiene historial, el sistema lo protegerá y deberás dejarlo inactivo.`,
+    );
+    if (!accepted) return;
+    setDeletingModule(true);
+    try {
+      await browserApiRequest(`/api/admin/generation-modules/${selected.id}`, { method: "DELETE" });
+      toast.success("Módulo eliminado.");
+      setSelected(null);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible eliminar el módulo.");
+    } finally {
+      setDeletingModule(false);
+    }
+  };
+
   return <div className="space-y-7">
     <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div><p className="text-xs font-semibold uppercase tracking-[.28em] text-red-400">Pipeline visual</p><h1 className="mt-2 text-3xl font-semibold text-white">Módulos de generación</h1><p className="mt-2 max-w-3xl text-sm text-zinc-500">Arrastra pasos, edítalos y deja que el editor sugiera conexiones por nombre y tipo.</p></div>
@@ -98,7 +118,7 @@ export default function GenerationModulesPage() {
           </button>;
         })}</div>
       </section>
-      {!selected ? <EmptyState/> : <ModuleEditor module={selected} pricingRules={pricingRules} setModule={setSelected} saving={saving} onSave={saveModule} onOpenEditor={setEditor}/>} 
+      {!selected ? <EmptyState/> : <ModuleEditor module={selected} pricingRules={pricingRules} setModule={setSelected} saving={saving} deleting={deletingModule} onSave={saveModule} onDelete={deleteSelectedModule} onOpenEditor={setEditor}/>} 
     </div>
     {editor && selected && <StepEditor module={selected} target={editor} onClose={() => setEditor(null)} onSaved={module => { setSelected(module); setEditor(null); void load(); }}/>} 
     {createOpen && <CreateModuleModal onClose={() => setCreateOpen(false)} onCreated={module => { setItems(current => [module, ...current]); setSelected(module); setCreateOpen(false); }}/>} 
@@ -107,12 +127,12 @@ export default function GenerationModulesPage() {
 
 function EmptyState() { return <section className="luxia-panel flex min-h-[560px] flex-col items-center justify-center rounded-3xl p-10 text-center"><Boxes size={44} className="text-zinc-800"/><h2 className="mt-5 text-xl font-semibold text-white">Selecciona un módulo</h2><p className="mt-2 max-w-md text-sm text-zinc-600">Aquí aparecerá el editor visual del pipeline.</p></section>; }
 
-function ModuleEditor({ module, pricingRules, setModule, saving, onSave, onOpenEditor }: { module: GenerationModule; pricingRules: PricingRuleResponse[]; setModule: (module: GenerationModule) => void; saving: boolean; onSave: () => void; onOpenEditor: (target: EditorTarget) => void }) {
+function ModuleEditor({ module, pricingRules, setModule, saving, deleting, onSave, onDelete, onOpenEditor }: { module: GenerationModule; pricingRules: PricingRuleResponse[]; setModule: (module: GenerationModule) => void; saving: boolean; deleting: boolean; onSave: () => void; onDelete: () => void; onOpenEditor: (target: EditorTarget) => void }) {
   const patch = (value: Partial<GenerationModule>) => setModule({ ...module, ...value });
   return <section className="luxia-panel overflow-hidden rounded-3xl">
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/6 p-5"><div className="flex items-center gap-3"><span className={`h-3 w-3 rounded-full ${module.is_active ? "bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,.9)]" : "bg-red-500 shadow-[0_0_14px_rgba(239,68,68,.55)]"}`}/><div><h2 className="text-xl font-semibold text-white">{module.name}</h2><p className="mt-1 font-mono text-xs text-zinc-600">{module.key} · ID {module.id} · {module.is_active ? "ACTIVO" : "INACTIVO"}</p></div></div><button onClick={onSave} disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-50">{saving ? <LoaderCircle size={16} className="animate-spin"/> : <Save size={16}/>}Guardar módulo</button></div>
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/6 p-5"><div className="flex items-center gap-3"><span className={`h-3 w-3 rounded-full ${module.is_active ? "bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,.9)]" : "bg-red-500 shadow-[0_0_14px_rgba(239,68,68,.55)]"}`}/><div><h2 className="text-xl font-semibold text-white">{module.name}</h2><p className="mt-1 font-mono text-xs text-zinc-600">{module.key} · ID {module.id} · {module.is_active ? "ACTIVO" : "INACTIVO"}</p></div></div><div className="flex flex-wrap gap-2"><button onClick={onDelete} disabled={deleting || saving} className="inline-flex h-10 items-center gap-2 rounded-xl border border-red-500/20 bg-red-950/15 px-4 text-sm font-semibold text-red-300 disabled:opacity-50">{deleting ? <LoaderCircle size={16} className="animate-spin"/> : <Trash2 size={16}/>}Eliminar módulo</button><button onClick={onSave} disabled={saving || deleting} className="inline-flex h-10 items-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-50">{saving ? <LoaderCircle size={16} className="animate-spin"/> : <Save size={16}/>}Guardar módulo</button></div></div>
     <div className="space-y-7 p-5">
-      <div className="grid gap-4 md:grid-cols-6"><Field label="Nombre"><input value={module.name} onChange={e => patch({ name: e.target.value })} className="gm-input"/></Field><Field label="Categoría"><input value={module.category} onChange={e => patch({ category: e.target.value })} className="gm-input"/></Field><Field label="Motor"><select value={module.default_execution_engine} onChange={e => patch({ default_execution_engine: e.target.value as GenerationExecutionEngine })} className="gm-input">{engines.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field><Field label="Endpoint"><input value={module.endpoint ?? ""} onChange={e => patch({ endpoint: e.target.value || null })} placeholder="ID o URL del endpoint" className="gm-input"/><span className="mt-1 block text-[10px] text-zinc-600">Se usa junto con el motor seleccionado.</span></Field><Field label="Pricing rule"><select value={module.pricing_rule_id ?? ""} onChange={e => patch({ pricing_rule_id: e.target.value ? Number(e.target.value) : null })} className="gm-input"><option value="">Sin regla</option>{pricingRules.map(rule => <option key={rule.id} value={rule.id}>{rule.title} · {rule.required_tokens} tokens</option>)}</select></Field><Field label="Estado"><select value={String(module.is_active)} onChange={e => patch({ is_active: e.target.value === "true" })} className={`gm-input ${module.is_active ? "border-emerald-500/40 text-emerald-300" : ""}`}><option value="true">Activo</option><option value="false">Inactivo</option></select></Field></div>
+      <div className="grid gap-4 md:grid-cols-6"><Field label="Nombre"><input value={module.name} onChange={e => patch({ name: e.target.value })} className="gm-input"/></Field><Field label="Categoría"><input value={module.category} onChange={e => patch({ category: e.target.value })} className="gm-input"/></Field><Field label="Motor"><select value={module.default_execution_engine ?? ""} onChange={e => patch({ default_execution_engine: e.target.value ? e.target.value as GenerationExecutionEngine : null, is_active: e.target.value ? module.is_active : false })} className="gm-input"><option value="">Sin motor todavía</option>{engines.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select><span className="mt-1 block text-[10px] text-zinc-600">Puedes elegirlo después. Sin motor el módulo permanece inactivo.</span></Field><Field label="Endpoint (opcional)"><input value={module.endpoint ?? ""} onChange={e => patch({ endpoint: e.target.value || null })} placeholder="ID o URL del endpoint" className="gm-input"/><span className="mt-1 block text-[10px] text-zinc-600">Se usa junto con el motor seleccionado.</span></Field><Field label="Pricing rule"><select value={module.pricing_rule_id ?? ""} onChange={e => patch({ pricing_rule_id: e.target.value ? Number(e.target.value) : null })} className="gm-input"><option value="">Sin regla</option>{pricingRules.map(rule => <option key={rule.id} value={rule.id}>{rule.title} · {rule.required_tokens} tokens</option>)}</select></Field><Field label="Estado"><select value={String(module.is_active)} onChange={e => patch({ is_active: e.target.value === "true" })} className={`gm-input ${module.is_active ? "border-emerald-500/40 text-emerald-300" : ""}`}><option value="true" disabled={!module.default_execution_engine}>Activo</option><option value="false">Inactivo</option></select>{!module.default_execution_engine && <span className="mt-1 block text-[10px] text-zinc-600">Elige un motor antes de activarlo.</span>}</Field></div>
       <ContractEditor module={module} setModule={setModule}/>
       <div>
         <div className="mb-3 flex flex-col gap-3 rounded-2xl border border-white/7 bg-black/25 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -317,7 +337,48 @@ function PythonStepEditor({ module, target, onClose, onSaved }: { module: Genera
 function collectAvailablePorts(module: GenerationModule, current?: GenerationModuleStep) { const ordered = [...module.steps].sort((a, b) => a.position - b.position); const limit = current ? ordered.findIndex(item => item.id === current.id) : ordered.length; return [...module.inputs.map(input => ({ key: input.key, label: input.name, type: input.input_type, path: input.key, origin: "module" })), ...ordered.slice(0, limit).flatMap(step => describeStepOutputs(step, module))]; }
 function JsonMapping({ title, value, onChange }: { title: string; value: Record<string, unknown>; onChange: (value: Record<string, unknown>) => void }) { const [text, setText] = useState(JSON.stringify(value, null, 2)); useEffect(() => setText(JSON.stringify(value, null, 2)), [value]); return <div className="mt-4"><p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">{title}</p><textarea className="gm-input min-h-28 py-3 font-mono text-xs" value={text} onChange={e => { setText(e.target.value); try { onChange(JSON.parse(e.target.value)); } catch {} }}/></div>; }
 
-function CreateModuleModal({ onClose, onCreated }: { onClose: () => void; onCreated: (module: GenerationModule) => void }) { const [form, setForm] = useState({ key: "", name: "", description: "", category: "tryon", default_execution_engine: "simulated" as GenerationExecutionEngine, endpoint: "" }); const [busy, setBusy] = useState(false); return <ModalShell title="Nuevo módulo" onClose={onClose}><div className="grid gap-4 md:grid-cols-2"><Field label="Clave"><input className="gm-input" value={form.key} onChange={e => setForm({ ...form, key: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, "-") })}/></Field><Field label="Nombre"><input className="gm-input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}/></Field><Field label="Categoría"><input className="gm-input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}/></Field><Field label="Motor"><select className="gm-input" value={form.default_execution_engine} onChange={e => setForm({ ...form, default_execution_engine: e.target.value as GenerationExecutionEngine })}>{engines.map(engine => <option key={engine.value} value={engine.value}>{engine.label}</option>)}</select></Field><Field label="Endpoint"><input className="gm-input" placeholder="ID o URL del endpoint" value={form.endpoint} onChange={e => setForm({ ...form, endpoint: e.target.value })}/></Field></div><button disabled={busy || form.key.length < 2 || form.name.length < 2} onClick={async () => { setBusy(true); try { onCreated(await browserApiRequest<GenerationModule>("/api/admin/generation-modules", { method: "POST", body: JSON.stringify({ ...form, version: 1, is_active: true, metadata: {}, inputs: [], outputs: [], steps: [] }) })); } finally { setBusy(false); } }} className="mt-5 h-11 w-full rounded-xl bg-red-600 font-semibold text-white disabled:opacity-40">Crear módulo</button></ModalShell>; }
+function CreateModuleModal({ onClose, onCreated }: { onClose: () => void; onCreated: (module: GenerationModule) => void }) {
+  const [form, setForm] = useState({ key: "", name: "", description: "", category: "tryon" });
+  const [busy, setBusy] = useState(false);
+
+  const create = async () => {
+    setBusy(true);
+    try {
+      const module = await browserApiRequest<GenerationModule>("/api/admin/generation-modules", {
+        method: "POST",
+        body: JSON.stringify({
+          ...form,
+          version: 1,
+          is_active: false,
+          metadata: {},
+          inputs: [],
+          outputs: [],
+          steps: [],
+        }),
+      });
+      onCreated(module);
+      toast.success("Módulo creado como borrador. Configura motor, endpoint y precio cuando estés listo.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible crear el módulo.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return <ModalShell title="Nuevo módulo" onClose={onClose}>
+    <div className="rounded-2xl border border-cyan-500/15 bg-cyan-500/[.04] p-4 text-sm leading-6 text-cyan-100/80">
+      Crea primero la ficha básica. El motor, endpoint, precio, entradas, salidas y pasos se pueden configurar después.
+    </div>
+    <div className="mt-4 grid gap-4 md:grid-cols-2">
+      <Field label="Clave"><input className="gm-input" value={form.key} onChange={e => setForm({ ...form, key: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, "-") })}/></Field>
+      <Field label="Nombre"><input className="gm-input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}/></Field>
+      <Field label="Categoría"><input className="gm-input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}/></Field>
+      <Field label="Descripción"><input className="gm-input" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}/></Field>
+    </div>
+    <button disabled={busy || form.key.length < 2 || form.name.length < 2 || form.category.length < 2} onClick={() => void create()} className="mt-5 h-11 w-full rounded-xl bg-red-600 font-semibold text-white disabled:opacity-40">{busy ? "Creando..." : "Crear borrador"}</button>
+  </ModalShell>;
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-600">{label}</span>{children}</label>; }
 function Contract({ title, onAdd, children }: { title: string; onAdd: () => void; children: React.ReactNode }) { return <div><div className="mb-3 flex items-center justify-between"><h3 className="text-xs font-semibold uppercase tracking-[.18em] text-zinc-500">{title}</h3><button onClick={onAdd} className="gm-secondary"><Plus size={14}/>Agregar</button></div><div className="space-y-2 rounded-2xl border border-white/6 bg-white/[.015] p-3">{children}</div></div>; }
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) { return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"><div className="max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-white/10 bg-[#0b0b0d] shadow-2xl"><div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/7 bg-[#0b0b0d]/95 p-5"><h2 className="text-xl font-semibold text-white">{title}</h2><button onClick={onClose} className="gm-icon"><X size={18}/></button></div><div className="p-5">{children}</div></div></div>; }

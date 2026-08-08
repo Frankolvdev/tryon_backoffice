@@ -21,7 +21,7 @@ export interface GenerationModuleStep {
 }
 export interface GenerationModule {
   id: number; key: string; name: string; description?: string | null; version: number;
-  category: string; endpoint?: string | null; default_execution_engine: GenerationExecutionEngine;
+  category: string; endpoint?: string | null; default_execution_engine: GenerationExecutionEngine | null;
   metadata: Record<string, unknown>; is_active: boolean; created_by_user_id?: number | null;
   pricing_rule_id?: number | null;
   pricing?: { id: number; required_tokens: number; final_price_usd: number; token_value_usd: number; currency: string; is_active: boolean } | null;

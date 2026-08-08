@@ -31,6 +31,10 @@ export function GenerationTestConsole({ module }: { module: GenerationModule }) 
   }, [execution, refresh]);
 
   const run = async () => {
+    if (!module.default_execution_engine) {
+      toast.error("Selecciona y guarda un motor antes de ejecutar una prueba.");
+      return;
+    }
     const error = validateGenerationValues(module.inputs, values);
     if (error) {
       toast.error(error);
@@ -84,13 +88,13 @@ export function GenerationTestConsole({ module }: { module: GenerationModule }) 
               <h3 className="font-semibold text-white">Formulario automático de prueba</h3>
               <p className="mt-1 text-xs text-zinc-500">Generado desde las entradas reales del módulo.</p>
             </div>
-            <button onClick={() => void run()} disabled={busy || !module.is_active} className="inline-flex h-10 items-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-40">
+            <button onClick={() => void run()} disabled={busy || !module.is_active || !module.default_execution_engine} className="inline-flex h-10 items-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-40">
               {busy ? <LoaderCircle className="animate-spin" size={16} /> : <Play size={16} />}
               Ejecutar prueba
             </button>
           </div>
           <DynamicGenerationForm inputs={module.inputs} values={values} onChange={setValues} disabled={busy} />
-          {!module.is_active && <p className="mt-4 text-xs text-amber-300">El módulo está inactivo. Actívalo y guarda antes de probarlo.</p>}
+          {!module.default_execution_engine ? <p className="mt-4 text-xs text-amber-300">Este módulo todavía no tiene motor. Elige uno arriba y guarda antes de probarlo.</p> : !module.is_active && <p className="mt-4 text-xs text-amber-300">El módulo está inactivo. Actívalo y guarda antes de probarlo.</p>}
         </div>
 
         <aside className="rounded-2xl border border-white/8 bg-black/30 p-5">

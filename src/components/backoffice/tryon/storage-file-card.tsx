@@ -52,7 +52,10 @@ function formatBytes(value: number | null): string {
 export function StorageFileCard({ file, onDeleted }: StorageFileCardProps) {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const isImage = file.content_type?.toLowerCase().startsWith("image/") ?? false;
+  const imageName = (file.original_filename || file.object_key || "").toLowerCase();
+  const isImage =
+    (file.content_type?.toLowerCase().startsWith("image/") ?? false)
+    || /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(imageName);
   const contentUrl = `/api/admin/storage/files/${file.id}/content`;
   const downloadUrl = `${contentUrl}?download=1`;
 
@@ -83,7 +86,7 @@ export function StorageFileCard({ file, onDeleted }: StorageFileCardProps) {
               src={contentUrl}
               alt={file.original_filename ?? `Archivo ${file.id}`}
               loading="lazy"
-              className="h-full w-full object-cover transition duration-300 hover:scale-[1.03]"
+              className="h-full w-full object-contain p-2 transition duration-300 hover:scale-[1.02]"
             />
           ) : (
             <File size={42} className="text-red-400" />

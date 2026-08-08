@@ -4,8 +4,9 @@ import { FileInput, FileOutput, FolderOpen, HardDrive, ImageIcon, LoaderCircle, 
 import { useCallback, useEffect, useMemo, useState, type ComponentType } from "react";
 import { toast } from "sonner";
 
+import { StorageImageViewer } from "@/components/backoffice/tryon/storage-image-viewer";
 import { browserApiRequest } from "@/lib/api/browser-api";
-import type { AdminStorageFile, StorageSignedUrlResponse } from "@/types/admin-storage";
+import type { AdminStorageFile } from "@/types/admin-storage";
 import type { GenerationModuleExecution } from "@/types/admin-generation-modules";
 import type { AdminUserGenerationDeleteResponse } from "@/types/admin-users";
 
@@ -155,9 +156,25 @@ function isImage(file: AdminStorageFile) {
 }
 
 function FilePreview({file}:{file:AdminStorageFile}) {
-  const [url,setUrl]=useState<string|null>(null);
-  useEffect(()=>{ if (!isImage(file)) return; let live=true; void browserApiRequest<StorageSignedUrlResponse>(`/api/admin/storage/files/${file.id}/signed-url`).then(r=>{if(live)setUrl(r.url)}).catch(()=>{}); return()=>{live=false}; },[file.id,file.content_type]);
-  return <div className="overflow-hidden rounded-xl border border-white/6 bg-black/30">{url?<img src={url} alt={file.original_filename||"Resultado"} className="aspect-square w-full object-cover"/>:<div className="flex aspect-square items-center justify-center text-zinc-700"><ImageIcon size={20}/></div>}<div className="p-2"><p className="truncate text-[10px] text-zinc-500">{file.original_filename||`Archivo #${file.id}`}</p></div></div>;
+  const [viewerOpen,setViewerOpen]=useState(false);
+  const image = isImage(file);
+  const contentUrl = `/api/admin/storage/files/${file.id}/content`;
+
+  return <>
+    <button
+      type="button"
+      onClick={() => image && setViewerOpen(true)}
+      disabled={!image}
+      className="block w-full overflow-hidden rounded-xl border border-white/6 bg-black/30 text-left disabled:cursor-default"
+      title={image ? "Abrir visor" : "Este archivo no es una imagen previsualizable"}
+    >
+      {image
+        ? <div className="flex aspect-square items-center justify-center overflow-hidden bg-[#070708] p-2"><img src={contentUrl} alt={file.original_filename||"Resultado"} className="h-full w-full object-contain"/></div>
+        : <div className="flex aspect-square items-center justify-center text-zinc-700"><ImageIcon size={20}/></div>}
+      <div className="p-2"><p className="truncate text-[10px] text-zinc-500">{file.original_filename||`Archivo #${file.id}`}</p></div>
+    </button>
+    {viewerOpen && image && <StorageImageViewer file={file} onClose={()=>setViewerOpen(false)}/>}
+  </>;
 }
 
 function FileCard({file}:{file:AdminStorageFile}) {

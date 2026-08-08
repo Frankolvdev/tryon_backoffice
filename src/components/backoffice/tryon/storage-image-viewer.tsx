@@ -37,6 +37,19 @@ export function StorageImageViewer({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
+  useEffect(() => {
+    // The viewer is a true modal layer. Lock the document so zoom/pan inside
+    // the image can never scroll the page that remains underneath it.
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, []);
+
   const reset = () => {
     setScale(1);
     setPosition({ x: 0, y: 0 });
@@ -51,7 +64,7 @@ export function StorageImageViewer({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-black/95 backdrop-blur-xl">
+    <div className="fixed inset-0 z-[9999] flex flex-col overscroll-none bg-black/95 backdrop-blur-xl">
       <header className="flex items-center justify-between gap-4 border-b border-white/10 px-4 py-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-white">
@@ -86,7 +99,7 @@ export function StorageImageViewer({
 
       <div
         ref={viewportRef}
-        className="relative flex min-h-0 flex-1 cursor-grab items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.05),transparent_60%)] active:cursor-grabbing"
+        className="relative flex min-h-0 flex-1 touch-none cursor-grab items-center justify-center overflow-hidden overscroll-none bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.05),transparent_60%)] active:cursor-grabbing"
         onWheel={(event) => {
           event.preventDefault();
           changeScale(scale + (event.deltaY < 0 ? 0.15 : -0.15));
