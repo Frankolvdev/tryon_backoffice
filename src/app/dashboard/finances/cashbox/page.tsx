@@ -341,6 +341,14 @@ export default function CashboxPage(){
       panelClassName:"border-rose-500/20 bg-rose-500/[0.045]",
       help:"Retiros de utilidad. No incluye transferencias hechas a proveedores de IA.",
     },
+    {
+      label:"Gastos disponibles",
+      value:operational?.available_operational_funds_usd??0,
+      icon:CircleDollarSign,
+      className:"text-fuchsia-300",
+      panelClassName:"border-fuchsia-500/20 bg-fuchsia-500/[0.045]",
+      help:"Dinero que ya puedes usar para hosting, correo, dominios, storage, software y otros gastos del negocio.",
+    },
   ]:[];
 
   const load=useCallback(async()=>{
@@ -672,7 +680,7 @@ export default function CashboxPage(){
 
     {loading
       ? <div className="luxia-panel rounded-3xl p-10 text-center text-zinc-500">Calculando las cajas…</div>
-      : summary&&<section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      : summary&&<section className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
         {summaryCards.map(({label,value,icon:Icon,className,panelClassName,help})=>
           <article key={label} className={`luxia-panel rounded-3xl border p-5 ${panelClassName}`}>
             <Icon className={className} size={20}/>
