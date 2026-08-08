@@ -42,6 +42,9 @@ const money=(value:number)=>`USD ${Number(value||0).toFixed(6)}`;
 const date=(value?:string|null)=>value
   ? new Intl.DateTimeFormat("es-MX",{dateStyle:"medium",timeStyle:"short"}).format(new Date(value))
   : "—";
+const dateOnly=(value?:string|null)=>value
+  ? new Intl.DateTimeFormat("es-MX",{dateStyle:"medium",timeZone:"UTC"}).format(new Date(`${value}T00:00:00Z`))
+  : "—";
 
 const labels:Record<string,string>={
   new:"Nueva",
@@ -245,6 +248,13 @@ export default function CashboxPage(){
   const [promoFundProvider,setPromoFundProvider]=useState("modal");
   const [promoFundReference,setPromoFundReference]=useState("");
   const [promoFundDescription,setPromoFundDescription]=useState("Crédito promocional de infraestructura");
+  const [promoRecurringName,setPromoRecurringName]=useState("");
+  const [promoRecurringProvider,setPromoRecurringProvider]=useState("modal");
+  const [promoRecurringCurrent,setPromoRecurringCurrent]=useState("");
+  const [promoRecurringNext,setPromoRecurringNext]=useState("");
+  const [promoRecurringStart,setPromoRecurringStart]=useState("");
+  const [promoRecurringEnd,setPromoRecurringEnd]=useState("");
+  const [promoRecurringDrafts,setPromoRecurringDrafts]=useState<Record<number,string>>({});
   const [promoGrantOpen,setPromoGrantOpen]=useState(false);
   const [promoUsers,setPromoUsers]=useState<AdminUser[]>([]);
   const [promoUserSearch,setPromoUserSearch]=useState("");
@@ -462,6 +472,44 @@ export default function CashboxPage(){
     finally{setAction(null);}
   }
 
+  async function addRecurringPromotionalSource(){
+    const current=Number(promoRecurringCurrent);
+    const recurring=Number(promoRecurringNext);
+    if(!promoRecurringName.trim()){toast.error("Escribe un nombre para este crédito, por ejemplo Modal mensual.");return;}
+    if(!Number.isFinite(current)||current<0){toast.error("Escribe cuánto crédito te queda realmente en el ciclo actual.");return;}
+    if(!Number.isFinite(recurring)||recurring<=0){toast.error("Escribe cuánto crédito recibes al comenzar cada nuevo ciclo.");return;}
+    if(!promoRecurringStart||!promoRecurringEnd){toast.error("Selecciona el inicio y fin del ciclo actual.");return;}
+    setAction("promo-recurring-create");
+    try{
+      await browserApiRequest("/api/admin/finances/promotional-credits/recurring-sources",{
+        method:"POST",body:JSON.stringify({
+          name:promoRecurringName.trim(),provider:promoRecurringProvider,
+          current_available_usd:current,recurring_amount_usd:recurring,
+          cycle_start:promoRecurringStart,cycle_end:promoRecurringEnd,
+        }),
+      });
+      toast.success("Crédito recurrente guardado. El saldo actual se respeta y los siguientes ciclos usarán el monto completo configurado.");
+      setPromoRecurringName("");setPromoRecurringCurrent("");setPromoRecurringNext("");
+      void load();
+    }catch(error){toast.error(error instanceof Error?error.message:"No fue posible guardar el crédito recurrente.");}
+    finally{setAction(null);}
+  }
+
+  async function updateRecurringPromotionalSource(sourceId:number,active:boolean,currentAmount:number){
+    const draft=promoRecurringDrafts[sourceId];
+    const amount=draft===undefined?currentAmount:Number(draft);
+    if(!Number.isFinite(amount)||amount<=0){toast.error("El monto del próximo ciclo debe ser mayor que cero.");return;}
+    setAction(`promo-recurring-${sourceId}`);
+    try{
+      await browserApiRequest(`/api/admin/finances/promotional-credits/recurring-sources/${sourceId}`,{
+        method:"PUT",body:JSON.stringify({recurring_amount_usd:amount,active}),
+      });
+      toast.success(active?"Crédito recurrente actualizado.":"Crédito recurrente pausado.");
+      void load();
+    }catch(error){toast.error(error instanceof Error?error.message:"No fue posible actualizar el crédito recurrente.");}
+    finally{setAction(null);}
+  }
+
   async function savePromotionalSettings(){
     if(!promotional)return;
     setAction("promo-settings");
@@ -614,32 +662,100 @@ export default function CashboxPage(){
         )}
       </section>}
 
-    {promotional&&<AccordionSection title="Promociones y tokens gratis" description="Controla el dinero que respalda los tokens gratis y decide cuántos regalar y a quién."><section className="rounded-2xl">
+    {promotional&&<AccordionSection title="Promociones y tokens gratis" description="Separa el crédito que te regala un proveedor del dinero que tú decides poner para seguir regalando tokens. El motor de tokens gratis sigue siendo el mismo." defaultOpen><section className="rounded-2xl">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-fuchsia-300">Tokens gratis respaldados</p>
           <h2 className="mt-2 text-lg font-semibold text-white">Dinero para tokens gratis</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">
-            Aquí registras el dinero o crédito que usarás para regalar tokens. Esos tokens no generan ganancia ni gastos operativos.
+            Primero se usa el crédito recurrente del proveedor que puede vencer. Si se acaba, el sistema continúa con el dinero propio que hayas agregado para ese proveedor. Son dos fuentes distintas, pero las bolsas promocionales y su contabilidad siguen funcionando igual.
           </p>
         </div>
-        <div className="text-right"><p className="text-xs text-zinc-600">Disponible</p><p className="mt-1 text-2xl font-semibold text-fuchsia-300">{money(promotional.total_available_usd)}</p><p className="mt-1 text-xs text-zinc-600">Dinero apartado por token gratis: {money(promotional.reserve_per_token_usd)} / token</p><p className="mt-1 text-xs text-zinc-700">La regla de generación conserva {money(promotional.generation_infrastructure_reserve_per_token_usd)} de capacidad IA por token; el crédito promocional no utilizado regresa a esta caja.</p></div>
+        <div className="grid min-w-[300px] gap-2 text-right sm:grid-cols-3">
+          <div><p className="text-xs text-zinc-600">Total disponible</p><p className="mt-1 text-xl font-semibold text-fuchsia-300">{money(promotional.total_available_usd)}</p></div>
+          <div><p className="text-xs text-zinc-600">Crédito de proveedores</p><p className="mt-1 text-lg font-semibold text-cyan-300">{money(promotional.total_recurring_available_usd)}</p></div>
+          <div><p className="text-xs text-zinc-600">Dinero propio</p><p className="mt-1 text-lg font-semibold text-amber-300">{money(promotional.total_own_available_usd)}</p></div>
+        </div>
       </div>
 
       <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {promotional.provider_balances.map(item=><article key={item.provider} className="rounded-2xl border border-white/6 bg-black/20 p-4"><p className="text-xs font-semibold uppercase text-fuchsia-300">{item.provider}</p><p className="mt-3 text-xl font-semibold text-white">{money(item.available_usd)}</p><p className="mt-1 text-xs text-zinc-600">≈ {item.available_tokens} tokens que puedes regalar</p></article>)}
+        {promotional.provider_balances.map(item=><article key={item.provider} className="rounded-2xl border border-white/6 bg-black/20 p-4">
+          <p className="text-xs font-semibold uppercase text-fuchsia-300">{item.provider}</p>
+          <p className="mt-3 text-xl font-semibold text-white">{money(item.available_usd)}</p>
+          <p className="mt-1 text-xs text-zinc-600">≈ {item.available_tokens} tokens que puedes regalar</p>
+          <div className="mt-3 border-t border-white/6 pt-3 text-xs leading-5 text-zinc-600">
+            <p>Proveedor recurrente: <b className="text-cyan-300">{money(item.recurring_available_usd)}</b></p>
+            <p>Dinero propio: <b className="text-amber-300">{money(item.own_available_usd)}</b></p>
+          </div>
+        </article>)}
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-cyan-500/15 bg-cyan-500/[0.025] p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[.18em] text-cyan-300">Crédito que renueva el proveedor</p>
+            <h3 className="mt-2 font-semibold text-white">Ciclos recurrentes</h3>
+            <p className="mt-2 max-w-4xl text-sm leading-6 text-zinc-500">Ejemplo: Modal puede darte USD 30 por ciclo, pero hoy quizá solo te queden USD 19.76. Registras <b className="text-zinc-300">19.76 como saldo actual</b> y <b className="text-zinc-300">30 como monto de los siguientes ciclos</b>. Al terminar el ciclo, lo que sobró no se acumula; el siguiente inicia con el monto configurado.</p>
+          </div>
+          <span className="rounded-full border border-cyan-500/20 px-3 py-1 text-xs text-cyan-200">Sin webhook obligatorio</span>
+        </div>
+
+        <div className="mt-5 grid gap-5 xl:grid-cols-[1fr_1.2fr]">
+          <div className="rounded-2xl border border-white/6 bg-black/20 p-4">
+            <h4 className="text-sm font-semibold text-white">Agregar crédito recurrente</h4>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <input value={promoRecurringName} onChange={e=>setPromoRecurringName(e.target.value)} placeholder="Nombre, ej. Modal mensual" className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white sm:col-span-2"/>
+              <select value={promoRecurringProvider} onChange={e=>setPromoRecurringProvider(e.target.value)} className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"><option value="modal">Modal</option><option value="runpod">RunPod</option><option value="beam">Beam</option><option value="general">General</option></select>
+              <input value={promoRecurringCurrent} onChange={e=>setPromoRecurringCurrent(e.target.value)} type="number" min="0" step="0.01" placeholder="Saldo real de este ciclo" className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"/>
+              <label className="text-xs text-zinc-500"><span>Inicio del ciclo actual</span><input value={promoRecurringStart} onChange={e=>setPromoRecurringStart(e.target.value)} type="date" className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"/></label>
+              <label className="text-xs text-zinc-500"><span>Fin del ciclo actual</span><input value={promoRecurringEnd} onChange={e=>setPromoRecurringEnd(e.target.value)} type="date" className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"/></label>
+              <label className="text-xs text-zinc-500 sm:col-span-2"><span>Monto completo que inicia cada ciclo siguiente</span><input value={promoRecurringNext} onChange={e=>setPromoRecurringNext(e.target.value)} type="number" min="0.01" step="0.01" placeholder="Ej. 30" className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"/></label>
+            </div>
+            <button disabled={action!==null} onClick={()=>void addRecurringPromotionalSource()} className="mt-4 rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-40">Guardar crédito recurrente</button>
+          </div>
+
+          <div className="space-y-3">
+            {promotional.recurring_sources.length===0&&<div className="rounded-2xl border border-dashed border-white/10 p-6 text-sm text-zinc-600">Todavía no hay créditos recurrentes. El dinero promocional que ya tenías sigue funcionando como dinero propio y no se reinicia.</div>}
+            {promotional.recurring_sources.map(source=>{
+              const current=source.cycles.find(c=>c.status==="active");
+              const beforeTracking=current?Math.max(current.configured_amount_usd-current.opening_available_usd,0):0;
+              const usedHere=current?Math.max(current.opening_available_usd-source.current_available_usd,0):0;
+              const draft=promoRecurringDrafts[source.id]??String(source.recurring_amount_usd);
+              return <article key={source.id} className={`rounded-2xl border p-4 ${source.active?"border-cyan-500/15 bg-black/20":"border-white/6 bg-black/10 opacity-70"}`}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div><p className="font-semibold text-white">{source.name}</p><p className="mt-1 text-xs uppercase text-zinc-600">{source.provider} · mensual · {source.active?"activo":"pausado"}</p></div>
+                  <div className="text-right"><p className="text-xs text-zinc-600">Disponible ahora</p><p className="text-xl font-semibold text-cyan-300">{money(source.current_available_usd)}</p></div>
+                </div>
+                <div className="mt-4 grid gap-2 text-xs sm:grid-cols-2">
+                  <div className="rounded-xl border border-white/6 p-3"><p className="text-zinc-600">Ciclo actual</p><p className="mt-1 text-zinc-300">{dateOnly(source.current_cycle_start)} → {dateOnly(source.current_cycle_end)}</p></div>
+                  <div className="rounded-xl border border-white/6 p-3"><p className="text-zinc-600">Saldo con el que empezaste a registrarlo</p><p className="mt-1 text-zinc-300">{money(current?.opening_available_usd||0)}</p></div>
+                  <div className="rounded-xl border border-white/6 p-3"><p className="text-zinc-600">Ya usado antes de registrarlo aquí</p><p className="mt-1 text-zinc-300">{money(beforeTracking)}</p></div>
+                  <div className="rounded-xl border border-white/6 p-3"><p className="text-zinc-600">Usado/asignado desde que lo registraste</p><p className="mt-1 text-zinc-300">{money(usedHere)}</p></div>
+                </div>
+                <div className="mt-4 flex flex-wrap items-end gap-3">
+                  <label className="min-w-[220px] flex-1 text-xs text-zinc-500"><span>Monto que tendrá cada nuevo ciclo</span><input value={draft} onChange={e=>setPromoRecurringDrafts(current=>({...current,[source.id]:e.target.value}))} type="number" min="0.01" step="0.01" className="mt-2 h-10 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"/></label>
+                  <button disabled={action!==null} onClick={()=>void updateRecurringPromotionalSource(source.id,source.active,source.recurring_amount_usd)} className="rounded-xl border border-cyan-500/25 px-4 py-2 text-xs text-cyan-200 disabled:opacity-40">Guardar próximo monto</button>
+                  <button disabled={action!==null} onClick={()=>void updateRecurringPromotionalSource(source.id,!source.active,source.recurring_amount_usd)} className="rounded-xl border border-white/10 px-4 py-2 text-xs text-zinc-300 disabled:opacity-40">{source.active?"Pausar":"Activar"}</button>
+                </div>
+                {!source.active&&<p className="mt-3 text-xs leading-5 text-zinc-600">Pausado: este crédito no se utilizará ni abrirá ciclos nuevos. Tu dinero propio sigue disponible.</p>}
+              </article>;
+            })}
+          </div>
+        </div>
       </div>
 
       <div className="mt-6 grid gap-5 xl:grid-cols-2">
-        <div className="rounded-2xl border border-white/6 p-5">
-          <h3 className="font-semibold text-white">Agregar dinero para tokens gratis</h3>
+        <div className="rounded-2xl border border-amber-500/15 bg-amber-500/[0.02] p-5">
+          <p className="text-[10px] font-semibold uppercase tracking-[.18em] text-amber-300">Financiamiento propio</p>
+          <h3 className="mt-2 font-semibold text-white">Agregar tu propio dinero para tokens gratis</h3>
+          <p className="mt-2 text-sm leading-6 text-zinc-500">Este dinero <b className="text-zinc-300">no se reinicia ni vence por ciclo</b>. Sirve como respaldo cuando se acaba el crédito gratuito del proveedor. Los fondos promocionales que ya existían antes de esta capa se conservan aquí como propios para no reinterpretar ni modificar tu histórico.</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <input value={promoFundAmount} onChange={e=>setPromoFundAmount(e.target.value)} type="number" min="0" step="0.01" placeholder="USD" className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"/>
             <select value={promoFundProvider} onChange={e=>setPromoFundProvider(e.target.value)} className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"><option value="modal">Modal</option><option value="runpod">RunPod</option><option value="beam">Beam</option><option value="general">General</option></select>
             <input value={promoFundReference} onChange={e=>setPromoFundReference(e.target.value)} placeholder="Referencia opcional" className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"/>
             <input value={promoFundDescription} onChange={e=>setPromoFundDescription(e.target.value)} placeholder="Concepto" className="h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"/>
           </div>
-          <button disabled={action!==null} onClick={()=>void addPromotionalFund()} className="mt-4 rounded-xl bg-fuchsia-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">Agregar dinero</button>
+          <button disabled={action!==null} onClick={()=>void addPromotionalFund()} className="mt-4 rounded-xl bg-amber-400 px-4 py-2 text-sm font-semibold text-black disabled:opacity-40">Agregar dinero propio</button>
         </div>
 
         <div className="rounded-2xl border border-white/6 p-5">
@@ -647,7 +763,7 @@ export default function CashboxPage(){
           <div className="mt-4 space-y-4 text-sm">
             <label className="flex items-center justify-between gap-4 text-zinc-300"><span>Dar tokens al registrarse</span><input type="checkbox" checked={promotional.settings.signup_enabled} onChange={e=>setPromotional({...promotional,settings:{...promotional.settings,signup_enabled:e.target.checked}})}/></label>
             <label className="block text-zinc-400"><span>Tokens por nuevo usuario</span><input type="number" min="0" value={promotional.settings.signup_tokens} onChange={e=>setPromotional({...promotional,settings:{...promotional.settings,signup_tokens:Number(e.target.value)||0}})} className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"/></label>
-            <label className="block text-zinc-400"><span>De qué proveedor sale el dinero</span><select value={promotional.settings.signup_provider} onChange={e=>setPromotional({...promotional,settings:{...promotional.settings,signup_provider:e.target.value}})} className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"><option value="modal">Modal</option><option value="runpod">RunPod</option><option value="beam">Beam</option><option value="general">General</option></select></label>
+            <label className="block text-zinc-400"><span>Proveedor que deben usar esos tokens</span><select value={promotional.settings.signup_provider} onChange={e=>setPromotional({...promotional,settings:{...promotional.settings,signup_provider:e.target.value}})} className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"><option value="modal">Modal</option><option value="runpod">RunPod</option><option value="beam">Beam</option><option value="general">General</option></select></label>
             <label className="flex items-start justify-between gap-4 text-zinc-300"><span><b>Permitir promocionales para deudas anteriores</b><small className="mt-1 block max-w-md text-zinc-600">Apagado por defecto: los tokens gratis sirven para generaciones nuevas, pero no para desbloquear resultados que ya debían tokens.</small></span><input type="checkbox" checked={promotional.settings.allow_pending_settlement} onChange={e=>setPromotional({...promotional,settings:{...promotional.settings,allow_pending_settlement:e.target.checked}})}/></label>
           </div>
           <div className="mt-4 flex flex-wrap gap-3"><button disabled={action!==null} onClick={()=>void savePromotionalSettings()} className="rounded-xl border border-fuchsia-500/30 px-4 py-2 text-sm text-fuchsia-200 disabled:opacity-40">Guardar política</button><button onClick={()=>void openPromotionalGrant()} className="flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-white"><UserPlus size={15}/>Asignar a usuario</button></div>
@@ -656,7 +772,6 @@ export default function CashboxPage(){
 
       {promotional.grants.length>0&&<div className="mt-6 overflow-auto"><table className="w-full min-w-[850px] text-left text-sm"><thead className="text-xs uppercase text-zinc-600"><tr><th className="p-3">Usuario</th><th>Tokens</th><th>Proveedor</th><th>Dinero usado</th><th>Tipo</th><th>Fecha</th></tr></thead><tbody>{promotional.grants.slice(0,20).map(grant=><tr key={grant.id} className="border-t border-white/5"><td className="p-3 text-zinc-300">{grant.user_email||`#${grant.user_id}`}</td><td>{grant.tokens_granted}</td><td className="uppercase">{promotional.funds.find(f=>f.id===grant.fund_id)?.provider||"—"}</td><td>{money(grant.amount_reserved_usd)}</td><td>{grant.grant_type}</td><td className="text-xs text-zinc-600">{date(grant.created_at)}</td></tr>)}</tbody></table></div>}
     </section></AccordionSection>}
-
     {pendingRecoveries&&pendingRecoveries.items.length>0&&
       <AccordionSection title="Cobros pendientes" description="Generaciones que ya terminaron pero todavía tienen tokens por cobrar. Aquí puedes ver cuánto falta recuperar."><section className="rounded-2xl">
         <div className="flex flex-wrap items-start justify-between gap-4">

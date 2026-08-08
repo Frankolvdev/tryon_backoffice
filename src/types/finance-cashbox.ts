@@ -169,6 +169,8 @@ export interface PromotionalProviderBalance {
   provider:string;
   funded_usd:number;
   available_usd:number;
+  own_available_usd:number;
+  recurring_available_usd:number;
   available_tokens:number;
 }
 
@@ -180,6 +182,32 @@ export interface PromotionalFund {
   reference?:string|null;
   description?:string|null;
   created_at:string;
+}
+
+export interface PromotionalFundingCycle {
+  id:number;
+  cycle_start:string;
+  cycle_end:string;
+  configured_amount_usd:number;
+  opening_available_usd:number;
+  current_available_usd:number;
+  expired_unused_usd:number;
+  returned_after_close_usd:number;
+  status:string;
+}
+
+export interface PromotionalRecurringSource {
+  id:number;
+  name:string;
+  provider:string;
+  source_type:string;
+  recurrence:string;
+  recurring_amount_usd:number;
+  current_cycle_start:string;
+  current_cycle_end:string;
+  current_available_usd:number;
+  active:boolean;
+  cycles:PromotionalFundingCycle[];
 }
 
 export interface PromotionalGrantHistory {
@@ -200,10 +228,13 @@ export interface PromotionalCreditSummary {
   generation_infrastructure_reserve_per_token_usd:number;
   total_funded_usd:number;
   total_available_usd:number;
+  total_own_available_usd:number;
+  total_recurring_available_usd:number;
   provider_balances:PromotionalProviderBalance[];
   settings:PromotionalCreditSettings;
   funds:PromotionalFund[];
   grants:PromotionalGrantHistory[];
+  recurring_sources:PromotionalRecurringSource[];
 }
 
 export interface PromotionalGrantResult {
