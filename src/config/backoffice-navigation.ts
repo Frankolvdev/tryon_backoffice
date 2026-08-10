@@ -27,6 +27,7 @@ import {
   SlidersHorizontal,
   Users,
   Workflow,
+  WandSparkles,
 } from "lucide-react";
 
 export interface BackofficeNavigationItem {
@@ -95,6 +96,16 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         label: "Docker File Manager",
         href: "/dashboard/docker-file-manager",
         icon: HardDrive,
+      },
+    ],
+  },
+  {
+    label: "Tools Generation",
+    items: [
+      {
+        label: "Generador de proporciones",
+        href: "/dashboard/tools-generation/body-proportions",
+        icon: WandSparkles,
       },
     ],
   },
