@@ -739,7 +739,7 @@ function Field({ label, value, onChange, min, max }: { label: string; value: num
       value={draft}
       onChange={e => {
         const next = e.target.value;
-        if (/^-?\\d*(?:[.,]\\d*)?$/.test(next)) setDraft(next);
+        if (/^-?\d*(?:[.,]\d*)?$/.test(next)) setDraft(next);
       }}
       onBlur={commit}
       onKeyDown={e => {
