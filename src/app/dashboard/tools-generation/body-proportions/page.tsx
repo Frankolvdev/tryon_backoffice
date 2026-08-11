@@ -82,6 +82,7 @@ export default function BodyProportionGeneratorPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState<Set<number>>(new Set());
   const [dangerOpen, setDangerOpen] = useState(false);
+  const [deleteWorkflowMappingsOnReset, setDeleteWorkflowMappingsOnReset] = useState(false);
   const [mappingOpen, setMappingOpen] = useState(false); // CLOSED BY DEFAULT
   const [nodeIdSearch, setNodeIdSearch] = useState<Record<string, string>>({});
   const [matrixOpen, setMatrixOpen] = useState<Record<string, boolean>>({ low: true });
@@ -336,10 +337,13 @@ export default function BodyProportionGeneratorPage() {
   };
 
   const resetAll = async () => {
-    if (!window.confirm(`Esto eliminará TODOS los presets, imágenes, intermedios y configuración de ${sex === "woman" ? "Mujer" : "Hombre"} de esta herramienta. No afecta ningún otro módulo. ¿Continuar?`)) return;
+    if (!window.confirm(`Esto eliminará TODOS los presets, imágenes e intermedios de ${sex === "woman" ? "Mujer" : "Hombre"} de esta herramienta.${deleteWorkflowMappingsOnReset ? " También eliminará el workflow y los nodos mapeados." : " El workflow y los nodos mapeados se conservarán."} No afecta ningún otro módulo. ¿Continuar?`)) return;
     if (!window.confirm("Confirmación final: esta acción no se puede deshacer. ¿Limpiar todo?")) return;
     try {
-      const r = await browserApiRequest<BodyProportionResetResult>(`${API}/reset/${sex}`, { method: "DELETE" });
+      const r = await browserApiRequest<BodyProportionResetResult>(
+        `${API}/reset/${sex}?delete_workflow_mappings=${deleteWorkflowMappingsOnReset ? "true" : "false"}`,
+        { method: "DELETE" }
+      );
       toast.success(`Limpieza terminada: ${r.deleted_presets} presets eliminados.`);
       await load();
     } catch (e) {
@@ -659,9 +663,21 @@ export default function BodyProportionGeneratorPage() {
       </button>
       {dangerOpen && <div className="border-t border-red-500/10 p-5">
         <p className="max-w-3xl text-xs leading-5 text-zinc-500">
-          Elimina presets, intermedios, previews, archivos vinculados por esta herramienta, espejo local y configuración del generador.
+          Elimina presets, intermedios, previews, archivos vinculados por esta herramienta y espejo local.
+          Las reglas vuelven a sus valores predeterminados. El workflow y los nodos mapeados se conservan salvo que marques la opción siguiente.
           No modifica usuarios, billing, generación comercial, Modal, RunPod, Beam, Storage global ni ningún otro módulo.
         </p>
+        <label className="mt-4 flex max-w-xl cursor-pointer items-start gap-3 rounded-xl border border-red-500/15 bg-red-950/15 p-3">
+          <input
+            type="checkbox"
+            checked={deleteWorkflowMappingsOnReset}
+            onChange={e => setDeleteWorkflowMappingsOnReset(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-red-600"
+          />
+          <span className="text-xs leading-5 text-red-200/80">
+            Eliminar también el workflow de ComfyUI y todos los nodos/inputs mapeados.
+          </span>
+        </label>
         <button onClick={resetAll} className="mt-4 inline-flex h-42 items-center gap-2 rounded-xl border border-red-500/30 bg-red-950/30 px-4 py-3 text-xs font-semibold text-red-300 hover:bg-red-950/60">
           <Trash2 size={15}/>Limpiar TODO · {sex === "woman" ? "Mujer" : "Hombre"}
         </button>
