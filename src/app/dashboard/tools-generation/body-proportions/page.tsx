@@ -22,7 +22,7 @@ const defaults: BodyProportionConfig = {
   workflow: null,
   input_mapping: {},
   limits: {
-    hips_min: 0, hips_max: 9, breasts_min: null, breasts_max: 1.5,
+    hips_min: 0, hips_max: 9, breasts_min: null, breasts_max: 3,
     fat_thin_min: -1.5, fat_thin_max: 1.8, skin_tone_min: -5, skin_tone_max: 5
   },
   formula: {
@@ -221,6 +221,20 @@ export default function BodyProportionGeneratorPage() {
     }
   };
 
+  const restoreAllPresetValues = async () => {
+    if (!window.confirm("¿Restaurar los valores de todas las categorías base según la configuración global actual?")) return;
+    try {
+      const result = await browserApiRequest<{ updated: number }>(
+        `${API}/presets/synchronize-all-rules`,
+        { method: "POST" }
+      );
+      await load();
+      toast.success(`Valores restaurados en ${result.updated} categorías.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudieron restaurar todas las categorías.");
+    }
+  };
+
   const generate = async (p: BodyProportionPreset) => {
     setGenerating(s => new Set(s).add(p.id));
     try {
@@ -384,6 +398,7 @@ export default function BodyProportionGeneratorPage() {
         <button onClick={syncMatrix} className="bp-secondary"><RefreshCcw size={15}/>Sincronizar malla</button>
         <button onClick={recalc} className="bp-secondary"><SlidersHorizontal size={15}/>Recalcular pendientes</button>
         <button onClick={() => setGalleryOpen(true)} className="bp-secondary"><Images size={15}/>Galería comparativa</button>
+        <button onClick={restoreAllPresetValues} disabled={generating.size > 0} className="bp-secondary"><RefreshCcw size={15}/>Restaurar valores de todas las categorías</button>
         <button onClick={() => generateList(base.filter(x => x.status !== "ready"))} disabled={generating.size > 0} className="bp-primary">
           <Play size={15}/>Generar pendientes
         </button>
