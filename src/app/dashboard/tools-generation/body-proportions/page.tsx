@@ -207,6 +207,19 @@ export default function BodyProportionGeneratorPage() {
     return saved;
   };
 
+  const syncPreset = async (p: BodyProportionPreset) => {
+    try {
+      const synced = await browserApiRequest<BodyProportionPreset>(
+        `${API}/presets/${p.id}/synchronize-rules`,
+        { method: "POST" }
+      );
+      setPresets(list => list.map(x => x.id === synced.id ? synced : x));
+      toast.success("Valores restaurados desde las reglas globales.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo sincronizar el preset.");
+    }
+  };
+
   const generate = async (p: BodyProportionPreset) => {
     setGenerating(s => new Set(s).add(p.id));
     try {
@@ -580,6 +593,7 @@ export default function BodyProportionGeneratorPage() {
                           ? <PresetCard key={p.id} preset={p} displayName={visualLabel(p.display_name)} busy={generating.has(p.id)}
                               patch={v => patchPreset(p.id, v)}
                               save={() => savePreset(p).then(() => toast.success("Preset guardado."))}
+                              sync={() => syncPreset(p)}
                               generate={() => generate(p)}/>
                           : <div key={breastKey} className="rounded-2xl border border-white/6 p-4 text-xs text-zinc-700">Falta {breast.label}</div>;
                       })}
@@ -786,8 +800,8 @@ function Field({ label, value, onChange, min, max }: { label: string; value: num
   </label>;
 }
 
-function PresetCard({ preset, displayName, busy, patch, save, generate }: {
-  preset: BodyProportionPreset; displayName: string; busy: boolean; patch: (v: Partial<BodyProportionPreset>) => void; save: () => void; generate: () => void;
+function PresetCard({ preset, displayName, busy, patch, save, sync, generate }: {
+  preset: BodyProportionPreset; displayName: string; busy: boolean; patch: (v: Partial<BodyProportionPreset>) => void; save: () => void; sync: () => void; generate: () => void;
 }) {
   const img = preset.image_storage_file_id ? `/api/admin/storage/files/${preset.image_storage_file_id}/content` : null;
   return <div className="overflow-hidden rounded-2xl border border-white/6 bg-black/20">
@@ -804,8 +818,9 @@ function PresetCard({ preset, displayName, busy, patch, save, generate }: {
         <Field label="Fat/Thin" value={preset.fat_thin} onChange={v => patch({ fat_thin: v })}/>
         <Field label="Breasts" value={preset.breasts_size} onChange={v => patch({ breasts_size: v })}/>
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <button onClick={save} className="bp-secondary">Guardar</button>
+        <button onClick={sync} disabled={busy} className="bp-secondary">Restaurar valores</button>
         <button onClick={generate} disabled={busy} className="bp-primary">{preset.status === "ready" ? "Regenerar" : "Generar"}</button>
       </div>
       {preset.last_error && <p className="text-[10px] text-red-400">{preset.last_error}</p>}
