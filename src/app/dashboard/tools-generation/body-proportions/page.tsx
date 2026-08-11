@@ -3,7 +3,7 @@
 import { ChangeEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ChevronDown, ChevronUp, FileJson, Image as ImageIcon, LoaderCircle, Play,
-  Plus, RefreshCcw, Save, SlidersHorizontal, Trash2, Unplug
+  Plus, RefreshCcw, Save, SlidersHorizontal, Trash2, Unplug, Images, X
 } from "lucide-react";
 import { toast } from "sonner";
 import { browserApiRequest } from "@/lib/api/browser-api";
@@ -31,8 +31,8 @@ const defaults: BodyProportionConfig = {
       low: { label: "Low Fat", body_fat_percent: 18, fat_thin: 1, hips_compensation: 0, breasts_compensation: 0, order: 20, is_core: true },
       medium_low: { label: "Medium-Low Fat", body_fat_percent: 24, fat_thin: 0.5, hips_compensation: 0, breasts_compensation: 0, order: 30, is_core: true },
       medium: { label: "Medium Fat", body_fat_percent: 30, fat_thin: 0, hips_compensation: 0, breasts_compensation: 0, order: 40, is_core: true },
-      high: { label: "High Fat", body_fat_percent: 36, fat_thin: -1, hips_compensation: 0, breasts_compensation: 0, order: 50, is_core: true },
-      very_high: { label: "Very High Fat", body_fat_percent: 42, fat_thin: -1.4, hips_compensation: 0, breasts_compensation: 0, order: 60, is_core: true },
+      high: { label: "High Fat", body_fat_percent: 36, fat_thin: -0.5, hips_compensation: 0, breasts_compensation: 0, order: 50, is_core: true },
+      very_high: { label: "Very High Fat", body_fat_percent: 42, fat_thin: -1, hips_compensation: 0, breasts_compensation: 0, order: 60, is_core: true },
     },
     ass_levels: {
       small: { label: "Small Ass", hips_size: 0, order: 10, is_core: true },
@@ -85,6 +85,11 @@ export default function BodyProportionGeneratorPage() {
   const [mappingOpen, setMappingOpen] = useState(false); // CLOSED BY DEFAULT
   const [nodeIdSearch, setNodeIdSearch] = useState<Record<string, string>>({});
   const [matrixOpen, setMatrixOpen] = useState<Record<string, boolean>>({ low: true });
+  const [galleryOpen, setGalleryOpen] = useState(false);
+
+  // Presentation only: backend keys, formula fields and persisted category names remain "ass".
+  const visualLabel = (value: string) => value.replace(/\bAss\b/gi, match => match[0] === "A" ? "Hips" : "hips");
+  const internalAssLabel = (value: string) => value.replace(/\bHips\b/gi, match => match[0] === "H" ? "Ass" : "ass");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -268,7 +273,7 @@ export default function BodyProportionGeneratorPage() {
         ass_breast_compensation: compensation,
       },
     };
-    await applyAnchorConfig(next, `Intermedio de glúteos creado en ${hips.toFixed(2)}.`);
+    await applyAnchorConfig(next, `Intermedio de hips creado en ${hips.toFixed(2)}.`);
   };
 
   const insertBreastBetween = async (leftKey: string, rightKey: string) => {
@@ -354,13 +359,14 @@ export default function BodyProportionGeneratorPage() {
         <p className="text-xs font-semibold uppercase tracking-[.28em] text-red-400">Tools Generation</p>
         <h1 className="mt-2 text-3xl font-semibold text-white">Generador de proporciones corporales</h1>
         <p className="mt-2 max-w-5xl text-sm text-zinc-500">
-          Malla dinámica derivada de bandas de grasa, anclas de glúteos y anclas de pecho.
+          Malla dinámica derivada de bandas de grasa, anclas de hips y anclas de pecho.
           Los intermedios amplían automáticamente la matriz sin tocar el resto de la plataforma.
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
         <button onClick={syncMatrix} className="bp-secondary"><RefreshCcw size={15}/>Sincronizar malla</button>
         <button onClick={recalc} className="bp-secondary"><SlidersHorizontal size={15}/>Recalcular pendientes</button>
+        <button onClick={() => setGalleryOpen(true)} className="bp-secondary"><Images size={15}/>Galería comparativa</button>
         <button onClick={() => generateList(base.filter(x => x.status !== "ready"))} disabled={generating.size > 0} className="bp-primary">
           <Play size={15}/>Generar pendientes
         </button>
@@ -448,15 +454,15 @@ export default function BodyProportionGeneratorPage() {
       <div className="mt-4 flex justify-end"><button onClick={saveConfig} className="bp-primary"><Save size={15}/>Guardar y sincronizar</button></div>
     </Accordion>
 
-    <Accordion title="Anclas de glúteos" subtitle={`${assEntries.length} anclas. Cada intermedio queda obligado a permanecer entre sus vecinos.`}>
+    <Accordion title="Anclas de hips" subtitle={`${assEntries.length} anclas. Cada intermedio queda obligado a permanecer entre sus vecinos.`}>
       <div className="space-y-2">
         {assEntries.map(([key, level], index) => {
           const prev = assEntries[index - 1]?.[1];
           const next = assEntries[index + 1]?.[1];
           return <div key={key}>
             <AnchorRow
-              label={level.label}
-              onLabel={v => setConfig(c => ({ ...c, formula: { ...c.formula, ass_levels: { ...c.formula.ass_levels, [key]: { ...c.formula.ass_levels[key], label: v } } } }))}
+              label={visualLabel(level.label)}
+              onLabel={v => setConfig(c => ({ ...c, formula: { ...c.formula, ass_levels: { ...c.formula.ass_levels, [key]: { ...c.formula.ass_levels[key], label: internalAssLabel(v) } } } }))}
               fields={[{
                 label: "hips_size", value: level.hips_size,
                 min: prev ? prev.hips_size + .001 : (config.limits.hips_min ?? 0),
@@ -467,7 +473,7 @@ export default function BodyProportionGeneratorPage() {
               onDelete={() => removeAnchor("ass", key)}
             />
             {index < assEntries.length - 1 &&
-              <BetweenButton onClick={() => insertAssBetween(key, assEntries[index + 1][0])} text="Agregar glúteo intermedio"/>
+              <BetweenButton onClick={() => insertAssBetween(key, assEntries[index + 1][0])} text="Agregar hips intermedio"/>
             }
           </div>;
         })}
@@ -502,16 +508,16 @@ export default function BodyProportionGeneratorPage() {
       <div className="mt-4 flex justify-end"><button onClick={saveConfig} className="bp-primary"><Save size={15}/>Guardar y sincronizar</button></div>
     </Accordion>
 
-    <Accordion title="Compensación glúteos → pecho" subtitle="Matriz avanzada. Los intermedios heredan por interpolación la compensación de sus vecinos.">
+    <Accordion title="Compensación hips → pecho" subtitle="Matriz avanzada. Los intermedios heredan por interpolación la compensación de sus vecinos.">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] text-xs">
           <thead><tr>
-            <th className="p-2 text-left text-zinc-600">Ass \\ Breast</th>
+            <th className="p-2 text-left text-zinc-600">Hips \\ Breast</th>
             {breastEntries.map(([b, level]) => <th key={b} className="p-2 text-zinc-600">{level.label}</th>)}
           </tr></thead>
           <tbody>
             {assEntries.map(([a, ass]) => <tr key={a}>
-              <td className="p-2 text-zinc-400">{ass.label}</td>
+              <td className="p-2 text-zinc-400">{visualLabel(ass.label)}</td>
               {breastEntries.map(([b]) => <td key={b} className="p-1">
                 <input type="number" step="0.05" value={config.formula.ass_breast_compensation[a]?.[b] ?? 0}
                   onChange={e => setConfig(c => ({
@@ -566,12 +572,12 @@ export default function BodyProportionGeneratorPage() {
                 </div>
                 {assEntries.map(([assKey, ass]) => {
                   const assRows = rows.filter(p => p.ass_band === assKey);
-                  return <Accordion key={assKey} title={ass.label} subtitle={`${assRows.length} combinaciones de pecho`} compact>
+                  return <Accordion key={assKey} title={visualLabel(ass.label)} subtitle={`${assRows.length} combinaciones de pecho`} compact>
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                       {breastEntries.map(([breastKey, breast]) => {
                         const p = assRows.find(x => x.breast_band === breastKey);
                         return p
-                          ? <PresetCard key={p.id} preset={p} busy={generating.has(p.id)}
+                          ? <PresetCard key={p.id} preset={p} displayName={visualLabel(p.display_name)} busy={generating.has(p.id)}
                               patch={v => patchPreset(p.id, v)}
                               save={() => savePreset(p).then(() => toast.success("Preset guardado."))}
                               generate={() => generate(p)}/>
@@ -585,6 +591,27 @@ export default function BodyProportionGeneratorPage() {
           })
       }
     </section>
+
+    {galleryOpen && <div className="fixed inset-0 z-[100] bg-black/90 p-4 backdrop-blur-sm md:p-8">
+      <div className="mx-auto flex h-full max-w-[1800px] flex-col overflow-hidden rounded-3xl border border-white/10 bg-zinc-950">
+        <div className="flex items-center justify-between border-b border-white/8 px-5 py-4">
+          <div><p className="text-xs uppercase tracking-[.22em] text-red-400">Comparación visual</p><h2 className="text-lg font-semibold text-white">Todas las previsualizaciones · {presets.filter(p => p.image_storage_file_id).length}</h2></div>
+          <button onClick={() => setGalleryOpen(false)} className="bp-secondary"><X size={16}/>Cerrar</button>
+        </div>
+        <div className="flex-1 overflow-auto p-2">
+          <div className="grid grid-cols-3 gap-[3px] sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 2xl:grid-cols-12">
+            {presets.filter(p => p.image_storage_file_id).map(p => <div key={p.id} className="group relative overflow-hidden bg-black">
+              <img src={`/api/admin/storage/files/${p.image_storage_file_id}/content`} alt={visualLabel(p.display_name)} className="aspect-[4/5] h-auto w-full object-cover"/>
+              <div className="absolute inset-x-0 bottom-0 bg-black/75 p-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+                <p className="text-[9px] leading-3 text-white">{visualLabel(p.display_name)}</p>
+                <p className="mt-0.5 font-mono text-[8px] text-zinc-400">H {p.hips_size} · F {p.fat_thin} · B {p.breasts_size}</p>
+              </div>
+            </div>)}
+          </div>
+          {presets.every(p => !p.image_storage_file_id) && <div className="flex h-full items-center justify-center text-sm text-zinc-600">Todavía no hay previsualizaciones generadas.</div>}
+        </div>
+      </div>
+    </div>}
 
     <Accordion title="Vincular nodos e inputs del workflow" subtitle="Avanzado · permanece cerrado por defecto. Relaciona cada valor con node_id + input_name." forceOpen={mappingOpen} onForceOpen={setMappingOpen}>
       {!config.workflow
@@ -759,19 +786,19 @@ function Field({ label, value, onChange, min, max }: { label: string; value: num
   </label>;
 }
 
-function PresetCard({ preset, busy, patch, save, generate }: {
-  preset: BodyProportionPreset; busy: boolean; patch: (v: Partial<BodyProportionPreset>) => void; save: () => void; generate: () => void;
+function PresetCard({ preset, displayName, busy, patch, save, generate }: {
+  preset: BodyProportionPreset; displayName: string; busy: boolean; patch: (v: Partial<BodyProportionPreset>) => void; save: () => void; generate: () => void;
 }) {
   const img = preset.image_storage_file_id ? `/api/admin/storage/files/${preset.image_storage_file_id}/content` : null;
   return <div className="overflow-hidden rounded-2xl border border-white/6 bg-black/20">
     <div className="relative aspect-[4/5] bg-black/40">
-      {img ? <img src={img} alt={preset.display_name} className="h-full w-full object-cover"/>
+      {img ? <img src={img} alt={displayName} className="h-full w-full object-cover"/>
         : <div className="flex h-full flex-col items-center justify-center text-zinc-800"><ImageIcon/><span className="mt-2 text-[10px]">Sin preview</span></div>}
       {busy && <div className="absolute inset-0 flex items-center justify-center bg-black/70"><LoaderCircle className="animate-spin text-red-400"/></div>}
       <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2 py-1 font-mono text-[9px] text-red-300">{preset.profile_key}</span>
     </div>
     <div className="space-y-3 p-3">
-      <p className="min-h-9 text-xs font-semibold leading-4 text-white">{preset.display_name}</p>
+      <p className="min-h-9 text-xs font-semibold leading-4 text-white">{displayName}</p>
       <div className="grid grid-cols-3 gap-2">
         <Field label="Hips" value={preset.hips_size} onChange={v => patch({ hips_size: v })}/>
         <Field label="Fat/Thin" value={preset.fat_thin} onChange={v => patch({ fat_thin: v })}/>
