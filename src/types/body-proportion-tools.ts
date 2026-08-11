@@ -3,6 +3,18 @@ export type BodyProportionStorageMode = "auto" | "local" | "amazon_s3" | "cloudf
 
 export type WorkflowMapping = Record<string, { node_id: string; input_name: string }>;
 
+export interface FatLevel {
+  label: string;
+  body_fat_percent: number;
+  fat_thin: number;
+  hips_compensation: number;
+  breasts_compensation: number;
+  order: number;
+  is_core?: boolean;
+}
+export interface AssLevel { label: string; hips_size: number; order: number; is_core?: boolean; }
+export interface BreastLevel { label: string; base: number; order: number; is_core?: boolean; }
+
 export interface BodyProportionConfig {
   id: number | null;
   sex: BodySex;
@@ -10,9 +22,9 @@ export interface BodyProportionConfig {
   input_mapping: WorkflowMapping;
   limits: Record<string, number | null>;
   formula: {
-    fat_levels: Record<string, { label: string; fat_thin: number; hips_compensation: number; breasts_compensation: number }>;
-    ass_levels: Record<string, { label: string; hips_size: number }>;
-    breast_levels: Record<string, { label: string; base: number }>;
+    fat_levels: Record<string, FatLevel>;
+    ass_levels: Record<string, AssLevel>;
+    breast_levels: Record<string, BreastLevel>;
     ass_breast_compensation: Record<string, Record<string, number>>;
     [key: string]: unknown;
   };
@@ -55,3 +67,4 @@ export interface BodyProportionPreset {
 export interface BodyProportionPresetList { items: BodyProportionPreset[]; total: number; }
 export interface BodyProportionGeneration { preset: BodyProportionPreset; prompt_id: string; storage_provider: string; overwritten: boolean; }
 export interface BodyProportionStorageOptions { active_provider: string; modes: BodyProportionStorageMode[]; }
+export interface BodyProportionResetResult { sex: BodySex; deleted_presets: number; deleted_storage_files: number; deleted_config: boolean; mirror_removed: boolean; }
