@@ -235,15 +235,18 @@ export default function BodyProportionGeneratorPage() {
     }
   };
 
-  const generate = async (p: BodyProportionPreset) => {
+  const generate = async (p: BodyProportionPreset, throwOnError = false): Promise<boolean> => {
     setGenerating(s => new Set(s).add(p.id));
     try {
       await savePreset(p);
       const r = await browserApiRequest<BodyProportionGeneration>(`${API}/presets/${p.id}/generate`, { method: "POST" });
       setPresets(list => list.map(x => x.id === p.id ? r.preset : x));
       toast.success(`${p.display_name}${r.overwritten ? " regenerado" : " generado"}.`);
+      return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falló la generación.");
+      if (throwOnError) throw e;
+      return false;
     } finally {
       setGenerating(s => {
         const next = new Set(s); next.delete(p.id); return next;
@@ -252,7 +255,37 @@ export default function BodyProportionGeneratorPage() {
   };
 
   const generateList = async (rows: BodyProportionPreset[]) => {
-    for (const row of rows) await generate(row);
+    const assOrder = new Map(assEntries.map(([key], index) => [key, index]));
+    const breastOrder = new Map(breastEntries.map(([key], index) => [key, index]));
+
+    const orderedRows = [...rows].sort((a, b) => {
+      const assA = assOrder.get(a.ass_band ?? "") ?? Number.MAX_SAFE_INTEGER;
+      const assB = assOrder.get(b.ass_band ?? "") ?? Number.MAX_SAFE_INTEGER;
+      if (assA !== assB) return assA - assB;
+
+      const breastA = breastOrder.get(a.breast_band ?? "") ?? Number.MAX_SAFE_INTEGER;
+      const breastB = breastOrder.get(b.breast_band ?? "") ?? Number.MAX_SAFE_INTEGER;
+      if (breastA !== breastB) return breastA - breastB;
+
+      return a.id - b.id;
+    });
+
+    for (const row of orderedRows) {
+      const latest = await browserApiRequest<BodyProportionPresetList>(`${API}/presets?sex=${sex}`);
+      const current = latest.items.find(item => item.id === row.id);
+
+      if (!current) continue;
+      if (current.status === "ready" || current.status === "generating") continue;
+      if (current.status !== "draft" && current.status !== "error") continue;
+
+      try {
+        await generate(current, true);
+      } catch {
+        break;
+      }
+    }
+
+    await load();
   };
 
   const patchPreset = (id: number, change: Partial<BodyProportionPreset>) =>
@@ -399,7 +432,7 @@ export default function BodyProportionGeneratorPage() {
         <button onClick={recalc} className="bp-secondary"><SlidersHorizontal size={15}/>Recalcular pendientes</button>
         <button onClick={() => setGalleryOpen(true)} className="bp-secondary"><Images size={15}/>Galería comparativa</button>
         <button onClick={restoreAllPresetValues} disabled={generating.size > 0} className="bp-secondary"><RefreshCcw size={15}/>Restaurar valores de todas las categorías</button>
-        <button onClick={() => generateList(base.filter(x => x.status !== "ready"))} disabled={generating.size > 0} className="bp-primary">
+        <button onClick={() => generateList(base.filter(x => x.status === "draft" || x.status === "error"))} disabled={generating.size > 0} className="bp-primary">
           <Play size={15}/>Generar pendientes
         </button>
       </div>
@@ -599,7 +632,7 @@ export default function BodyProportionGeneratorPage() {
               </button>
               {isOpen && <div className="space-y-5 border-t border-white/6 p-5">
                 <div className="flex justify-end gap-2">
-                  <button onClick={() => generateList(rows.filter(x => x.status === "draft"))} className="bp-secondary">Generar pendientes del grupo</button>
+                  <button onClick={() => generateList(rows.filter(x => x.status === "draft" || x.status === "error"))} className="bp-secondary">Generar pendientes del grupo</button>
                   <button onClick={() => generateList(rows)} className="bp-secondary">Regenerar grupo</button>
                 </div>
                 {assEntries.map(([assKey, ass]) => {
