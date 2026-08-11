@@ -705,11 +705,57 @@ function AnchorRow({
 }
 
 function Field({ label, value, onChange, min, max }: { label: string; value: number; onChange: (v: number) => void; min?: number; max?: number }) {
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  const commit = () => {
+    const normalized = draft.trim().replace(",", ".");
+
+    // Estados válidos mientras el usuario todavía está escribiendo un decimal negativo.
+    if (normalized === "" || normalized === "-" || normalized === "." || normalized === "-.") {
+      setDraft(String(value));
+      return;
+    }
+
+    const parsed = Number(normalized);
+    if (!Number.isFinite(parsed)) {
+      setDraft(String(value));
+      return;
+    }
+
+    const bounded = Math.min(max ?? parsed, Math.max(min ?? parsed, parsed));
+    onChange(bounded);
+    setDraft(String(bounded));
+  };
+
   return <label>
     <span className="mb-1 block text-[9px] uppercase tracking-[.12em] text-zinc-600">{label}</span>
-    <input type="number" step="0.05" value={value} min={min} max={max}
-      onChange={e => onChange(num(e.target.value))} className="bp-input"/>
-    {(min !== undefined || max !== undefined) && <span className="mt-1 block text-[8px] text-zinc-700">{min !== undefined ? `>${Number(min).toFixed(2)}` : ""}{min !== undefined && max !== undefined ? " · " : ""}{max !== undefined ? `<${Number(max).toFixed(2)}` : ""}</span>}
+    <input
+      type="text"
+      inputMode="decimal"
+      value={draft}
+      onChange={e => {
+        const next = e.target.value;
+        if (/^-?\\d*(?:[.,]\\d*)?$/.test(next)) setDraft(next);
+      }}
+      onBlur={commit}
+      onKeyDown={e => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          commit();
+          e.currentTarget.blur();
+        }
+        if (e.key === "Escape") {
+          setDraft(String(value));
+          e.currentTarget.blur();
+        }
+      }}
+      className="bp-input"
+    />
+    {(min !== undefined || max !== undefined) && <span className="mt-1 block text-[8px] text-zinc-700">{min !== undefined ? `≥${Number(min).toFixed(3)}` : ""}{min !== undefined && max !== undefined ? " · " : ""}{max !== undefined ? `≤${Number(max).toFixed(3)}` : ""}</span>}
   </label>;
 }
 
