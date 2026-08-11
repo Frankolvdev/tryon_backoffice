@@ -83,6 +83,7 @@ export default function BodyProportionGeneratorPage() {
   const [generating, setGenerating] = useState<Set<number>>(new Set());
   const [dangerOpen, setDangerOpen] = useState(false);
   const [mappingOpen, setMappingOpen] = useState(false); // CLOSED BY DEFAULT
+  const [nodeIdSearch, setNodeIdSearch] = useState<Record<string, string>>({});
   const [matrixOpen, setMatrixOpen] = useState<Record<string, boolean>>({ low: true });
 
   const load = useCallback(async () => {
@@ -594,9 +595,21 @@ export default function BodyProportionGeneratorPage() {
               const node = workflowNodes.find(n => n.id === m?.node_id);
               return <div key={key} className="rounded-xl border border-white/6 p-3">
                 <p className="mb-2 text-xs font-medium text-zinc-300">{key}</p>
+                <input
+                  value={nodeIdSearch[key] ?? ""}
+                  onChange={e => setNodeIdSearch(prev => ({ ...prev, [key]: e.target.value.replace(/[^0-9]/g, "") }))}
+                  placeholder="Buscar ID de nodo..."
+                  inputMode="numeric"
+                  className="bp-input mb-2"
+                />
                 <select value={m?.node_id ?? ""} onChange={e => patchMapping(key, "node_id", e.target.value)} className="bp-input">
                   <option value="">Sin mapear</option>
-                  {workflowNodes.map(n => <option key={n.id} value={n.id}>{n.label}</option>)}
+                  {workflowNodes
+                    .filter(n => {
+                      const q = (nodeIdSearch[key] ?? "").trim();
+                      return !q || n.id.includes(q) || n.id === m?.node_id;
+                    })
+                    .map(n => <option key={n.id} value={n.id}>{n.label}</option>)}
                 </select>
                 <select value={m?.input_name ?? ""} onChange={e => patchMapping(key, "input_name", e.target.value)} className="bp-input mt-2">
                   <option value="">Input</option>
