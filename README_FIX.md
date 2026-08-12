@@ -1,9 +1,5 @@
-# Hotfix BackOffice: visualización de destinos de cupones
-
-Corrige la página de cupones para tratar `applies_to` como una lista y mostrar correctamente:
-
-- Paquetes de tokens
-- Compra libre de tokens
-- Ambos destinos
-
-No modifica la lógica de creación, edición ni checkout.
+Fix aislado de UX Biblioteca:
+- estados de carga independientes: copiar/verificar/activar/exportar/importar;
+- cada botón muestra su propio spinner/texto;
+- títulos aclaran Destino de nuevas generaciones vs Fuente activa para AppWeb.
+No se tocan formulas, anchors, colas, mappings ni otras vistas.

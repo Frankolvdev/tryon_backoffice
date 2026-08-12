@@ -95,7 +95,12 @@ export default function BodyProportionGeneratorPage() {
   } | null>(null);
   const [librarySource, setLibrarySource] = useState<"auto" | "local" | "cloudflare_r2" | "amazon_s3">("auto");
   const [libraryTarget, setLibraryTarget] = useState<"local" | "cloudflare_r2" | "amazon_s3">("cloudflare_r2");
-  const [libraryBusy, setLibraryBusy] = useState(false);
+  const [libraryAction, setLibraryAction] = useState<
+    null | "copy" | "verify_local" | "verify_cloudflare_r2" | "verify_amazon_s3"
+    | "activate_local" | "activate_cloudflare_r2" | "activate_amazon_s3"
+    | "export" | "import"
+  >(null);
+  const libraryBusy = libraryAction !== null;
 
   // Presentation only: backend keys, formula fields and persisted category names remain "ass".
   const visualLabel = (value: string) => value.replace(/\bAss\b/gi, match => match[0] === "A" ? "Hips" : "hips");
@@ -412,7 +417,7 @@ export default function BodyProportionGeneratorPage() {
   };
 
   const copyPreviewLibrary = async () => {
-    setLibraryBusy(true);
+    setLibraryAction("copy");
     try {
       const form = new FormData();
       form.append("sex", sex);
@@ -432,12 +437,12 @@ export default function BodyProportionGeneratorPage() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo copiar la biblioteca.");
     } finally {
-      setLibraryBusy(false);
+      setLibraryAction(null);
     }
   };
 
   const verifyPreviewSource = async (source: string) => {
-    setLibraryBusy(true);
+    setLibraryAction(`verify_${source}` as typeof libraryAction);
     try {
       const form = new FormData();
       form.append("sex", sex);
@@ -451,13 +456,13 @@ export default function BodyProportionGeneratorPage() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo verificar la fuente.");
     } finally {
-      setLibraryBusy(false);
+      setLibraryAction(null);
     }
   };
 
   const activatePreviewSource = async (source: string) => {
     if (!window.confirm(`¿Usar ${source} como fuente activa de previews para ${sex === "woman" ? "Mujer" : "Hombre"}? Primero se verificará toda la biblioteca.`)) return;
-    setLibraryBusy(true);
+    setLibraryAction(`activate_${source}` as typeof libraryAction);
     try {
       const form = new FormData();
       form.append("sex", sex);
@@ -468,12 +473,12 @@ export default function BodyProportionGeneratorPage() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo activar la fuente.");
     } finally {
-      setLibraryBusy(false);
+      setLibraryAction(null);
     }
   };
 
   const exportPortableZip = async () => {
-    setLibraryBusy(true);
+    setLibraryAction("export");
     try {
       const response = await fetch(`${API}/library/export-zip/${sex}?source=${encodeURIComponent(librarySource)}`, {
         credentials: "same-origin",
@@ -500,7 +505,7 @@ export default function BodyProportionGeneratorPage() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo exportar el ZIP.");
     } finally {
-      setLibraryBusy(false);
+      setLibraryAction(null);
     }
   };
 
@@ -508,7 +513,7 @@ export default function BodyProportionGeneratorPage() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    setLibraryBusy(true);
+    setLibraryAction("import");
     try {
       const form = new FormData();
       form.append("archive", file);
@@ -526,7 +531,7 @@ export default function BodyProportionGeneratorPage() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo importar el ZIP.");
     } finally {
-      setLibraryBusy(false);
+      setLibraryAction(null);
     }
   };
 
@@ -591,8 +596,8 @@ export default function BodyProportionGeneratorPage() {
           </label>
         </div>
         <div className="rounded-2xl border border-white/7 bg-black/20 p-4">
-          <p className="text-sm font-semibold text-white">Almacenamiento de esta herramienta</p>
-          <p className="mt-1 text-xs text-zinc-600">Proveedor global activo: <b className="text-zinc-300">{storage.active_provider}</b></p>
+          <p className="text-sm font-semibold text-white">Destino de nuevas generaciones</p>
+          <p className="mt-1 text-xs text-zinc-600">Define dónde se guardará cada imagen NUEVA que genere esta herramienta. Proveedor global activo: <b className="text-zinc-300">{storage.active_provider}</b></p>
           <select value={config.storage_mode} onChange={e => setConfig(c => ({ ...c, storage_mode: e.target.value as BodyProportionConfig["storage_mode"] }))} className="bp-input mt-4">
             <option value="auto">Auto · usar configuración global</option>
             <option value="local">Local</option>
@@ -608,7 +613,7 @@ export default function BodyProportionGeneratorPage() {
       <div className="mt-4 flex justify-end"><button onClick={saveConfig} className="bp-primary"><Save size={15}/>Guardar</button></div>
     </Accordion>
 
-    <Accordion title="Biblioteca y fuente de previews" subtitle="Copia, verifica, activa o respalda previews sin cambiar la lógica de generación. Preparado por sexo para Mujer y Hombre.">
+    <Accordion title="Biblioteca y fuente de previews para AppWeb" subtitle="Administra copias Local / R2 / S3 y elige desde dónde AppWeb mostrará las previews. Esto NO cambia dónde se guardan las nuevas generaciones.">
       <div className="grid gap-4 xl:grid-cols-3">
         {(["local", "cloudflare_r2", "amazon_s3"] as const).map(source => {
           const info = libraryStatus?.sources?.[source];
@@ -624,8 +629,14 @@ export default function BodyProportionGeneratorPage() {
               {info ? `${info.available} / ${info.required} previews registradas` : "Sin estado"}
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <button onClick={() => verifyPreviewSource(source)} disabled={libraryBusy} className="bp-secondary">Verificar</button>
-              <button onClick={() => activatePreviewSource(source)} disabled={libraryBusy || active} className="bp-secondary">Usar esta fuente</button>
+              <button onClick={() => verifyPreviewSource(source)} disabled={libraryBusy} className="bp-secondary">
+                {libraryAction === `verify_${source}` ? <LoaderCircle size={15} className="animate-spin"/> : <RefreshCcw size={15}/>}
+                {libraryAction === `verify_${source}` ? "Verificando..." : "Verificar"}
+              </button>
+              <button onClick={() => activatePreviewSource(source)} disabled={libraryBusy || active} className="bp-secondary">
+                {libraryAction === `activate_${source}` ? <LoaderCircle size={15} className="animate-spin"/> : null}
+                {libraryAction === `activate_${source}` ? "Activando..." : "Usar esta fuente"}
+              </button>
             </div>
           </div>;
         })}
@@ -655,8 +666,8 @@ export default function BodyProportionGeneratorPage() {
             </label>
           </div>
           <button onClick={copyPreviewLibrary} disabled={libraryBusy} className="bp-primary mt-4">
-            {libraryBusy ? <LoaderCircle size={15} className="animate-spin"/> : <RefreshCcw size={15}/>}
-            Copiar y verificar
+            {libraryAction === "copy" ? <LoaderCircle size={15} className="animate-spin"/> : <RefreshCcw size={15}/>}
+            {libraryAction === "copy" ? "Copiando y verificando..." : "Copiar y verificar"}
           </button>
         </div>
 
@@ -667,20 +678,22 @@ export default function BodyProportionGeneratorPage() {
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <button onClick={exportPortableZip} disabled={libraryBusy} className="bp-secondary">
-              <Save size={15}/>Exportar ZIP desde origen
+              {libraryAction === "export" ? <LoaderCircle size={15} className="animate-spin"/> : <Save size={15}/>}
+              {libraryAction === "export" ? "Preparando ZIP..." : "Exportar ZIP desde origen"}
             </button>
             <label className={`bp-secondary ${libraryBusy ? "pointer-events-none opacity-50" : "cursor-pointer"}`}>
-              <FileJson size={15}/>Importar ZIP al destino
+              {libraryAction === "import" ? <LoaderCircle size={15} className="animate-spin"/> : <FileJson size={15}/>}
+              {libraryAction === "import" ? "Importando ZIP..." : "Importar ZIP al destino"}
               <input type="file" accept=".zip,application/zip" onChange={importPortableZip} className="hidden"/>
             </label>
           </div>
         </div>
       </div>
 
-      <p className="mt-4 text-[11px] leading-5 text-zinc-700">
-        Fuente activa actual: {libraryStatus?.active_source ?? "auto"} → {libraryStatus?.active_provider ?? "—"}.
-        Cambiarla no modifica el proveedor donde se guardan las nuevas generaciones.
-      </p>
+      <div className="mt-4 rounded-2xl border border-white/5 bg-black/15 p-4 text-[11px] leading-5 text-zinc-600">
+        <p><b className="text-zinc-300">Destino de nuevas generaciones:</b> {config.storage_mode}. Se configura arriba y es el origen que usa este BackOffice para mostrar las imágenes recién generadas.</p>
+        <p className="mt-1"><b className="text-zinc-300">Fuente activa para AppWeb:</b> {libraryStatus?.active_source ?? "auto"} → {libraryStatus?.active_provider ?? "—"}. Solo cambia desde dónde AppWeb/Create Model IA sirve las previews ya disponibles.</p>
+      </div>
     </Accordion>
 
     <Accordion title="Valores fijos y límites" subtitle="Skin tone y hair length permanecen fijos por ahora; límites protegen la fórmula.">
