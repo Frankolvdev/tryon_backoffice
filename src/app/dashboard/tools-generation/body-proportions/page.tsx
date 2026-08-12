@@ -10,7 +10,8 @@ import { browserApiRequest } from "@/lib/api/browser-api";
 import type {
   AssLevel, BodyProportionConfig, BodyProportionGeneration, BodyProportionPreset,
   BodyProportionPresetList, BodyProportionResetResult, BodyProportionStorageOptions,
-  BodySex, BreastLevel, FatLevel
+  BodySex, BreastLevel, FatLevel, BubbleButtConfig, BubbleButtPreset,
+  BubbleButtPresetList, BubbleButtGeneration, BubbleButtReadiness
 } from "@/types/body-proportion-tools";
 
 const API = "/api/admin/tools-generation/body-proportions";
@@ -880,6 +881,8 @@ export default function BodyProportionGeneratorPage() {
       }
     </section>
 
+    <BubbleButtSection sex={sex} bodyConfig={config} fatEntries={fatEntries} assEntries={assEntries}/>
+
     {galleryOpen && <div className="fixed inset-0 z-[100] bg-black/90 p-4 backdrop-blur-sm md:p-8">
       <div className="mx-auto flex h-full max-w-[1800px] flex-col overflow-hidden rounded-3xl border border-white/10 bg-zinc-950">
         <div className="flex items-center justify-between border-b border-white/8 px-5 py-4">
@@ -977,6 +980,102 @@ export default function BodyProportionGeneratorPage() {
       .bp-input:focus{border-color:rgba(239,68,68,.45)}
     `}</style>
   </div>;
+}
+
+
+const bubbleMapKeys = ["hips_size", "fat_thin", "breasts_size", "bubble_butt", "skin_tone", "hair_length", "category_name", "sex"] as const;
+
+function BubbleButtSection({ sex, bodyConfig, fatEntries, assEntries }: {
+  sex: BodySex;
+  bodyConfig: BodyProportionConfig;
+  fatEntries: [string, FatLevel][];
+  assEntries: [string, AssLevel][];
+}) {
+  const [cfg, setCfg] = useState<BubbleButtConfig>({
+    id:null, sex, workflow:null, input_mapping:{}, bubble_values:[0,0,0], is_enabled:false,
+    notes:null, created_at:null, updated_at:null,
+  });
+  const [rows, setRows] = useState<BubbleButtPreset[]>([]);
+  const [readiness, setReadiness] = useState<BubbleButtReadiness>({sex,required:0,ready:0,missing_count:0,complete:false,missing:[]});
+  const [busy, setBusy] = useState<Set<number>>(new Set());
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [mappingOpen, setMappingOpen] = useState(false);
+  const [groupOpen, setGroupOpen] = useState<Record<string, boolean>>({});
+  const [nodeSearch, setNodeSearch] = useState<Record<string,string>>({});
+
+  const reload = useCallback(async () => {
+    try {
+      const [nextCfg, list] = await Promise.all([
+        browserApiRequest<BubbleButtConfig>(`${API}/bubble-butt/config/${sex}`),
+        browserApiRequest<BubbleButtPresetList>(`${API}/bubble-butt/presets/${sex}`),
+      ]);
+      setCfg(nextCfg); setRows(list.items); setReadiness(list.readiness);
+    } catch(e) { toast.error(e instanceof Error ? e.message : "No se pudo cargar Bubble Butt."); }
+  }, [sex]);
+  useEffect(() => { void reload(); }, [reload]);
+
+  const nodes = useMemo(() => Object.entries(cfg.workflow ?? {}).map(([id, raw]) => {
+    const node = raw as {class_type?:string; _meta?:{title?:string}; inputs?:Record<string,unknown>};
+    return {id,label:`${id} · ${node._meta?.title ?? node.class_type ?? "Node"}`,inputs:Object.keys(node.inputs ?? {})};
+  }), [cfg.workflow]);
+
+  const uploadWorkflow = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file=event.target.files?.[0]; event.target.value=""; if(!file)return;
+    try { const workflow=JSON.parse(await file.text()); setCfg(c=>({...c,workflow})); toast.success(`Workflow Bubble Butt cargado: ${file.name}`); }
+    catch { toast.error("El workflow Bubble Butt no es un JSON API válido."); }
+  };
+  const save = async () => {
+    try {
+      const saved=await browserApiRequest<BubbleButtConfig>(`${API}/bubble-butt/config/${sex}`,{method:"PUT",body:JSON.stringify({
+        workflow:cfg.workflow,input_mapping:cfg.input_mapping,bubble_values:cfg.bubble_values.map(Number),is_enabled:cfg.is_enabled,notes:cfg.notes
+      })});
+      setCfg(saved); await reload(); toast.success("Bubble Butt guardado y sincronizado.");
+    } catch(e){toast.error(e instanceof Error?e.message:"No se pudo guardar Bubble Butt.");}
+  };
+  const sync = async () => { try { await browserApiRequest(`${API}/bubble-butt/sync/${sex}`,{method:"POST"}); await reload(); toast.success("Malla Bubble Butt sincronizada."); } catch(e){toast.error(e instanceof Error?e.message:"No se pudo sincronizar.");} };
+  const patchMapping=(key:string,field:"node_id"|"input_name",value:string)=>setCfg(c=>({...c,input_mapping:{...c.input_mapping,[key]:{node_id:c.input_mapping[key]?.node_id??"",input_name:c.input_mapping[key]?.input_name??"",[field]:value}}}));
+
+  const generateOne=async(row:BubbleButtPreset,throwOnError=false)=>{
+    setBusy(s=>new Set(s).add(row.id));
+    try { const r=await browserApiRequest<BubbleButtGeneration>(`${API}/bubble-butt/presets/${row.id}/generate`,{method:"POST"}); setRows(x=>x.map(y=>y.id===row.id?r.preset:y)); return true; }
+    catch(e){toast.error(e instanceof Error?e.message:"Falló Bubble Butt."); if(throwOnError)throw e; return false;}
+    finally{setBusy(s=>{const n=new Set(s);n.delete(row.id);return n;});}
+  };
+  const generateList=async(list:BubbleButtPreset[])=>{
+    if(!readiness.complete){toast.error(`Bubble Butt bloqueado: faltan ${readiness.missing_count} imágenes anteriores.`);return;}
+    setBatchBusy(true);
+    try{
+      const fo=new Map(fatEntries.map(([k],i)=>[k,i])), ao=new Map(assEntries.map(([k],i)=>[k,i]));
+      const orderedRows=[...list].sort((a,b)=>(fo.get(a.fat_band)??9999)-(fo.get(b.fat_band)??9999)||(ao.get(a.ass_band)??9999)-(ao.get(b.ass_band)??9999)||a.variant_index-b.variant_index||a.id-b.id);
+      for(const row of orderedRows){if(row.status==="ready"||row.status==="generating")continue; try{await generateOne(row,true);}catch{break;}}
+      await reload();
+    }finally{setBatchBusy(false);}
+  };
+
+  if(sex!=="woman") return <section className="luxia-panel rounded-3xl p-8"><p className="text-xs font-semibold uppercase tracking-[.22em] text-red-400">Etapa 2 · Bubble Butt</p><p className="mt-2 text-sm text-zinc-500">Arquitectura preparada para Hombre; se habilitará cuando su Body Proportions esté calibrado.</p></section>;
+
+  return <section className="space-y-5">
+    <div className="luxia-panel rounded-3xl p-5">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[.22em] text-red-400">Etapa 2 · Bubble Butt</p><h2 className="mt-1 text-xl font-semibold text-white">Tamaño del trasero</h2><p className="mt-2 max-w-4xl text-xs leading-5 text-zinc-500">Hereda Fat/Hips dinámicos, incluidos intermedios. Cada Fat × Hips crea 3 variantes. Fat/Thin y Hips conservan su fila; Breasts usa siempre Huge Breast dinámico de esa combinación.</p></div><div className="flex flex-wrap gap-2"><button onClick={sync} className="bp-secondary"><RefreshCcw size={15}/>Sincronizar Bubble Butt</button><button onClick={()=>generateList(rows.filter(x=>x.status==="draft"||x.status==="error"))} disabled={!readiness.complete||batchBusy} className="bp-primary">{batchBusy?<LoaderCircle size={15} className="animate-spin"/>:<Play size={15}/>} {batchBusy?"Generando...":"Generar pendientes"}</button></div></div>
+      <div className={`mt-4 rounded-2xl border p-4 ${readiness.complete?"border-emerald-500/20 bg-emerald-500/5":"border-amber-500/20 bg-amber-500/5"}`}><p className={`text-xs font-semibold ${readiness.complete?"text-emerald-300":"text-amber-300"}`}>{readiness.complete?"Body Proportions completo · Bubble Butt desbloqueado":"Bubble Butt bloqueado"}</p><p className="mt-1 text-xs text-zinc-500">{readiness.ready}/{readiness.required} imágenes anteriores disponibles en el proveedor de generación.{!readiness.complete&&` Faltan ${readiness.missing_count}.`}</p></div>
+    </div>
+
+    <Accordion title="Workflow Bubble Butt y valores globales" subtitle={`Segundo workflow independiente · almacenamiento heredado: ${bodyConfig.storage_mode}`} defaultOpen>
+      <div className="grid gap-4 xl:grid-cols-2"><div className="rounded-2xl border border-white/7 bg-black/20 p-4"><p className="text-sm font-semibold text-white">Workflow API Bubble Butt</p><p className="mt-1 text-xs text-zinc-600">{cfg.workflow?`${Object.keys(cfg.workflow).length} nodos cargados`:"Sin workflow cargado"}</p><label className="bp-secondary mt-4 cursor-pointer"><FileJson size={15}/>Cargar workflow API JSON<input type="file" accept=".json,application/json" onChange={uploadWorkflow} className="hidden"/></label><label className="mt-4 flex items-center gap-3 text-xs text-zinc-400"><input type="checkbox" checked={cfg.is_enabled} onChange={e=>setCfg(c=>({...c,is_enabled:e.target.checked}))} className="accent-red-600"/>Habilitar generación Bubble Butt</label></div><div className="rounded-2xl border border-white/7 bg-black/20 p-4"><p className="text-sm font-semibold text-white">3 valores globales Bubble Butt</p><p className="mt-1 text-xs text-zinc-600">Variante 1, 2 y 3 para cada combinación Fat × Hips.</p><div className="mt-4 grid grid-cols-3 gap-3">{[0,1,2].map(index=><label key={index} className="text-xs text-zinc-500">Variante {index+1}<input type="number" step="0.1" value={cfg.bubble_values[index]??0} onChange={e=>setCfg(c=>{const v=[...c.bubble_values];v[index]=num(e.target.value);return{...c,bubble_values:v};})} className="bp-input mt-1"/></label>)}</div></div></div>
+      <div className="mt-4 flex justify-end"><button onClick={save} className="bp-primary"><Save size={15}/>Guardar Bubble Butt</button></div>
+    </Accordion>
+
+    <Accordion title="Vincular nodos e inputs · Bubble Butt" subtitle="Mapeo independiente del workflow Body Proportions." forceOpen={mappingOpen} onForceOpen={setMappingOpen}>
+      {!cfg.workflow?<div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-zinc-600">Carga primero el workflow Bubble Butt.</div>:<div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{bubbleMapKeys.map(key=>{const m=cfg.input_mapping[key],node=nodes.find(n=>n.id===m?.node_id);return <div key={key} className="rounded-xl border border-white/6 p-3"><p className="mb-2 text-xs font-medium text-zinc-300">{key}</p><input value={nodeSearch[key]??""} onChange={e=>setNodeSearch(s=>({...s,[key]:e.target.value.replace(/[^0-9]/g,"")}))} placeholder="Buscar ID..." inputMode="numeric" className="bp-input mb-2"/><select value={m?.node_id??""} onChange={e=>patchMapping(key,"node_id",e.target.value)} className="bp-input"><option value="">Sin mapear</option>{nodes.filter(n=>!(nodeSearch[key]??"")||n.id.includes(nodeSearch[key])||n.id===m?.node_id).map(n=><option key={n.id} value={n.id}>{n.label}</option>)}</select><select value={m?.input_name??""} onChange={e=>patchMapping(key,"input_name",e.target.value)} className="bp-input mt-2"><option value="">Input</option>{(node?.inputs??[]).map(i=><option key={i} value={i}>{i}</option>)}</select></div>})}</div>}
+      <div className="mt-4 flex justify-end"><button onClick={save} className="bp-primary"><Unplug size={15}/>Guardar vínculos Bubble Butt</button></div>
+    </Accordion>
+
+    <div className="space-y-4">{fatEntries.map(([fatKey,fat])=>{const fatRows=rows.filter(x=>x.fat_band===fatKey),open=!!groupOpen[fatKey];return <div key={fatKey} className="luxia-panel overflow-hidden rounded-3xl"><button onClick={()=>setGroupOpen(o=>({...o,[fatKey]:!o[fatKey]}))} className="flex w-full items-center justify-between p-5 text-left"><div><p className="text-xs uppercase tracking-[.2em] text-red-400">{fat.label}</p><p className="mt-1 text-sm text-zinc-500">{fatRows.length} variantes Bubble Butt</p></div>{open?<ChevronUp/>:<ChevronDown/>}</button>{open&&<div className="space-y-4 border-t border-white/6 p-5">{assEntries.map(([assKey,ass])=>{const assRows=fatRows.filter(x=>x.ass_band===assKey).sort((a,b)=>a.variant_index-b.variant_index);return <Accordion key={assKey} title={ass.label.replace(/\bAss\b/gi,"Hips")} subtitle="3 tamaños Bubble Butt" compact><div className="grid gap-3 md:grid-cols-3">{[1,2,3].map(v=>{const row=assRows.find(x=>x.variant_index===v);return row?<BubbleCard key={row.id} row={row} busy={busy.has(row.id)} generate={()=>generateOne(row)}/>:<div key={v} className="rounded-2xl border border-white/6 p-4 text-xs text-zinc-700">Falta Variante {v}</div>})}</div></Accordion>})}</div>}</div>})}</div>
+  </section>;
+}
+
+function BubbleCard({row,busy,generate}:{row:BubbleButtPreset;busy:boolean;generate:()=>void}){
+  return <div className="overflow-hidden rounded-2xl border border-white/7 bg-black/20"><div className="relative aspect-[4/5] bg-zinc-950">{row.image_storage_file_id?<img src={`/api/admin/storage/files/${row.image_storage_file_id}/content`} alt={row.display_name} className="h-full w-full object-cover"/>:<div className="flex h-full items-center justify-center text-zinc-700"><ImageIcon size={22}/></div>}{busy&&<div className="absolute inset-0 flex items-center justify-center bg-black/70"><LoaderCircle className="animate-spin text-red-400"/></div>}<span className="absolute left-2 top-2 rounded-full bg-black/70 px-2 py-1 text-[10px] text-zinc-300">Bubble {row.variant_index}</span></div><div className="p-3"><p className="text-xs font-semibold text-white">{row.display_name.replace(/\bAss\b/gi,"Hips")}</p><p className="mt-1 font-mono text-[10px] text-zinc-500">H {row.hips_size} · F {row.fat_thin} · B {row.breasts_size} · BB {row.bubble_butt}</p>{row.last_error&&<p className="mt-2 line-clamp-2 text-[10px] text-red-400">{row.last_error}</p>}<button onClick={generate} disabled={busy} className="bp-secondary mt-3 w-full">{busy?<LoaderCircle size={14} className="animate-spin"/>:<Play size={14}/>} {row.status==="ready"?"Regenerar":"Generar"}</button></div></div>;
 }
 
 function Accordion({

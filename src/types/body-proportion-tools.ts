@@ -68,3 +68,65 @@ export interface BodyProportionPresetList { items: BodyProportionPreset[]; total
 export interface BodyProportionGeneration { preset: BodyProportionPreset; prompt_id: string; storage_provider: string; overwritten: boolean; }
 export interface BodyProportionStorageOptions { active_provider: string; modes: BodyProportionStorageMode[]; }
 export interface BodyProportionResetResult { sex: BodySex; deleted_presets: number; deleted_storage_files: number; deleted_config: boolean; mirror_removed: boolean; }
+
+
+export interface BubbleButtConfig {
+  id: number | null;
+  sex: BodySex;
+  workflow: Record<string, unknown> | null;
+  input_mapping: WorkflowMapping;
+  bubble_values: [number, number, number] | number[];
+  is_enabled: boolean;
+  notes: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface BubbleButtReadiness {
+  sex: BodySex;
+  required: number;
+  ready: number;
+  missing_count: number;
+  complete: boolean;
+  missing: { preset_id: number; profile_key: string; reason: string }[];
+}
+
+export interface BubbleButtPreset {
+  id: number;
+  sex: BodySex;
+  sort_order: number;
+  profile_key: string;
+  display_name: string;
+  category_slug: string;
+  fat_band: string;
+  ass_band: string;
+  variant_index: number;
+  hips_size: number;
+  fat_thin: number;
+  breasts_size: number;
+  bubble_butt: number;
+  skin_tone: number;
+  hair_length: number;
+  image_storage_file_id: number | null;
+  image_url: string | null;
+  local_mirror_path: string | null;
+  status: string;
+  last_error: string | null;
+  generation_metadata: Record<string, unknown>;
+  generated_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BubbleButtPresetList {
+  items: BubbleButtPreset[];
+  total: number;
+  readiness: BubbleButtReadiness;
+}
+
+export interface BubbleButtGeneration {
+  preset: BubbleButtPreset;
+  prompt_id: string;
+  storage_provider: string;
+  overwritten: boolean;
+}
