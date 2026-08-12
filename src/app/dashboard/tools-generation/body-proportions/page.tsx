@@ -87,6 +87,15 @@ export default function BodyProportionGeneratorPage() {
   const [nodeIdSearch, setNodeIdSearch] = useState<Record<string, string>>({});
   const [matrixOpen, setMatrixOpen] = useState<Record<string, boolean>>({ low: true });
   const [galleryOpen, setGalleryOpen] = useState(false);
+  const [libraryStatus, setLibraryStatus] = useState<{
+    active_source: string;
+    active_provider: string;
+    required: number;
+    sources: Record<string, { provider: string; available: number; required: number; complete_by_records: boolean }>;
+  } | null>(null);
+  const [librarySource, setLibrarySource] = useState<"auto" | "local" | "cloudflare_r2" | "amazon_s3">("auto");
+  const [libraryTarget, setLibraryTarget] = useState<"local" | "cloudflare_r2" | "amazon_s3">("cloudflare_r2");
+  const [libraryBusy, setLibraryBusy] = useState(false);
 
   // Presentation only: backend keys, formula fields and persisted category names remain "ass".
   const visualLabel = (value: string) => value.replace(/\bAss\b/gi, match => match[0] === "A" ? "Hips" : "hips");
@@ -95,14 +104,20 @@ export default function BodyProportionGeneratorPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [cfg, list, storageOptions] = await Promise.all([
+      const [cfg, list, storageOptions, library] = await Promise.all([
         browserApiRequest<BodyProportionConfig>(`${API}/config/${sex}`),
         browserApiRequest<BodyProportionPresetList>(`${API}/presets?sex=${sex}`),
         browserApiRequest<BodyProportionStorageOptions>(`${API}/storage-options`),
+        browserApiRequest<{
+          active_source: string; active_provider: string; required: number;
+          sources: Record<string, { provider: string; available: number; required: number; complete_by_records: boolean }>;
+        }>(`${API}/library/status/${sex}`),
       ]);
       setConfig(cfg);
       setPresets(list.items);
       setStorage(storageOptions);
+      setLibraryStatus(library);
+      setLibrarySource((library.active_source || "auto") as "auto" | "local" | "cloudflare_r2" | "amazon_s3");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo cargar la herramienta.");
     } finally {
@@ -396,6 +411,125 @@ export default function BodyProportionGeneratorPage() {
     await applyAnchorConfig({ ...config, formula }, "Ancla intermedia eliminada.");
   };
 
+  const copyPreviewLibrary = async () => {
+    setLibraryBusy(true);
+    try {
+      const form = new FormData();
+      form.append("sex", sex);
+      form.append("source", librarySource);
+      form.append("target", libraryTarget);
+      const result = await browserApiRequest<{
+        copied: number; skipped_existing: number; failed: { error: string }[];
+        verification: { complete: boolean; missing_count: number; verified: number; required: number };
+      }>(`${API}/library/copy`, { method: "POST", body: form });
+
+      await load();
+      if (result.verification.complete) {
+        toast.success(`Biblioteca copiada y verificada: ${result.verification.verified}/${result.verification.required}.`);
+      } else {
+        toast.warning(`Copia terminada, pero faltan ${result.verification.missing_count} previews en el destino.`);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo copiar la biblioteca.");
+    } finally {
+      setLibraryBusy(false);
+    }
+  };
+
+  const verifyPreviewSource = async (source: string) => {
+    setLibraryBusy(true);
+    try {
+      const form = new FormData();
+      form.append("sex", sex);
+      form.append("source", source);
+      const result = await browserApiRequest<{
+        complete: boolean; verified: number; required: number; missing_count: number;
+      }>(`${API}/library/verify`, { method: "POST", body: form });
+      await load();
+      if (result.complete) toast.success(`Fuente verificada: ${result.verified}/${result.required} previews disponibles.`);
+      else toast.warning(`Fuente incompleta: faltan ${result.missing_count} previews.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo verificar la fuente.");
+    } finally {
+      setLibraryBusy(false);
+    }
+  };
+
+  const activatePreviewSource = async (source: string) => {
+    if (!window.confirm(`¿Usar ${source} como fuente activa de previews para ${sex === "woman" ? "Mujer" : "Hombre"}? Primero se verificará toda la biblioteca.`)) return;
+    setLibraryBusy(true);
+    try {
+      const form = new FormData();
+      form.append("sex", sex);
+      form.append("source", source);
+      await browserApiRequest(`${API}/library/activate`, { method: "POST", body: form });
+      await load();
+      toast.success("Fuente activa actualizada. AppWeb servirá las previews desde ese origen.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo activar la fuente.");
+    } finally {
+      setLibraryBusy(false);
+    }
+  };
+
+  const exportPortableZip = async () => {
+    setLibraryBusy(true);
+    try {
+      const response = await fetch(`${API}/library/export-zip/${sex}?source=${encodeURIComponent(librarySource)}`, {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        let message = "No se pudo exportar el ZIP.";
+        try {
+          const payload = await response.json();
+          if (typeof payload?.detail === "string") message = payload.detail;
+        } catch {}
+        throw new Error(message);
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `proportions_${sex}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast.success("ZIP portable exportado.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo exportar el ZIP.");
+    } finally {
+      setLibraryBusy(false);
+    }
+  };
+
+  const importPortableZip = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setLibraryBusy(true);
+    try {
+      const form = new FormData();
+      form.append("archive", file);
+      form.append("target", libraryTarget);
+      const result = await browserApiRequest<{
+        imported: number; created: number; updated: number; errors: { path: string; error: string }[];
+        sexes: BodySex[];
+      }>(`${API}/library/import-zip`, { method: "POST", body: form });
+      await load();
+      if (result.errors.length) {
+        toast.warning(`Importadas ${result.imported}; ${result.errors.length} entradas tuvieron error.`);
+      } else {
+        toast.success(`ZIP importado: ${result.imported} previews.`);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo importar el ZIP.");
+    } finally {
+      setLibraryBusy(false);
+    }
+  };
+
   const resetAll = async () => {
     if (!window.confirm(`Esto eliminará TODOS los presets, imágenes e intermedios de ${sex === "woman" ? "Mujer" : "Hombre"} de esta herramienta.${deleteWorkflowMappingsOnReset ? " También eliminará el workflow y los nodos mapeados." : " El workflow y los nodos mapeados se conservarán."} No afecta ningún otro módulo. ¿Continuar?`)) return;
     if (!window.confirm("Confirmación final: esta acción no se puede deshacer. ¿Limpiar todo?")) return;
@@ -472,6 +606,81 @@ export default function BodyProportionGeneratorPage() {
         </div>
       </div>
       <div className="mt-4 flex justify-end"><button onClick={saveConfig} className="bp-primary"><Save size={15}/>Guardar</button></div>
+    </Accordion>
+
+    <Accordion title="Biblioteca y fuente de previews" subtitle="Copia, verifica, activa o respalda previews sin cambiar la lógica de generación. Preparado por sexo para Mujer y Hombre.">
+      <div className="grid gap-4 xl:grid-cols-3">
+        {(["local", "cloudflare_r2", "amazon_s3"] as const).map(source => {
+          const info = libraryStatus?.sources?.[source];
+          const active = libraryStatus?.active_provider === info?.provider;
+          return <div key={source} className={`rounded-2xl border p-4 ${active ? "border-red-500/40 bg-red-500/5" : "border-white/7 bg-black/20"}`}>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-white">
+                {source === "local" ? "Local" : source === "cloudflare_r2" ? "Cloudflare R2" : "Amazon S3"}
+              </p>
+              {active && <span className="rounded-full bg-red-500/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-red-300">Activa</span>}
+            </div>
+            <p className="mt-2 text-xs text-zinc-600">
+              {info ? `${info.available} / ${info.required} previews registradas` : "Sin estado"}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button onClick={() => verifyPreviewSource(source)} disabled={libraryBusy} className="bp-secondary">Verificar</button>
+              <button onClick={() => activatePreviewSource(source)} disabled={libraryBusy || active} className="bp-secondary">Usar esta fuente</button>
+            </div>
+          </div>;
+        })}
+      </div>
+
+      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+        <div className="rounded-2xl border border-white/7 bg-black/20 p-4">
+          <p className="text-sm font-semibold text-white">Copiar biblioteca entre proveedores</p>
+          <p className="mt-1 text-xs leading-5 text-zinc-600">
+            No mueve ni elimina el origen. Crea/verifica una copia en el destino. Solo después puedes activarla.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label className="text-xs text-zinc-500">Origen
+              <select value={librarySource} onChange={e => setLibrarySource(e.target.value as "auto" | "local" | "cloudflare_r2" | "amazon_s3")} disabled={libraryBusy} className="bp-input mt-1">
+                <option value="auto">Auto · fuente activa</option>
+                <option value="local">Local</option>
+                <option value="cloudflare_r2">Cloudflare R2</option>
+                <option value="amazon_s3">Amazon S3</option>
+              </select>
+            </label>
+            <label className="text-xs text-zinc-500">Destino
+              <select value={libraryTarget} onChange={e => setLibraryTarget(e.target.value as "local" | "cloudflare_r2" | "amazon_s3")} disabled={libraryBusy} className="bp-input mt-1">
+                <option value="local">Local</option>
+                <option value="cloudflare_r2">Cloudflare R2</option>
+                <option value="amazon_s3">Amazon S3</option>
+              </select>
+            </label>
+          </div>
+          <button onClick={copyPreviewLibrary} disabled={libraryBusy} className="bp-primary mt-4">
+            {libraryBusy ? <LoaderCircle size={15} className="animate-spin"/> : <RefreshCcw size={15}/>}
+            Copiar y verificar
+          </button>
+        </div>
+
+        <div className="rounded-2xl border border-white/7 bg-black/20 p-4">
+          <p className="text-sm font-semibold text-white">ZIP portable</p>
+          <p className="mt-1 text-xs leading-5 text-zinc-600">
+            Estructura compatible a futuro: proportions_woman / proportions_man → categoría → preview + values.json + values.txt.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button onClick={exportPortableZip} disabled={libraryBusy} className="bp-secondary">
+              <Save size={15}/>Exportar ZIP desde origen
+            </button>
+            <label className={`bp-secondary ${libraryBusy ? "pointer-events-none opacity-50" : "cursor-pointer"}`}>
+              <FileJson size={15}/>Importar ZIP al destino
+              <input type="file" accept=".zip,application/zip" onChange={importPortableZip} className="hidden"/>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <p className="mt-4 text-[11px] leading-5 text-zinc-700">
+        Fuente activa actual: {libraryStatus?.active_source ?? "auto"} → {libraryStatus?.active_provider ?? "—"}.
+        Cambiarla no modifica el proveedor donde se guardan las nuevas generaciones.
+      </p>
     </Accordion>
 
     <Accordion title="Valores fijos y límites" subtitle="Skin tone y hair length permanecen fijos por ahora; límites protegen la fórmula.">
