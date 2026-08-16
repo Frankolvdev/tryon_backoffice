@@ -1,8 +1,8 @@
 "use client";
 
-import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Check, Download, Film, Image as ImageIcon, RefreshCcw, Search,
+  Check, Download, Film, Image as ImageIcon, Loader2, Pause, Play, RefreshCcw, Search,
   Trash2, Upload,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -75,6 +75,43 @@ export default function AncestryAssetsPage() {
   const [selected, setSelected] = useState<AncestryCatalogItem>(ANCESTRY_CATALOG[0]);
   const [mode, setMode] = useState<AncestryStorageMode>("auto");
   const [busy, setBusy] = useState<number | "new" | null>(null);
+  const [uploadStage, setUploadStage] = useState<string | null>(null);
+  const [playingId, setPlayingId] = useState<number | null>(null);
+  const videoRefs = useRef(new Map<number, HTMLVideoElement>());
+
+  function mediaMark(item: { flagEmoji?: string | null; countryCode?: string | null }) {
+    const code = (item.countryCode || "").toUpperCase();
+    if (code === "ARAB" || code === "AFR") {
+      return <span className={styles.regionMark}>{code}</span>;
+    }
+    return <span className={styles.flag}>{item.flagEmoji || "🌐"}</span>;
+  }
+
+  async function toggleVideo(asset: AncestryMediaAsset) {
+    if (!asset.video_url) return;
+    const video = videoRefs.current.get(asset.id);
+    if (!video) return;
+
+    if (playingId === asset.id && !video.paused) {
+      video.pause();
+      setPlayingId(null);
+      return;
+    }
+
+    for (const [id, other] of videoRefs.current.entries()) {
+      if (id !== asset.id && !other.paused) {
+        other.pause();
+        other.currentTime = 0;
+      }
+    }
+
+    try {
+      await video.play();
+      setPlayingId(asset.id);
+    } catch {
+      toast.error("El navegador no permitió reproducir el video.");
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -181,11 +218,22 @@ export default function AncestryAssetsPage() {
 
   async function videoSelected(file: File) {
     setBusy(selectedAsset?.id ?? "new");
+    setUploadStage("Preparando…");
     try {
       const asset = await createIfNeeded();
+
+      setUploadStage("Preparando poster…");
       const poster = await posterFromVideo(file).catch(() => null);
+
+      setUploadStage("Subiendo video…");
       await upload(asset.id, "video", file);
-      if (poster) await upload(asset.id, "poster", poster);
+
+      if (poster) {
+        setUploadStage("Subiendo poster…");
+        await upload(asset.id, "poster", poster);
+      }
+
+      setUploadStage("Finalizando…");
       toast.success(
         poster
           ? `${selected.displayName}: video y poster automático guardados.`
@@ -195,12 +243,14 @@ export default function AncestryAssetsPage() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo subir el video.");
     } finally {
+      setUploadStage(null);
       setBusy(null);
     }
   }
 
   async function posterSelected(asset: AncestryMediaAsset, file: File) {
     setBusy(asset.id);
+    setUploadStage("Subiendo poster…");
     try {
       await upload(asset.id, "poster", file);
       toast.success("Poster actualizado.");
@@ -208,6 +258,7 @@ export default function AncestryAssetsPage() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo subir el poster.");
     } finally {
+      setUploadStage(null);
       setBusy(null);
     }
   }
@@ -308,7 +359,7 @@ export default function AncestryAssetsPage() {
                     className={`${styles.result} ${selected.key === item.key ? styles.resultActive : ""}`}
                     onClick={() => choose(item)}
                   >
-                    <span className={styles.flag}>{item.flagEmoji}</span>
+                    {mediaMark({ flagEmoji: item.flagEmoji, countryCode: item.countryCode })}
                     <span className={styles.resultCopy}>
                       <strong>{item.displayName}</strong>
                       <small>
@@ -327,7 +378,7 @@ export default function AncestryAssetsPage() {
 
         <div className={styles.selectedCard}>
           <div className={styles.selectedIdentity}>
-            <span className={styles.selectedFlag}>{selected.flagEmoji}</span>
+            <div className={styles.selectedFlag}>{mediaMark({ flagEmoji: selected.flagEmoji, countryCode: selected.countryCode })}</div>
             <div>
               <span className={styles.selectedKicker}>
                 {selected.featured ? "ASCENDENCIA DESTACADA" : "CATÁLOGO"}
@@ -362,9 +413,14 @@ export default function AncestryAssetsPage() {
             </select>
           </label>
 
-          <label className={`${styles.videoButton} ${styles.upload}`}>
-            <Film size={17} />
-            {selectedAsset?.video_url ? "Reemplazar video" : "Subir video"}
+          <label
+            className={`${styles.videoButton} ${styles.upload} ${busy !== null ? styles.uploadDisabled : ""}`}
+            aria-disabled={busy !== null}
+          >
+            {busy !== null ? <Loader2 size={17} className={styles.spinner} /> : <Film size={17} />}
+            {busy !== null
+              ? (uploadStage || "Procesando…")
+              : (selectedAsset?.video_url ? "Reemplazar video" : "Subir video")}
             <input
               type="file"
               accept="video/mp4,video/webm"
@@ -400,16 +456,49 @@ export default function AncestryAssetsPage() {
         <section className={styles.cards}>
           {items.map((asset) => (
             <article className={styles.card} key={asset.id}>
-              <div className={styles.media}>
-                {asset.poster_url ? (
+              <button
+                type="button"
+                className={`${styles.media} ${asset.video_url ? styles.mediaPlayable : ""}`}
+                onClick={() => void toggleVideo(asset)}
+                disabled={!asset.video_url}
+                aria-label={asset.video_url ? `${playingId === asset.id ? "Pausar" : "Reproducir"} ${asset.display_name}` : asset.display_name}
+              >
+                {asset.video_url ? (
+                  <video
+                    ref={(node) => {
+                      if (node) videoRefs.current.set(asset.id, node);
+                      else videoRefs.current.delete(asset.id);
+                    }}
+                    src={asset.video_url}
+                    poster={asset.poster_url || undefined}
+                    muted
+                    playsInline
+                    loop
+                    preload="metadata"
+                    onPause={() => {
+                      if (playingId === asset.id) setPlayingId(null);
+                    }}
+                    onEnded={() => setPlayingId(null)}
+                  />
+                ) : asset.poster_url ? (
                   <img src={asset.poster_url} alt={asset.display_name} />
                 ) : (
                   <ImageIcon size={30} />
                 )}
+
                 <span className={styles.badge}>
-                  {asset.flag_emoji || "🌐"} {asset.display_name}
+                  {asset.country_code === "ARAB" || asset.country_code === "AFR"
+                    ? <span className={styles.regionMark}>{asset.country_code}</span>
+                    : <span className={styles.flag}>{asset.flag_emoji || "🌐"}</span>}
+                  {asset.display_name}
                 </span>
-              </div>
+
+                {asset.video_url && (
+                  <span className={styles.playOverlay}>
+                    {playingId === asset.id ? <Pause size={18} /> : <Play size={18} fill="currentColor" />}
+                  </span>
+                )}
+              </button>
 
               <div className={styles.body}>
                 <div className={styles.title}>
@@ -441,11 +530,13 @@ export default function AncestryAssetsPage() {
                     ))}
                   </select>
 
-                  <label className={`${styles.ghost} ${styles.upload}`}>
-                    <Film size={14} /> Video
+                  <label className={`${styles.ghost} ${styles.upload} ${busy === asset.id ? styles.uploadDisabled : ""}`}>
+                    {busy === asset.id ? <Loader2 size={14} className={styles.spinner} /> : <Film size={14} />}
+                    {busy === asset.id ? (uploadStage || "Procesando…") : "Video"}
                     <input
                       type="file"
                       accept="video/mp4,video/webm"
+                      disabled={busy !== null}
                       onChange={(event) => {
                         const file = event.target.files?.[0];
                         event.target.value = "";
@@ -471,11 +562,13 @@ export default function AncestryAssetsPage() {
                     />
                   </label>
 
-                  <label className={`${styles.ghost} ${styles.upload}`}>
-                    <ImageIcon size={14} /> Poster
+                  <label className={`${styles.ghost} ${styles.upload} ${busy === asset.id ? styles.uploadDisabled : ""}`}>
+                    {busy === asset.id ? <Loader2 size={14} className={styles.spinner} /> : <ImageIcon size={14} />}
+                    {busy === asset.id ? (uploadStage || "Procesando…") : "Poster"}
                     <input
                       type="file"
                       accept="image/webp,image/jpeg,image/png"
+                      disabled={busy !== null}
                       onChange={(event) => {
                         const file = event.target.files?.[0];
                         event.target.value = "";

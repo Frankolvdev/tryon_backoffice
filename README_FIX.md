@@ -1,29 +1,30 @@
-MEGAZIP BackOffice — Catálogo de ascendencias / países
+HOTFIX BackOffice — Ancestry Media UX
 
-Base exacta:
-tryon_backoffice-main - 2026-08-16T164830.256.zip
+Base:
+tryon_backoffice-main - 2026-08-16T165654.226.zip
 
-Cambios ÚNICOS:
-- Reemplaza la vista nueva de Ascendencias de rostro.
-- Agrega catálogo local de 251 opciones (14 destacadas + catálogo ISO mundial).
-- Destacadas aparecen primero.
-- Buscador por nombre, país, alias o código ISO.
-- Bandera, código, latitud/longitud y orden vienen precargados.
-- Ya NO hay que escribir ISO, bandera, latitud ni longitud.
-- Ya NO hay botón "Crear ancestry".
-- Al subir el primer video, crea automáticamente el registro y genera poster WebP.
-- Conserva storage Automatic / Local / Amazon S3 / Cloudflare R2.
-- Conserva Import/Export ZIP.
-- Conserva reemplazo de video/poster, Visible y Eliminar.
+ÚNICAMENTE modifica la nueva vista de Ascendencias.
 
-BLINDAJE:
-- NO modifica Backend.
-- NO modifica Body Proportions.
-- NO modifica Generation Modules.
-- NO modifica AppWeb.
-- NO modifica navegación ni otros módulos.
+Cambios:
+- Arab/African muestran ARAB/AFR en vez de un globo que parece bandera faltante.
+- Países ISO reales conservan su bandera.
+- Subir video muestra etapas reales:
+  Preparando poster -> Subiendo video -> Subiendo poster -> Finalizando.
+- Spinner visible y controles de upload deshabilitados mientras trabaja.
+- Poster/video usan object-fit: contain; ya no recortan la imagen vertical.
+- Si existe video, la propia preview sirve como Play/Pause.
+- Sin controles nativos/barra de reproductor.
+- Al reproducir otro, se pausa el anterior.
+- muted + playsInline + loop.
+
+NO modifica:
+- Backend
+- Body Proportions
+- Generation Modules
+- AppWeb
+- catálogo de países
+- almacenamiento/API existentes
 
 Archivos:
-src/lib/ancestry-country-catalog.ts
 src/app/dashboard/tools-generation/ancestry-assets/page.tsx
 src/app/dashboard/tools-generation/ancestry-assets/page.module.css
