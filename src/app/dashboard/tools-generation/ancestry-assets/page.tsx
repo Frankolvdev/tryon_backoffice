@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Check, Download, Film, Image as ImageIcon, Loader2, Pause, Play, RefreshCcw, Search,
+  Check, Download, Film, Image as ImageIcon, Loader2, Pause, Play, RefreshCcw, RotateCcw, Search,
   Trash2, Upload,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -18,7 +18,10 @@ import styles from "./page.module.css";
 
 const API = "/api/admin/tools-generation/ancestry-assets";
 
-async function posterFromVideo(file: File): Promise<File> {
+async function posterFromVideo(
+  file: File,
+  position: "first" | "alternate" = "first",
+): Promise<File> {
   const url = URL.createObjectURL(file);
   try {
     const video = document.createElement("video");
@@ -28,39 +31,70 @@ async function posterFromVideo(file: File): Promise<File> {
     video.src = url;
 
     await new Promise<void>((ok, fail) => {
-      video.onloadedmetadata = () => ok();
+      const ready = () => ok();
+      video.onloadeddata = ready;
+      video.onloadedmetadata = () => {
+        if (video.readyState >= 2) ready();
+      };
       video.onerror = () => fail(new Error("No se pudo leer el video."));
     });
 
-    video.currentTime = Math.min(
-      Math.max(video.duration * 0.15, 0.05),
-      Math.max(video.duration - 0.05, 0.05),
-    );
-    await new Promise<void>((ok) => {
-      video.onseeked = () => ok();
-    });
+    // "first" = earliest decoded frame. We seek a tiny amount above zero
+    // because some browsers do not emit seeked for exactly 0.
+    // "alternate" = 20% of the duration, explicitly chosen as a fallback.
+    const target =
+      position === "first"
+        ? Math.min(0.001, Math.max(video.duration - 0.001, 0))
+        : Math.min(
+            Math.max(video.duration * 0.20, 0.001),
+            Math.max(video.duration - 0.001, 0.001),
+          );
+
+    if (Math.abs(video.currentTime - target) > 0.0005) {
+      await new Promise<void>((ok, fail) => {
+        video.onseeked = () => ok();
+        video.onerror = () => fail(new Error("No se pudo buscar el frame."));
+        video.currentTime = target;
+      });
+    }
 
     const canvas = document.createElement("canvas");
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("No se pudo preparar el poster.");
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     const blob = await new Promise<Blob>((ok, fail) =>
       canvas.toBlob(
-        (value) => value ? ok(value) : fail(new Error("No se pudo crear poster.")),
+        (value) =>
+          value
+            ? ok(value)
+            : fail(new Error("No se pudo crear poster.")),
         "image/webp",
-        0.9,
+        0.92,
       ),
     );
 
+    const suffix = position === "first" ? "first-frame" : "frame-20pct";
     return new File(
       [blob],
-      `${file.name.replace(/\.[^.]+$/, "")}-poster.webp`,
+      `${file.name.replace(/\.[^.]+$/, "")}-${suffix}.webp`,
       { type: "image/webp" },
     );
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+async function fileFromRemoteVideo(url: string, displayName: string): Promise<File> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("No se pudo descargar el video guardado para rehacer el poster.");
+  const blob = await response.blob();
+  const extension = blob.type.includes("webm") ? "webm" : "mp4";
+  return new File([blob], `${displayName}.${extension}`, {
+    type: blob.type || "video/mp4",
+  });
 }
 
 export default function AncestryAssetsPage() {
@@ -223,7 +257,7 @@ export default function AncestryAssetsPage() {
       const asset = await createIfNeeded();
 
       setUploadStage("Preparando poster…");
-      const poster = await posterFromVideo(file).catch(() => null);
+      const poster = await posterFromVideo(file, "first").catch(() => null);
 
       setUploadStage("Subiendo video…");
       await upload(asset.id, "video", file);
@@ -257,6 +291,48 @@ export default function AncestryAssetsPage() {
       await load();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo subir el poster.");
+    } finally {
+      setUploadStage(null);
+      setBusy(null);
+    }
+  }
+
+  async function regeneratePoster(
+    asset: AncestryMediaAsset,
+    position: "first" | "alternate",
+  ) {
+    if (!asset.video_url) {
+      toast.error("Este registro todavía no tiene video.");
+      return;
+    }
+
+    setBusy(asset.id);
+    setUploadStage(
+      position === "first"
+        ? "Extrayendo primer frame…"
+        : "Extrayendo frame al 20%…",
+    );
+
+    try {
+      const videoFile = await fileFromRemoteVideo(
+        asset.video_url,
+        asset.ancestry_key,
+      );
+      const poster = await posterFromVideo(videoFile, position);
+      setUploadStage("Subiendo poster…");
+      await upload(asset.id, "poster", poster);
+      toast.success(
+        position === "first"
+          ? "Poster rehecho desde el primer frame."
+          : "Poster alternativo rehecho desde el 20% del video.",
+      );
+      await load();
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo rehacer el poster.",
+      );
     } finally {
       setUploadStage(null);
       setBusy(null);
@@ -576,6 +652,36 @@ export default function AncestryAssetsPage() {
                       }}
                     />
                   </label>
+
+                  {asset.video_url && (
+                    <>
+                      <button
+                        type="button"
+                        className={styles.frameButton}
+                        disabled={busy !== null}
+                        title="Vuelve a generar el cover usando el primer frame real del video."
+                        onClick={() => void regeneratePoster(asset, "first")}
+                      >
+                        {busy === asset.id ? (
+                          <Loader2 size={14} className={styles.spinner} />
+                        ) : (
+                          <RotateCcw size={14} />
+                        )}
+                        1er frame
+                      </button>
+
+                      <button
+                        type="button"
+                        className={styles.frameButtonAlt}
+                        disabled={busy !== null}
+                        title="Genera un cover alternativo usando exactamente el frame situado al 20% del video."
+                        onClick={() => void regeneratePoster(asset, "alternate")}
+                      >
+                        <ImageIcon size={14} />
+                        Frame 20%
+                      </button>
+                    </>
+                  )}
 
                   <label className={styles.toggleLabel}>
                     <input

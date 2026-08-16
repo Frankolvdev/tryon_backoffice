@@ -1,30 +1,24 @@
-HOTFIX BackOffice — Ancestry Media UX
+HOTFIX BackOffice — Ancestry poster frames
 
-Base:
-tryon_backoffice-main - 2026-08-16T165654.226.zip
+BASE: tryon_backoffice-main - 2026-08-16T172831.722.zip
 
-ÚNICAMENTE modifica la nueva vista de Ascendencias.
+BLINDAJE:
+- Solo modifica la vista nueva Tools Generation > Ascendencias.
+- NO modifica Backend.
+- NO modifica Body Proportions.
+- NO modifica Generation Modules.
+- NO modifica AppWeb.
 
-Cambios:
-- Arab/African muestran ARAB/AFR en vez de un globo que parece bandera faltante.
-- Países ISO reales conservan su bandera.
-- Subir video muestra etapas reales:
-  Preparando poster -> Subiendo video -> Subiendo poster -> Finalizando.
-- Spinner visible y controles de upload deshabilitados mientras trabaja.
-- Poster/video usan object-fit: contain; ya no recortan la imagen vertical.
-- Si existe video, la propia preview sirve como Play/Pause.
-- Sin controles nativos/barra de reproductor.
-- Al reproducir otro, se pausa el anterior.
-- muted + playsInline + loop.
+CAMBIOS:
+- El poster automático de un video nuevo sale del PRIMER FRAME real (t≈0.001 s).
+- Ya no usa 15% del video.
+- Cada registro con video tiene botón "1er frame" para rehacer el cover desde el inicio.
+- Tiene botón alternativo "Frame 20%".
+- El frame alternativo sale EXACTAMENTE del 20% de la duración del video.
+  Ejemplo: video de 5 s -> frame alternativo en 1.0 s.
+- Ambos botones muestran/bloquean loading mediante el busy existente.
+- Reutiliza el video ya guardado; no obliga a volver a subirlo.
 
-NO modifica:
-- Backend
-- Body Proportions
-- Generation Modules
-- AppWeb
-- catálogo de países
-- almacenamiento/API existentes
-
-Archivos:
+ARCHIVOS:
 src/app/dashboard/tools-generation/ancestry-assets/page.tsx
 src/app/dashboard/tools-generation/ancestry-assets/page.module.css

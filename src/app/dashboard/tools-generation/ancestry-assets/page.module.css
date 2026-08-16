@@ -105,3 +105,36 @@
     max-height:440px;
   }
 }
+
+
+/* Poster frame controls — Ancestry only */
+.frameButton,.frameButtonAlt{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  min-height:36px;
+  padding:8px 10px;
+  border-radius:10px;
+  font-size:11px;
+  font-weight:800;
+  cursor:pointer;
+  transition:.16s ease;
+}
+.frameButton{
+  color:#e9eaed;
+  border:1px solid rgba(255,255,255,.10);
+  background:#15161b;
+}
+.frameButtonAlt{
+  color:#b8bbc3;
+  border:1px solid rgba(255,255,255,.075);
+  background:#0c0d10;
+}
+.frameButton:hover,.frameButtonAlt:hover{
+  border-color:rgba(255,64,95,.28);
+  color:#fff;
+}
+.frameButton:disabled,.frameButtonAlt:disabled{
+  opacity:.52;
+  cursor:not-allowed;
+}
