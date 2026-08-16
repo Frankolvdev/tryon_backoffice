@@ -107,6 +107,11 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         href: "/dashboard/tools-generation/body-proportions",
         icon: WandSparkles,
       },
+      {
+        label: "Ascendencias de rostro",
+        href: "/dashboard/tools-generation/ancestry-assets",
+        icon: Globe2,
+      },
     ],
   },
   {
