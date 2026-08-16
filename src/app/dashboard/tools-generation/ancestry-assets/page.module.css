@@ -138,3 +138,5 @@
   opacity:.52;
   cursor:not-allowed;
 }
+
+.rebuildAll{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.10);background:#15161b;color:#eee;border-radius:11px;padding:9px 12px;font-weight:800;cursor:pointer}.rebuildAll:hover:not(:disabled){border-color:rgba(255,64,95,.28);background:rgba(183,15,45,.08)}.rebuildAll:disabled{opacity:.55;cursor:not-allowed}

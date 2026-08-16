@@ -87,12 +87,17 @@ async function posterFromVideo(
   }
 }
 
-async function fileFromRemoteVideo(url: string, displayName: string): Promise<File> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error("No se pudo descargar el video guardado para rehacer el poster.");
+async function fileFromStoredVideo(asset: AncestryMediaAsset): Promise<File> {
+  const response = await fetch(`/api/admin/tools-generation/ancestry-assets-video/${asset.id}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(detail || "No se pudo descargar el video guardado para rehacer el poster.");
+  }
   const blob = await response.blob();
   const extension = blob.type.includes("webm") ? "webm" : "mp4";
-  return new File([blob], `${displayName}.${extension}`, {
+  return new File([blob], `${asset.ancestry_key}.${extension}`, {
     type: blob.type || "video/mp4",
   });
 }
@@ -108,9 +113,10 @@ export default function AncestryAssetsPage() {
   const [openSearch, setOpenSearch] = useState(false);
   const [selected, setSelected] = useState<AncestryCatalogItem>(ANCESTRY_CATALOG[0]);
   const [mode, setMode] = useState<AncestryStorageMode>("auto");
-  const [busy, setBusy] = useState<number | "new" | null>(null);
+  const [busy, setBusy] = useState<number | "new" | "all" | null>(null);
   const [uploadStage, setUploadStage] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<number | null>(null);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const videoRefs = useRef(new Map<number, HTMLVideoElement>());
 
   function mediaMark(item: { flagEmoji?: string | null; countryCode?: string | null }) {
@@ -314,10 +320,7 @@ export default function AncestryAssetsPage() {
     );
 
     try {
-      const videoFile = await fileFromRemoteVideo(
-        asset.video_url,
-        asset.ancestry_key,
-      );
+      const videoFile = await fileFromStoredVideo(asset);
       const poster = await posterFromVideo(videoFile, position);
       setUploadStage("Subiendo poster…");
       await upload(asset.id, "poster", poster);
@@ -336,6 +339,43 @@ export default function AncestryAssetsPage() {
     } finally {
       setUploadStage(null);
       setBusy(null);
+    }
+  }
+
+  async function regenerateAllPosters() {
+    const candidates = items.filter((item) => Boolean(item.video_url));
+    if (!candidates.length) {
+      toast.error("No hay videos para recalcular.");
+      return;
+    }
+    if (!confirm(`¿Recalcular el poster desde el primer frame de ${candidates.length} videos?`)) return;
+
+    setBusy("all");
+    setBulkProgress({ done: 0, total: candidates.length });
+    let failed = 0;
+    try {
+      for (let index = 0; index < candidates.length; index += 1) {
+        const asset = candidates[index];
+        setUploadStage(`Recalculando ${index + 1} de ${candidates.length}: ${asset.display_name}…`);
+        try {
+          const videoFile = await fileFromStoredVideo(asset);
+          const poster = await posterFromVideo(videoFile, "first");
+          await upload(asset.id, "poster", poster);
+        } catch {
+          failed += 1;
+        }
+        setBulkProgress({ done: index + 1, total: candidates.length });
+      }
+      await load();
+      if (failed) {
+        toast.error(`Terminó con ${failed} error(es). ${candidates.length - failed} posters recalculados.`);
+      } else {
+        toast.success(`Se recalcularon ${candidates.length} posters desde el primer frame.`);
+      }
+    } finally {
+      setBusy(null);
+      setUploadStage(null);
+      setBulkProgress(null);
     }
   }
 
@@ -520,6 +560,17 @@ export default function AncestryAssetsPage() {
           <span className={styles.eyebrow}>BIBLIOTECA CARGADA</span>
           <h2>{items.length} ascendencias con registro</h2>
         </div>
+        <button
+          type="button"
+          className={styles.rebuildAll}
+          disabled={busy !== null}
+          onClick={() => void regenerateAllPosters()}
+        >
+          {busy === "all" ? <Loader2 size={15} className={styles.spinner} /> : <RotateCcw size={15} />}
+          {busy === "all" && bulkProgress
+            ? `Recalculando ${bulkProgress.done}/${bulkProgress.total}`
+            : "Recalcular todos · 1er frame"}
+        </button>
       </section>
 
       {loading ? (
