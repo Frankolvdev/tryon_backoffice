@@ -108,8 +108,8 @@ export const backofficeNavigation: BackofficeNavigationGroup[] = [
         icon: WandSparkles,
       },
       {
-        label: "Ascendencias de rostro",
-        href: "/dashboard/tools-generation/ancestry-assets",
+        label: "Models IA",
+        href: "/dashboard/tools-generation/models-ia",
         icon: Globe2,
       },
     ],

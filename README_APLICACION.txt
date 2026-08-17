@@ -1,13 +1,7 @@
-FIX BackOffice - importación del cliente API de Políticas legales
+ALCANCE BLINDADO — MODELS IA
 
-Causa:
-La página importaba @/lib/browser-api, pero el helper real del proyecto está en @/lib/api/browser-api.
-
-Aplicación:
-1. Descomprime este ZIP sobre la raíz del BackOffice.
-2. Ejecuta:
-   Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue
-   npm run build
-   npm run dev
-
-No modifica endpoints, navegación, documentos legales ni lógica de publicación.
+ZIP INCREMENTAL. Copia respetando rutas.
+Ancestry no fue modificado: la nueva vista Models IA lo reutiliza como tab.
+Tabs nuevas: Eyebrows, Lips, Hairstyle con título, valor editable, poster, video, storage y activo.
+Exportar/Importar todo es global y agrupa Ancestry + nuevas tools.
+No se tocaron otras secciones del BackOffice.
