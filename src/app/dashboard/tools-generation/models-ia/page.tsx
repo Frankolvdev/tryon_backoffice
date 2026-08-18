@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Download, Film, Image as ImageIcon, Loader2, Plus, Trash2, Upload } from "lucide-react";
+import { Download, Film, Image as ImageIcon, Loader2, Pause, Play, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { browserApiRequest } from "@/lib/api/browser-api";
 import type { ModelGenerationAsset, ModelGenerationAssetList, ModelGenerationStorageMode, ModelGenerationStorageOptions, ModelGenerationToolKey } from "@/types/model-generation-assets";
@@ -16,23 +16,65 @@ const TABS: {key:"ancestry"|ModelGenerationToolKey; label:string; description:st
   {key:"hairstyle",label:"Hairstyle",description:"Previews de estilos de cabello. Solo título, valor y media."},
 ];
 
-async function posterFromVideo(file:File):Promise<File>{
-  const url=URL.createObjectURL(file);
-  try{
-    const video=document.createElement("video"); video.muted=true; video.playsInline=true; video.preload="auto"; video.src=url;
-    await new Promise<void>((ok,fail)=>{video.onloadeddata=()=>ok();video.onerror=()=>fail(new Error("No se pudo leer el video."));});
-    if(video.duration>0.01){await new Promise<void>((ok)=>{video.onseeked=()=>ok();video.currentTime=Math.min(.001,video.duration/2);});}
-    const canvas=document.createElement("canvas"); canvas.width=video.videoWidth; canvas.height=video.videoHeight;
-    const ctx=canvas.getContext("2d"); if(!ctx) throw new Error("No se pudo crear el poster."); ctx.drawImage(video,0,0);
-    const blob=await new Promise<Blob>((ok,fail)=>canvas.toBlob(v=>v?ok(v):fail(new Error("No se pudo crear el poster.")),"image/webp",.92));
-    return new File([blob],`${file.name.replace(/\.[^.]+$/,"")}-poster.webp`,{type:"image/webp"});
-  }finally{URL.revokeObjectURL(url)}
+async function posterFromVideo(file: File): Promise<File> {
+  const url = URL.createObjectURL(file);
+  try {
+    const video = document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "auto";
+    video.src = url;
+
+    await new Promise<void>((ok, fail) => {
+      const ready = () => ok();
+      video.onloadeddata = ready;
+      video.onloadedmetadata = () => {
+        if (video.readyState >= 2) ready();
+      };
+      video.onerror = () => fail(new Error("No se pudo leer el video."));
+    });
+
+    // Igual que Ancestry: usar el primer frame decodificable, apenas por encima de 0.
+    const target = Math.min(0.001, Math.max(video.duration - 0.001, 0));
+    if (Math.abs(video.currentTime - target) > 0.0005) {
+      await new Promise<void>((ok, fail) => {
+        video.onseeked = () => ok();
+        video.onerror = () => fail(new Error("No se pudo buscar el primer frame."));
+        video.currentTime = target;
+      });
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("No se pudo preparar el poster.");
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const blob = await new Promise<Blob>((ok, fail) =>
+      canvas.toBlob(
+        value => value ? ok(value) : fail(new Error("No se pudo crear poster.")),
+        "image/webp",
+        0.92,
+      ),
+    );
+
+    return new File(
+      [blob],
+      `${file.name.replace(/\.[^.]+$/, "")}-first-frame.webp`,
+      { type: "image/webp" },
+    );
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
+
 
 function ToolManager({tool}:{tool:ModelGenerationToolKey}){
   const [items,setItems]=useState<ModelGenerationAsset[]>([]);
   const [storage,setStorage]=useState<ModelGenerationStorageOptions>({active_provider:"local",modes:["auto","local","amazon_s3","cloudflare_r2"]});
   const [loading,setLoading]=useState(true); const [busy,setBusy]=useState<number|"new"|null>(null);
+  const [playingId,setPlayingId]=useState<number|null>(null);
   const [title,setTitle]=useState(""); const [value,setValue]=useState(""); const [assetKey,setAssetKey]=useState("");
   const [mode,setMode]=useState<ModelGenerationStorageMode>("auto");
   const fileRefs=useRef(new Map<string,HTMLInputElement>());
@@ -43,7 +85,24 @@ function ToolManager({tool}:{tool:ModelGenerationToolKey}){
   async function create(){if(!title.trim()||!value.trim()){toast.error("Título y valor son obligatorios.");return}setBusy("new");try{const key=(assetKey.trim()||title.trim()).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");await browserApiRequest(API,{method:"POST",body:JSON.stringify({tool_key:tool,asset_key:key,title:title.trim(),value:value.trim(),sort_order:(items.length+1)*10,storage_mode:mode,is_active:true})});setTitle("");setValue("");setAssetKey("");await load();toast.success("Opción creada") }catch(e){toast.error(e instanceof Error?e.message:"No se pudo crear") }finally{setBusy(null)}}
   async function patch(item:ModelGenerationAsset,patch:Record<string,unknown>){setBusy(item.id);try{await browserApiRequest(`${API}/${item.id}`,{method:"PATCH",body:JSON.stringify(patch)});await load()}catch(e){toast.error(e instanceof Error?e.message:"No se pudo guardar") }finally{setBusy(null)}}
   async function remove(item:ModelGenerationAsset){if(!confirm(`Eliminar ${item.title}?`))return;setBusy(item.id);try{await browserApiRequest(`${API}/${item.id}`,{method:"DELETE"});await load();toast.success("Opción eliminada") }catch(e){toast.error(e instanceof Error?e.message:"No se pudo eliminar") }finally{setBusy(null)}}
-  async function upload(item:ModelGenerationAsset,kind:"poster"|"video",file:File){setBusy(item.id);try{const fd=new FormData();fd.set("kind",kind);fd.set("media",file);await browserApiRequest(`${API}/${item.id}/media`,{method:"POST",body:fd});if(kind==="video"&&!item.poster_url){const poster=await posterFromVideo(file);const pfd=new FormData();pfd.set("kind","poster");pfd.set("media",poster);await browserApiRequest(`${API}/${item.id}/media`,{method:"POST",body:pfd});}await load();toast.success(kind==="video"?"Video guardado":"Poster guardado") }catch(e){toast.error(e instanceof Error?e.message:"No se pudo subir") }finally{setBusy(null)}}
+  async function upload(item:ModelGenerationAsset,kind:"poster"|"video",file:File){
+    setBusy(item.id);
+    try{
+      let poster:File|null=null;
+      if(kind==="video"){
+        poster=await posterFromVideo(file);
+      }
+      const fd=new FormData();fd.set("kind",kind);fd.set("media",file);
+      await browserApiRequest(`${API}/${item.id}/media`,{method:"POST",body:fd});
+      if(kind==="video"&&poster){
+        const pfd=new FormData();pfd.set("kind","poster");pfd.set("media",poster);
+        await browserApiRequest(`${API}/${item.id}/media`,{method:"POST",body:pfd});
+        setPlayingId(null);
+      }
+      await load();
+      toast.success(kind==="video"?"Video y poster automático guardados":"Poster guardado");
+    }catch(e){toast.error(e instanceof Error?e.message:"No se pudo subir") }finally{setBusy(null)}
+  }
   function chooseFile(item:ModelGenerationAsset,kind:"poster"|"video"){fileRefs.current.get(`${item.id}:${kind}`)?.click()}
   function onFile(item:ModelGenerationAsset,kind:"poster"|"video",event:ChangeEvent<HTMLInputElement>){const file=event.target.files?.[0];event.target.value="";if(file)void upload(item,kind,file)}
 
@@ -57,7 +116,12 @@ function ToolManager({tool}:{tool:ModelGenerationToolKey}){
       <button className={styles.btn} onClick={()=>void create()} disabled={busy==="new"}>{busy==="new"?<Loader2 size={14}/>:<Plus size={14}/>} Agregar</button>
     </div>
     {loading?<div className={styles.empty}><Loader2 size={18}/> Cargando…</div>:<div className={styles.grid}>{ordered.map(item=><article className={styles.card} key={item.id}>
-      <div className={styles.media}>{item.video_url?<video src={item.video_url} muted loop playsInline controls={false} onMouseEnter={e=>void e.currentTarget.play()} onMouseLeave={e=>{e.currentTarget.pause();e.currentTarget.currentTime=0}}/>:item.poster_url?<img src={item.poster_url} alt={item.title}/>:<div className={styles.empty}>Sin preview</div>}</div>
+      <button type="button" className={`${styles.media} ${item.video_url?styles.mediaPlayable:""}`} onClick={()=>{if(item.video_url)setPlayingId(current=>current===item.id?null:item.id)}} aria-label={item.video_url?`${playingId===item.id?"Pausar":"Reproducir"} ${item.title}`:item.title}>
+        {playingId===item.id&&item.video_url?
+          <video key={`${item.id}-${item.video_url}`} src={item.video_url} poster={item.poster_url||undefined} muted loop playsInline autoPlay/>:
+          item.poster_url?<img src={item.poster_url} alt={item.title}/>:<div className={styles.empty}>Sin preview</div>}
+        {item.video_url&&<span className={styles.playBadge}>{playingId===item.id?<Pause size={14}/>:<Play size={14}/>}</span>}
+      </button>
       <div className={styles.cardBody}><input className={styles.cardEdit} defaultValue={item.title} maxLength={180} aria-label="Título" onBlur={e=>{const v=e.target.value.trim();if(v&&v!==item.title)void patch(item,{title:v})}}/><textarea className={styles.cardValueEdit} defaultValue={item.value} maxLength={500} aria-label="Valor para prompt" onBlur={e=>{const v=e.target.value.trim();if(v&&v!==item.value)void patch(item,{value:v})}}/><div className={styles.meta}><span>{item.asset_key}</span><label className={styles.toggle}><input type="checkbox" checked={item.is_active} onChange={e=>void patch(item,{is_active:e.target.checked})}/> activo</label></div>
       <div className={styles.actions}><button onClick={()=>chooseFile(item,"poster")}><ImageIcon size={12}/> Poster</button><button onClick={()=>chooseFile(item,"video")}><Film size={12}/> Video</button><button onClick={()=>void patch(item,{sort_order:Math.max(0,item.sort_order-10)})}>↑ Orden</button><button className={styles.danger} onClick={()=>void remove(item)}><Trash2 size={12}/> Eliminar</button></div>
       <input ref={el=>{if(el)fileRefs.current.set(`${item.id}:poster`,el)}} className={styles.hidden} type="file" accept="image/*" onChange={e=>onFile(item,"poster",e)}/>
