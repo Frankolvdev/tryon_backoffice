@@ -4,7 +4,7 @@ import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "
 import { Download, Film, Image as ImageIcon, Loader2, Pause, Play, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { browserApiRequest } from "@/lib/api/browser-api";
-import type { ModelGenerationAsset, ModelGenerationAssetList, ModelGenerationStorageMode, ModelGenerationStorageOptions, ModelGenerationToolKey } from "@/types/model-generation-assets";
+import type { ModelGenerationAsset, ModelGenerationAssetList, ModelGenerationStorageOptions, ModelGenerationToolKey } from "@/types/model-generation-assets";
 import AncestryAssetsPage from "../ancestry-assets/page";
 import styles from "./page.module.css";
 
@@ -75,14 +75,29 @@ function ToolManager({tool}:{tool:ModelGenerationToolKey}){
   const [storage,setStorage]=useState<ModelGenerationStorageOptions>({active_provider:"local",modes:["auto","local","amazon_s3","cloudflare_r2"]});
   const [loading,setLoading]=useState(true); const [busy,setBusy]=useState<number|"new"|null>(null);
   const [playingId,setPlayingId]=useState<number|null>(null);
-  const [title,setTitle]=useState(""); const [value,setValue]=useState(""); const [assetKey,setAssetKey]=useState("");
-  const [mode,setMode]=useState<ModelGenerationStorageMode>("auto");
+  const [title,setTitle]=useState(""); const [value,setValue]=useState(""); const [newVideo,setNewVideo]=useState<File|null>(null);
+  const newVideoRef=useRef<HTMLInputElement>(null);
   const fileRefs=useRef(new Map<string,HTMLInputElement>());
   const load=useCallback(async()=>{setLoading(true);try{const [list,opts]=await Promise.all([browserApiRequest<ModelGenerationAssetList>(`${API}?tool_key=${tool}`),browserApiRequest<ModelGenerationStorageOptions>(`${API}/storage-options`)]);setItems(list.items);setStorage(opts)}catch(e){toast.error(e instanceof Error?e.message:"No se pudo cargar Models IA") }finally{setLoading(false)}},[tool]);
   useEffect(()=>{void load()},[load]);
   const ordered=useMemo(()=>[...items].sort((a,b)=>a.sort_order-b.sort_order||a.id-b.id),[items]);
 
-  async function create(){if(!title.trim()||!value.trim()){toast.error("Título y valor son obligatorios.");return}setBusy("new");try{const key=(assetKey.trim()||title.trim()).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");await browserApiRequest(API,{method:"POST",body:JSON.stringify({tool_key:tool,asset_key:key,title:title.trim(),value:value.trim(),sort_order:(items.length+1)*10,storage_mode:mode,is_active:true})});setTitle("");setValue("");setAssetKey("");await load();toast.success("Opción creada") }catch(e){toast.error(e instanceof Error?e.message:"No se pudo crear") }finally{setBusy(null)}}
+  async function create(){
+    if(!title.trim()||!value.trim()){toast.error("Título y valor son obligatorios.");return}
+    if(!newVideo){toast.error("Selecciona un video para crear la preview.");return}
+    setBusy("new");
+    try{
+      const poster=await posterFromVideo(newVideo);
+      const key=title.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+      const created=await browserApiRequest<ModelGenerationAsset>(API,{method:"POST",body:JSON.stringify({tool_key:tool,asset_key:key,title:title.trim(),value:value.trim(),sort_order:(items.length+1)*10,storage_mode:"auto",is_active:true})});
+      const vfd=new FormData();vfd.set("kind","video");vfd.set("media",newVideo);
+      await browserApiRequest(`${API}/${created.id}/media`,{method:"POST",body:vfd});
+      const pfd=new FormData();pfd.set("kind","poster");pfd.set("media",poster);
+      await browserApiRequest(`${API}/${created.id}/media`,{method:"POST",body:pfd});
+      setTitle("");setValue("");setNewVideo(null);if(newVideoRef.current)newVideoRef.current.value="";
+      await load();toast.success("Opción, video y poster automático creados");
+    }catch(e){toast.error(e instanceof Error?e.message:"No se pudo crear") }finally{setBusy(null)}
+  }
   async function patch(item:ModelGenerationAsset,patch:Record<string,unknown>){setBusy(item.id);try{await browserApiRequest(`${API}/${item.id}`,{method:"PATCH",body:JSON.stringify(patch)});await load()}catch(e){toast.error(e instanceof Error?e.message:"No se pudo guardar") }finally{setBusy(null)}}
   async function remove(item:ModelGenerationAsset){if(!confirm(`Eliminar ${item.title}?`))return;setBusy(item.id);try{await browserApiRequest(`${API}/${item.id}`,{method:"DELETE"});await load();toast.success("Opción eliminada") }catch(e){toast.error(e instanceof Error?e.message:"No se pudo eliminar") }finally{setBusy(null)}}
   async function upload(item:ModelGenerationAsset,kind:"poster"|"video",file:File){
@@ -110,9 +125,9 @@ function ToolManager({tool}:{tool:ModelGenerationToolKey}){
     <div className={styles.toolbar}><div><h2>{TABS.find(t=>t.key===tool)?.label}</h2><p>{TABS.find(t=>t.key===tool)?.description}</p></div><span className={styles.status}>Storage: {storage.active_provider.replaceAll("_"," ")}</span></div>
     <div className={styles.form}>
       <input className={styles.input} placeholder="Título visible" value={title} onChange={e=>setTitle(e.target.value)} maxLength={180}/>
-      <input className={styles.input} placeholder="Clave (opcional)" value={assetKey} onChange={e=>setAssetKey(e.target.value)} maxLength={120}/>
       <input className={styles.input} placeholder="Valor para prompt" value={value} onChange={e=>setValue(e.target.value)} maxLength={500}/>
-      <select className={styles.select} value={mode} onChange={e=>setMode(e.target.value as ModelGenerationStorageMode)}>{storage.modes.map(m=><option key={m} value={m}>{m}</option>)}</select>
+      <button type="button" className={styles.videoPicker} onClick={()=>newVideoRef.current?.click()}><Film size={14}/><span>{newVideo?newVideo.name:"Seleccionar video"}</span></button>
+      <input ref={newVideoRef} className={styles.hidden} type="file" accept="video/mp4,video/webm,video/quicktime" onChange={e=>setNewVideo(e.target.files?.[0]||null)}/>
       <button className={styles.btn} onClick={()=>void create()} disabled={busy==="new"}>{busy==="new"?<Loader2 size={14}/>:<Plus size={14}/>} Agregar</button>
     </div>
     {loading?<div className={styles.empty}><Loader2 size={18}/> Cargando…</div>:<div className={styles.grid}>{ordered.map(item=><article className={styles.card} key={item.id}>
