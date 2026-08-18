@@ -4,7 +4,7 @@ import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "
 import { Download, Film, Image as ImageIcon, Loader2, Pause, Play, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { browserApiRequest } from "@/lib/api/browser-api";
-import type { ModelGenerationAsset, ModelGenerationAssetList, ModelGenerationStorageOptions, ModelGenerationToolKey } from "@/types/model-generation-assets";
+import type { ModelGenerationAsset, ModelGenerationAssetList, ModelGenerationStorageMode, ModelGenerationStorageOptions, ModelGenerationToolKey } from "@/types/model-generation-assets";
 import AncestryAssetsPage from "../ancestry-assets/page";
 import styles from "./page.module.css";
 
@@ -75,12 +75,13 @@ function ToolManager({tool}:{tool:ModelGenerationToolKey}){
   const [storage,setStorage]=useState<ModelGenerationStorageOptions>({active_provider:"local",modes:["auto","local","amazon_s3","cloudflare_r2"]});
   const [loading,setLoading]=useState(true); const [busy,setBusy]=useState<number|"new"|null>(null);
   const [playingId,setPlayingId]=useState<number|null>(null);
-  const [title,setTitle]=useState(""); const [value,setValue]=useState(""); const [newVideo,setNewVideo]=useState<File|null>(null);
+  const [title,setTitle]=useState(""); const [value,setValue]=useState(""); const [newVideo,setNewVideo]=useState<File|null>(null); const [mode,setMode]=useState<ModelGenerationStorageMode>("auto");
   const newVideoRef=useRef<HTMLInputElement>(null);
   const fileRefs=useRef(new Map<string,HTMLInputElement>());
   const load=useCallback(async()=>{setLoading(true);try{const [list,opts]=await Promise.all([browserApiRequest<ModelGenerationAssetList>(`${API}?tool_key=${tool}`),browserApiRequest<ModelGenerationStorageOptions>(`${API}/storage-options`)]);setItems(list.items);setStorage(opts)}catch(e){toast.error(e instanceof Error?e.message:"No se pudo cargar Models IA") }finally{setLoading(false)}},[tool]);
   useEffect(()=>{void load()},[load]);
   const ordered=useMemo(()=>[...items].sort((a,b)=>a.sort_order-b.sort_order||a.id-b.id),[items]);
+  const activeLabel=useMemo(()=>storage.active_provider.replaceAll("_"," "),[storage.active_provider]);
 
   async function create(){
     if(!title.trim()||!value.trim()){toast.error("Título y valor son obligatorios.");return}
@@ -89,7 +90,7 @@ function ToolManager({tool}:{tool:ModelGenerationToolKey}){
     try{
       const poster=await posterFromVideo(newVideo);
       const key=title.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
-      const created=await browserApiRequest<ModelGenerationAsset>(API,{method:"POST",body:JSON.stringify({tool_key:tool,asset_key:key,title:title.trim(),value:value.trim(),sort_order:(items.length+1)*10,storage_mode:"auto",is_active:true})});
+      const created=await browserApiRequest<ModelGenerationAsset>(API,{method:"POST",body:JSON.stringify({tool_key:tool,asset_key:key,title:title.trim(),value:value.trim(),sort_order:(items.length+1)*10,storage_mode:mode,is_active:true})});
       const vfd=new FormData();vfd.set("kind","video");vfd.set("media",newVideo);
       await browserApiRequest(`${API}/${created.id}/media`,{method:"POST",body:vfd});
       const pfd=new FormData();pfd.set("kind","poster");pfd.set("media",poster);
@@ -126,6 +127,12 @@ function ToolManager({tool}:{tool:ModelGenerationToolKey}){
     <div className={styles.form}>
       <input className={styles.input} placeholder="Título visible" value={title} onChange={e=>setTitle(e.target.value)} maxLength={180}/>
       <input className={styles.input} placeholder="Valor para prompt" value={value} onChange={e=>setValue(e.target.value)} maxLength={500}/>
+      <label className={styles.storageField}>
+        <span>Destino de storage</span>
+        <select className={styles.select} value={mode} onChange={e=>setMode(e.target.value as ModelGenerationStorageMode)}>
+          {storage.modes.map(storageMode=><option key={storageMode} value={storageMode}>{storageMode==="auto"?`Automatic (${activeLabel})`:storageMode}</option>)}
+        </select>
+      </label>
       <button type="button" className={styles.videoPicker} onClick={()=>newVideoRef.current?.click()}><Film size={14}/><span>{newVideo?newVideo.name:"Seleccionar video"}</span></button>
       <input ref={newVideoRef} className={styles.hidden} type="file" accept="video/mp4,video/webm,video/quicktime" onChange={e=>setNewVideo(e.target.files?.[0]||null)}/>
       <button className={styles.btn} onClick={()=>void create()} disabled={busy==="new"}>{busy==="new"?<Loader2 size={14}/>:<Plus size={14}/>} Agregar</button>
@@ -137,7 +144,15 @@ function ToolManager({tool}:{tool:ModelGenerationToolKey}){
           item.poster_url?<img src={item.poster_url} alt={item.title}/>:<div className={styles.empty}>Sin preview</div>}
         {item.video_url&&<span className={styles.playBadge}>{playingId===item.id?<Pause size={14}/>:<Play size={14}/>}</span>}
       </button>
-      <div className={styles.cardBody}><input className={styles.cardEdit} defaultValue={item.title} maxLength={180} aria-label="Título" onBlur={e=>{const v=e.target.value.trim();if(v&&v!==item.title)void patch(item,{title:v})}}/><textarea className={styles.cardValueEdit} defaultValue={item.value} maxLength={500} aria-label="Valor para prompt" onBlur={e=>{const v=e.target.value.trim();if(v&&v!==item.value)void patch(item,{value:v})}}/><div className={styles.meta}><span>{item.asset_key}</span><label className={styles.toggle}><input type="checkbox" checked={item.is_active} onChange={e=>void patch(item,{is_active:e.target.checked})}/> activo</label></div>
+      <div className={styles.cardBody}><input className={styles.cardEdit} defaultValue={item.title} maxLength={180} aria-label="Título" onBlur={e=>{const v=e.target.value.trim();if(v&&v!==item.title)void patch(item,{title:v})}}/><textarea className={styles.cardValueEdit} defaultValue={item.value} maxLength={500} aria-label="Valor para prompt" onBlur={e=>{const v=e.target.value.trim();if(v&&v!==item.value)void patch(item,{value:v})}}/><div className={styles.cardStorage}>
+        <label>
+          <span>Destino</span>
+          <select className={styles.select} value={item.storage_mode} disabled={busy===item.id} onChange={e=>void patch(item,{storage_mode:e.target.value as ModelGenerationStorageMode})}>
+            {storage.modes.map(storageMode=><option key={storageMode} value={storageMode}>{storageMode==="auto"?`Automatic (${activeLabel})`:storageMode}</option>)}
+          </select>
+        </label>
+        <label className={styles.toggle}><input type="checkbox" checked={item.is_active} onChange={e=>void patch(item,{is_active:e.target.checked})}/> activo</label>
+      </div>
       <div className={styles.actions}><button onClick={()=>chooseFile(item,"poster")}><ImageIcon size={12}/> Poster</button><button onClick={()=>chooseFile(item,"video")}><Film size={12}/> Video</button><button onClick={()=>void patch(item,{sort_order:Math.max(0,item.sort_order-10)})}>↑ Orden</button><button className={styles.danger} onClick={()=>void remove(item)}><Trash2 size={12}/> Eliminar</button></div>
       <input ref={el=>{if(el)fileRefs.current.set(`${item.id}:poster`,el)}} className={styles.hidden} type="file" accept="image/*" onChange={e=>onFile(item,"poster",e)}/>
       <input ref={el=>{if(el)fileRefs.current.set(`${item.id}:video`,el)}} className={styles.hidden} type="file" accept="video/mp4,video/webm,video/quicktime" onChange={e=>onFile(item,"video",e)}/>
