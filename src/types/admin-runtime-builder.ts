@@ -102,9 +102,17 @@ export interface RuntimeWorkflowResolution extends RuntimeImportReport {
   unresolved_classes: string[];
   missing_models: string[];
   ambiguous_models: string[];
+  auxiliary_assets: Array<{
+    value:string;
+    field:string;
+    class_type:string;
+    label:string;
+    blocking:false;
+    managed_as:"auxiliary_asset";
+  }>;
   summary: RuntimeImportReport["summary"] & {
     workflow_nodes:number; unique_classes:number; core_classes:number; resolved_custom_classes:number; runtime_catalog_classes:number; knowledge_base_rules:number; required_custom_nodes:number; required_models:number;
-    referenced_models:number; missing_models:number; installed_custom_nodes:number; installed_models:number;
+    referenced_models:number; missing_models:number; auxiliary_assets:number; installed_custom_nodes:number; installed_models:number;
     compatibility_score:number;
   };
 }
