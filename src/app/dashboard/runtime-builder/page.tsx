@@ -4,7 +4,7 @@ import { Boxes, CheckCircle2, Code2, FileJson2, LoaderCircle, Plus, RefreshCcw, 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { browserApiRequest } from "@/lib/api/browser-api";
-import type { RuntimeBuilderConfig, RuntimeGeneratedFiles, RuntimeValidationResponse, RuntimeBuilderProfileSummary, RuntimeBuilderProfileList } from "@/types/admin-runtime-builder";
+import type { RuntimeBuilderConfig, RuntimeGeneratedFiles, RuntimeValidationResponse, RuntimeBuilderProfileSummary, RuntimeBuilderProfileList, RuntimeValidatedProfile, RuntimeValidatedProfileList } from "@/types/admin-runtime-builder";
 import { RuntimeBuildPanel } from "@/components/runtime-builder/runtime-build-panel";
 import { RuntimeImportWizard } from "@/components/runtime-builder/runtime-import-wizard";
 import { RuntimeContextGenerator } from "@/components/runtime-builder/runtime-context-generator";
@@ -19,7 +19,6 @@ const safeRuntimeName = (value?: string | null) => {
   return /^[a-z]/.test(normalized) ? normalized : `runtime-${normalized}`;
 };
 const REQUIRED_NODE_NAMES = ["ComfyUI-Manager", "rgthree-comfy", "ComfyUI-Easy-Use", "ComfyUI-Lora-Manager", "ComfyUI-KJNodes", "comfyui-essentials", "was-node-suite-comfyui", "ComfyUI-Logic", "ComfyUI-Execute-Python", "ComfyLiterals", "Anomalous_Model_Browser"];
-const UNIVERSAL_PROFILE = { python_version:"3.11", cuda_version:"12.8.1", pytorch_index_url:"https://download.pytorch.org/whl/cu128", comfyui_commit:"3dd10a59c00248d00f0cb0ab794ff1bb9fb00a5f", target_platform:"linux/amd64" };
 
 
 type Tab = "import" | "base" | "nodes" | "models" | "dependencies" | "environment" | "preview" | "generator" | "model-export" | "builds";
@@ -33,6 +32,9 @@ export default function RuntimeBuilderPage() {
   const [saving, setSaving] = useState(false);
   const [advancedMode, setAdvancedMode] = useState(false);
   const [profiles, setProfiles] = useState<RuntimeBuilderProfileSummary[]>([]);
+  const [validatedProfiles, setValidatedProfiles] = useState<RuntimeValidatedProfile[]>([]);
+  const [validatedProfileId, setValidatedProfileId] = useState("");
+  const [profileApplying, setProfileApplying] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [creatingProfile, setCreatingProfile] = useState(false);
   const [newProfileName, setNewProfileName] = useState("");
@@ -41,9 +43,15 @@ export default function RuntimeBuilderPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [loaded, profileList] = await Promise.all([browserApiRequest<RuntimeBuilderConfig>("/api/admin/runtime-builder/config"), browserApiRequest<RuntimeBuilderProfileList>("/api/admin/runtime-builder/profiles")]);
+      const [loaded, profileList, validatedList] = await Promise.all([
+        browserApiRequest<RuntimeBuilderConfig>("/api/admin/runtime-builder/config"),
+        browserApiRequest<RuntimeBuilderProfileList>("/api/admin/runtime-builder/profiles"),
+        browserApiRequest<RuntimeValidatedProfileList>("/api/admin/runtime-builder/validated-profiles"),
+      ]);
       setProfiles(profileList.items);
-      setConfig({ ...loaded, ...UNIVERSAL_PROFILE, include_comfyui_manager:true, runtime_name: safeRuntimeName(loaded.runtime_name) });
+      setValidatedProfiles(validatedList.items);
+      setValidatedProfileId(validatedList.selected_id);
+      setConfig({ ...loaded, include_comfyui_manager:true, runtime_name: safeRuntimeName(loaded.runtime_name) });
     }
     catch (error) { toast.error(error instanceof Error ? error.message : "No fue posible cargar Runtime Builder."); }
     finally { setLoading(false); }
@@ -70,6 +78,25 @@ export default function RuntimeBuilderPage() {
     if (config?.id === profile.id) setEditingProfile(false);
     await load();
   };
+
+  const applyValidatedProfile = async (profileId:string) => {
+    if (!profileId || profileId === validatedProfileId) return;
+    setProfileApplying(true);
+    try {
+      const updated = await browserApiRequest<RuntimeBuilderConfig>(
+        `/api/admin/runtime-builder/validated-profiles/${encodeURIComponent(profileId)}/apply`,
+        { method:"POST" },
+      );
+      setConfig({ ...updated, runtime_name:safeRuntimeName(updated.runtime_name) });
+      setValidatedProfileId(profileId);
+      toast.success("Perfil de runtime aplicado.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible aplicar el perfil.");
+    } finally {
+      setProfileApplying(false);
+    }
+  };
+  const selectedValidatedProfile = validatedProfiles.find(item=>item.id===validatedProfileId) ?? validatedProfiles[0];
 
   const patch = (values: Partial<RuntimeBuilderConfig>) => setConfig((current) => current ? { ...current, ...values } : current);
   const save = async () => {
@@ -135,10 +162,10 @@ export default function RuntimeBuilderPage() {
 
     {tab === "import" && <RuntimeImportWizard onApplied={(value)=>{setConfig(value);setTab("base")}} />}
 
-    {tab === "base" && <div className="space-y-4"><section className="rounded-3xl border border-emerald-500/20 bg-emerald-950/10 p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[.16em] text-emerald-400">Perfil validado</p><h2 className="mt-2 text-lg font-semibold text-white">Universal GPU — Modal + RTX 5090</h2><p className="mt-2 text-sm text-zinc-400">ComfyUI 0.15.1 · Frontend 1.39.19 · Python 3.11 · CUDA 12.8 · PyTorch cu128</p><p className="mt-2 text-xs text-zinc-500">Estos valores se vuelven a aplicar al guardar para impedir que una dependencia degrade PyTorch o rompa la compatibilidad.</p></div><label className="flex items-center gap-3 text-sm text-zinc-300"><input type="checkbox" checked={advancedMode} onChange={e=>setAdvancedMode(e.target.checked)} className="size-4 accent-red-600"/>Modo avanzado</label></div></section><section className={`${cardClass} grid gap-4 md:grid-cols-2 xl:grid-cols-3`}>
+    {tab === "base" && <div className="space-y-4"><section className="rounded-3xl border border-emerald-500/20 bg-emerald-950/10 p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div className="min-w-0 flex-1"><p className="text-xs font-semibold uppercase tracking-[.16em] text-emerald-400">Perfil validado</p><div className="mt-3 grid gap-3 xl:grid-cols-[minmax(280px,420px)_1fr]"><div><label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Perfil de compatibilidad</label><select className={inputClass} disabled={profileApplying} value={validatedProfileId} onChange={e=>void applyValidatedProfile(e.target.value)}>{validatedProfiles.map(profile=><option key={profile.id} value={profile.id}>{profile.label} · {new Date(`${profile.date}T00:00:00`).toLocaleDateString("es-MX",{day:"2-digit",month:"short",year:"numeric"})}</option>)}</select></div>{selectedValidatedProfile&&<div className="rounded-2xl border border-white/7 bg-black/20 px-4 py-3"><h2 className="text-base font-semibold text-white">{selectedValidatedProfile.label} <span className="text-zinc-500">· {new Date(`${selectedValidatedProfile.date}T00:00:00`).toLocaleDateString("es-MX",{day:"2-digit",month:"long",year:"numeric"})}</span></h2><p className="mt-2 text-sm text-zinc-400">ComfyUI {selectedValidatedProfile.comfyui_version} · Frontend {selectedValidatedProfile.comfyui_frontend_version} · Python {selectedValidatedProfile.python_version} · CUDA {selectedValidatedProfile.cuda_version.replace(/\.0$/,"")} · {selectedValidatedProfile.gpu_profile==="universal-cu130"?"PyTorch 2.13.0 cu130":"PyTorch cu128"}</p><p className="mt-2 text-xs text-zinc-500">Al seleccionar y al guardar se reaplican únicamente los valores protegidos del perfil. Todo lo demás del runtime permanece intacto.</p></div>}</div></div><label className="flex items-center gap-3 text-sm text-zinc-300"><input type="checkbox" checked={advancedMode} onChange={e=>setAdvancedMode(e.target.checked)} className="size-4 accent-red-600"/>Modo avanzado</label></div></section><section className={`${cardClass} grid gap-4 md:grid-cols-2 xl:grid-cols-3`}>
       <Field label="Versión"><input className={inputClass} value={config.runtime_version} onChange={e=>patch({runtime_version:e.target.value})}/></Field><Field label="Plataforma"><select disabled={!advancedMode} className={`${inputClass} disabled:cursor-not-allowed disabled:opacity-60`} value={config.target_platform} onChange={e=>patch({target_platform:e.target.value})}><option>linux/amd64</option><option>linux/arm64</option></select></Field>
       <Field label="CUDA"><input disabled={!advancedMode} className={`${inputClass} disabled:cursor-not-allowed disabled:opacity-60`} value={config.cuda_version} onChange={e=>patch({cuda_version:e.target.value})}/></Field><Field label="Python"><input disabled={!advancedMode} className={`${inputClass} disabled:cursor-not-allowed disabled:opacity-60`} value={config.python_version} onChange={e=>patch({python_version:e.target.value})}/></Field><Field label="PyTorch index URL"><input disabled={!advancedMode} className={`${inputClass} disabled:cursor-not-allowed disabled:opacity-60`} value={config.pytorch_index_url} onChange={e=>patch({pytorch_index_url:e.target.value})}/></Field>
-      <Field label="Repositorio ComfyUI" wide><input className={inputClass} value={config.comfyui_repository} onChange={e=>patch({comfyui_repository:e.target.value})}/></Field><Field label="Commit ComfyUI"><input disabled={!advancedMode} className={`${inputClass} disabled:cursor-not-allowed disabled:opacity-60`} value={config.comfyui_commit ?? ""} onChange={e=>patch({comfyui_commit:e.target.value || null})}/><span className="mt-2 block text-xs text-zinc-500">Commit validado para ComfyUI 0.15.1.</span></Field>
+      <Field label="Repositorio ComfyUI" wide><input className={inputClass} value={config.comfyui_repository} onChange={e=>patch({comfyui_repository:e.target.value})}/></Field><Field label="Commit ComfyUI"><input disabled={!advancedMode} className={`${inputClass} disabled:cursor-not-allowed disabled:opacity-60`} value={config.comfyui_commit ?? ""} onChange={e=>patch({comfyui_commit:e.target.value || null})}/><span className="mt-2 block text-xs text-zinc-500">Referencia validada para ComfyUI {selectedValidatedProfile?.comfyui_version ?? "—"}.</span></Field>
       <Field label="Imagen del registro" wide><input className={inputClass} value={config.registry_image} onChange={e=>patch({registry_image:e.target.value})}/></Field><Field label="Notas" wide><textarea className="min-h-24 w-full rounded-xl border border-white/10 bg-black/25 p-3 text-sm text-white" value={config.notes ?? ""} onChange={e=>patch({notes:e.target.value || null})}/></Field>
     </section></div>}
 

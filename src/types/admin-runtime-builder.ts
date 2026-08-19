@@ -3,6 +3,24 @@ export interface RuntimePythonDependency { package: string; version: string | nu
 export interface RuntimeModelAsset { resolver?: {class_type:string;field:string;folders:string}; name: string; model_type: "checkpoint"|"vae"|"lora"|"controlnet"|"clip"|"upscaler"|"diffusion_model"|"embedding"|"detector"|"sam"|"ipadapter"|"video_model"|"other"; source_url: string | null; target_path: string; sha256: string | null; strategy: "image"|"volume"|"startup-download"; enabled: boolean; }
 export interface RuntimeEnvironmentVariable { key: string; value: string | null; secret: boolean; required: boolean; }
 export interface RuntimeVolume { name: string; mount_path: string; read_only: boolean; }
+export interface RuntimeValidatedProfile {
+  id: string;
+  label: string;
+  date: string;
+  python_version: string;
+  cuda_version: string;
+  pytorch_index_url: string;
+  comfyui_version: string;
+  comfyui_frontend_version: string;
+  comfyui_commit: string | null;
+  torch_packages: string | null;
+  gpu_profile: string;
+}
+export interface RuntimeValidatedProfileList {
+  selected_id: string;
+  items: RuntimeValidatedProfile[];
+}
+
 export interface RuntimeBuilderConfig {
   id: number; name: string; provider: "modal" | "runpod" | "beam" | "local"; runtime_name: string; runtime_version: string; python_version: string; cuda_version: string;
   pytorch_index_url: string; comfyui_repository: string; comfyui_commit: string | null;
