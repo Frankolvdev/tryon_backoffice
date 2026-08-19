@@ -66,11 +66,40 @@ export default function Page() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const saveLocal = async (key:"local-docker"|"owner-local", value:LocalComfyProviderConfig) => {
+  const saveDockerLocal = async () => {
+    if (!docker) return;
+    setBusy("local-docker-save");
+    try {
+      // Preserve the pre-existing Docker/Runtime Builder persistence exactly:
+      // comfyui_path, output_directory, docker_volume, etc.
+      const [savedDocker, savedProvider] = await Promise.all([
+        browserApiRequest<RuntimeModelExportSettings>(
+          "/api/admin/runtime-builder/models-volume/settings",
+          { method: "PUT", body: JSON.stringify(docker) },
+        ),
+        browserApiRequest<LocalComfyProviderConfig>(
+          "/api/admin/infrastructure-providers/local-docker",
+          { method: "PUT", body: JSON.stringify(dockerProvider) },
+        ),
+      ]);
+      setDocker(savedDocker);
+      setDockerProvider(savedProvider);
+      toast.success("Configuración de Docker Local guardada.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo guardar Docker Local.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const saveLocal = async (key:"owner-local", value:LocalComfyProviderConfig) => {
     setBusy(`${key}-save`);
     try {
-      const saved=await browserApiRequest<LocalComfyProviderConfig>(`/api/admin/infrastructure-providers/${key}`,{method:"PUT",body:JSON.stringify(value)});
-      if(key==="local-docker") setDockerProvider(saved); else setOwnerLocal(saved);
+      const saved=await browserApiRequest<LocalComfyProviderConfig>(
+        `/api/admin/infrastructure-providers/${key}`,
+        {method:"PUT",body:JSON.stringify(value)},
+      );
+      setOwnerLocal(saved);
       toast.success("Configuración local guardada.");
     } catch(e){ toast.error(e instanceof Error?e.message:"No se pudo guardar."); }
     finally{ setBusy(null); }
@@ -132,7 +161,7 @@ export default function Page() {
     </div>
 
     {loading ? <section className="luxia-panel mt-5 flex min-h-72 items-center justify-center rounded-3xl"><LoaderCircle className="animate-spin text-red-500" /></section>
-      : tab === 'docker' && docker ? <section className="luxia-panel mt-5 rounded-3xl p-6"><Title name="Docker local" /><div className="mt-6 grid gap-5 lg:grid-cols-2"><Check value={dockerProvider.enabled} onChange={v=>setDockerProvider({...dockerProvider,enabled:v})}/><F label="Endpoint ComfyUI Docker"><input className={input} value={dockerProvider.endpoint} onChange={e=>setDockerProvider({...dockerProvider,endpoint:e.target.value})}/></F><F label="GPU"><select className={input} value={dockerProvider.gpu} onChange={e=>setDockerProvider({...dockerProvider,gpu:e.target.value})}>{LOCAL_GPUS.map(gpu=><option key={gpu}>{gpu}</option>)}</select></F><F label="Ruta local de ComfyUI"><input className={input} value={docker.comfyui_path} onChange={e => setDocker({ ...docker, comfyui_path: e.target.value })} /></F><F label="Directorio de salida"><input className={input} value={docker.output_directory} onChange={e => setDocker({ ...docker, output_directory: e.target.value })} /></F><F label="Volumen Docker"><select className={input} value={docker.docker_volume} onChange={e => setDocker({ ...docker, docker_volume: e.target.value })}><option value="">Seleccionar</option>{volumes.map(v => <option key={v.name}>{v.name}</option>)}</select></F><div className="lg:col-span-2"><ProviderGpuPricingTable provider="local_docker" gpuKeys={LOCAL_GPUS}/></div></div><div className="mt-6 flex gap-3"><button disabled={busy!==null} onClick={()=>void saveLocal("local-docker",dockerProvider)} className="h-11 rounded-xl bg-red-600 px-5 text-sm text-white"><Save size={16} className="mr-2 inline"/>Guardar proveedor</button><button disabled={busy!==null} onClick={()=>void testLocal("local-docker")} className="h-11 rounded-xl border border-white/10 px-5 text-sm text-zinc-300">Probar conexión</button></div></section>
+      : tab === 'docker' && docker ? <section className="luxia-panel mt-5 rounded-3xl p-6"><Title name="Docker local" /><div className="mt-6 grid gap-5 lg:grid-cols-2"><Check value={dockerProvider.enabled} onChange={v=>setDockerProvider({...dockerProvider,enabled:v})}/><F label="Endpoint ComfyUI Docker"><input className={input} value={dockerProvider.endpoint} onChange={e=>setDockerProvider({...dockerProvider,endpoint:e.target.value})}/></F><F label="GPU"><select className={input} value={dockerProvider.gpu} onChange={e=>setDockerProvider({...dockerProvider,gpu:e.target.value})}>{LOCAL_GPUS.map(gpu=><option key={gpu}>{gpu}</option>)}</select></F><F label="Ruta local de ComfyUI"><input className={input} value={docker.comfyui_path} onChange={e => setDocker({ ...docker, comfyui_path: e.target.value })} /></F><F label="Directorio de salida"><input className={input} value={docker.output_directory} onChange={e => setDocker({ ...docker, output_directory: e.target.value })} /></F><F label="Volumen Docker"><select className={input} value={docker.docker_volume} onChange={e => setDocker({ ...docker, docker_volume: e.target.value })}><option value="">Seleccionar</option>{volumes.map(v => <option key={v.name}>{v.name}</option>)}</select></F><div className="lg:col-span-2"><ProviderGpuPricingTable provider="local_docker" gpuKeys={LOCAL_GPUS}/></div></div><div className="mt-6 flex gap-3"><button disabled={busy!==null} onClick={()=>void saveDockerLocal()} className="h-11 rounded-xl bg-red-600 px-5 text-sm text-white"><Save size={16} className="mr-2 inline"/>Guardar proveedor</button><button disabled={busy!==null} onClick={()=>void testLocal("local-docker")} className="h-11 rounded-xl border border-white/10 px-5 text-sm text-zinc-300">Probar conexión</button></div></section>
       : tab === 'owner' ? <section className="luxia-panel mt-5 rounded-3xl p-6"><Title name="Owner Local · Pinokio Windows"/><p className="mt-2 text-sm text-zinc-500">Usa el ComfyUI de Pinokio/Windows. Comparte la cola y el límite de concurrencia local con Docker Local.</p><div className="mt-6 grid gap-5 lg:grid-cols-2"><Check value={ownerLocal.enabled} onChange={v=>setOwnerLocal({...ownerLocal,enabled:v})}/><F label="Endpoint ComfyUI Pinokio"><input className={input} value={ownerLocal.endpoint} onChange={e=>setOwnerLocal({...ownerLocal,endpoint:e.target.value})}/></F><F label="GPU"><select className={input} value={ownerLocal.gpu} onChange={e=>setOwnerLocal({...ownerLocal,gpu:e.target.value})}>{LOCAL_GPUS.map(gpu=><option key={gpu}>{gpu}</option>)}</select></F><NumberInput label="Timeout de ejecución (segundos)" value={ownerLocal.timeout_seconds} onChange={v=>setOwnerLocal({...ownerLocal,timeout_seconds:v})}/><div className="lg:col-span-2"><ProviderGpuPricingTable provider="owner_local" gpuKeys={LOCAL_GPUS}/></div></div><div className="mt-6 flex gap-3"><button disabled={busy!==null} onClick={()=>void saveLocal("owner-local",ownerLocal)} className="h-11 rounded-xl bg-red-600 px-5 text-sm text-white"><Save size={16} className="mr-2 inline"/>Guardar</button><button disabled={busy!==null} onClick={()=>void testLocal("owner-local")} className="h-11 rounded-xl border border-white/10 px-5 text-sm text-zinc-300">Probar conexión</button></div></section>
       : tab === 'modal' && modalEngine ? <ProviderCard providerKey="modal" name="Modal" busy={busy} onSave={() => save('modal', modal)} onTest={() => action('modal', 'test')} onVolume={() => action('modal', 'volume')}>
         <Check value={modal.enabled} onChange={v => setModal({ ...modal, enabled: v })} />
