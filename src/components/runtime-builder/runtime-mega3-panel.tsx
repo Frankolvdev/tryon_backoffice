@@ -518,12 +518,46 @@ export function RuntimeMega3Panel() {
         )}
 
         {analysis && (
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Metric label="Detectados" value={analysis.models_detected} />
-            <Metric label="Encontrados" value={analysis.models_found} />
-            <Metric label="Faltantes" value={analysis.models_missing} />
-            <Metric label="Tamaño" value={bytes(analysis.bytes_total)} />
-          </div>
+          <>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <Metric label="Detectados" value={analysis.models_detected} />
+              <Metric label="Encontrados" value={analysis.models_found} />
+              <Metric label="Faltantes" value={analysis.models_missing} />
+              <Metric label="Tamaño" value={bytes(analysis.bytes_total)} />
+            </div>
+
+            {analysis.models_missing > 0 && (
+              <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-950/10 p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-amber-300">
+                  <TriangleAlert size={16} />
+                  Modelos no encontrados ({analysis.models_missing})
+                </div>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Estos son los archivos que el análisis esperaba encontrar en la instalación local de ComfyUI.
+                </p>
+                <div className="mt-3 max-h-56 space-y-2 overflow-auto">
+                  {analysis.items
+                    .filter((item) => !item.found)
+                    .map((item, index) => (
+                      <div
+                        key={`${item.target_path}-${index}`}
+                        className="rounded-xl border border-white/7 bg-black/20 px-3 py-2"
+                      >
+                        <div className="break-all text-xs font-medium text-amber-100">
+                          {item.target_path || item.name}
+                        </div>
+                        <div className="mt-1 text-[11px] text-zinc-600">
+                          {item.model_type}
+                          {item.resolver
+                            ? ` · ${item.resolver.class_type}.${item.resolver.field}`
+                            : ""}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </section>
 
