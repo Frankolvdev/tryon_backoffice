@@ -78,6 +78,7 @@ function formatDate(
 
 function friendlyRole(value: string): string {
   const normalized=value.toLowerCase();
+  if(normalized==="owner") return "Propietario";
   if(normalized==="superadmin") return "Superadministrador";
   if(normalized==="admin") return "Administrador";
   if(normalized==="user") return "Usuario";

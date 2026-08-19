@@ -87,6 +87,11 @@ export function GenerationTestConsole({ module }: { module: GenerationModule }) 
             <div>
               <h3 className="font-semibold text-white">Formulario automático de prueba</h3>
               <p className="mt-1 text-xs text-zinc-500">Generado desde las entradas reales del módulo.</p>
+              <p className="mt-2 max-w-2xl text-[11px] leading-5 text-amber-200/80">
+                Modo de prueba administrativa: ejecuta el workflow y mide proveedor/GPU, pero no consume tokens,
+                no usa FIFO ni bolsas y no genera movimientos comerciales, utilidad ni registros financieros.
+                La ejecución técnica sí queda disponible en el historial para diagnóstico.
+              </p>
             </div>
             <button onClick={() => void run()} disabled={busy || !module.is_active || !module.default_execution_engine} className="inline-flex h-10 items-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-40">
               {busy ? <LoaderCircle className="animate-spin" size={16} /> : <Play size={16} />}
@@ -106,7 +111,7 @@ export function GenerationTestConsole({ module }: { module: GenerationModule }) 
             <p className="mt-8 text-sm text-zinc-600">Ejecuta una prueba para ver progreso, pasos y logs.</p>
           ) : (
             <div className="mt-5 space-y-4">
-              <div className="flex items-center justify-between"><span className="text-xs uppercase text-zinc-500">{execution.status}</span><span className="text-sm text-white">{execution.progress}%</span></div>
+              <div className="flex items-center justify-between"><span className="text-xs uppercase text-zinc-500">{execution.status} · {execution.engine.replaceAll("_"," ")}{execution.accounting_mode ? ` · ${execution.accounting_mode}` : ""}</span><span className="text-sm text-white">{execution.progress}%</span></div>
               <div className="h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full bg-red-600" style={{ width: `${execution.progress}%` }} /></div>
               <p className="rounded-xl bg-white/[.03] p-3 text-xs text-zinc-400">{lastLog}</p>
               <div className="space-y-2">{execution.steps.map((step) => <div key={step.step_key} className="flex items-center justify-between rounded-lg border border-white/5 px-3 py-2 text-xs"><span className="text-zinc-300">{step.step_name}</span><span className={step.status === "completed" ? "text-emerald-400" : step.status === "failed" ? "text-red-400" : "text-zinc-500"}>{step.status}</span></div>)}</div>

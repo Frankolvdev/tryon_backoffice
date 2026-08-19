@@ -7,15 +7,17 @@ import { TryOnModuleHeader } from "@/components/backoffice/tryon/tryon-module-he
 import { ProviderGpuPricingTable } from "@/components/backoffice/infrastructure/provider-gpu-pricing-table";
 import { browserApiRequest } from "@/lib/api/browser-api";
 import type { AiEngineSettings, AiEngineSettingsUpdate } from "@/types/admin-ai-engine-settings";
-import type { BeamProviderConfig, ModalProviderConfig, ProviderActionResponse, RunPodProviderConfig } from "@/types/admin-infrastructure-providers";
+import type { BeamProviderConfig, LocalComfyProviderConfig, ModalProviderConfig, ProviderActionResponse, RunPodProviderConfig } from "@/types/admin-infrastructure-providers";
 import type { RuntimeModelExportSettings } from "@/types/admin-runtime-builder";
 
 const input = "h-11 w-full rounded-xl border border-white/10 bg-black/25 px-3 text-sm text-white outline-none focus:border-red-500/50";
-type Tab = "docker" | "modal" | "runpod" | "beam";
+type Tab = "docker" | "owner" | "modal" | "runpod" | "beam";
 const MODAL_REGIONS = ["us", "us-east", "us-central", "us-south", "us-west", "eu", "eu-west", "eu-north", "eu-south", "uk", "ca", "mx", "ap", "ap-northeast", "ap-southeast", "ap-south", "ap-melbourne", "jp", "au", "me", "sa", "af"];
 const MODAL_GPUS = ["T4", "L4", "A10G", "L40S", "A100-40GB", "A100-80GB", "H100", "H200", "B200"];
 const RUNPOD_GPUS = ["NVIDIA GeForce RTX 4090", "NVIDIA RTX A6000", "NVIDIA A40", "NVIDIA L4", "NVIDIA L40", "NVIDIA L40S", "NVIDIA A100 40GB", "NVIDIA A100 80GB", "NVIDIA H100 80GB", "NVIDIA H200"];
 const BEAM_SERVERLESS_GPUS = ["A10G", "RTX4090", "T4"] as const;
+const LOCAL_GPUS = ["NVIDIA GeForce RTX 5090"] as const;
+const localDefault: LocalComfyProviderConfig = { enabled:false, endpoint:"http://127.0.0.1:8188", gpu:"NVIDIA GeForce RTX 5090", timeout_seconds:900 };
 
 const modalDefault: ModalProviderConfig = { enabled: false, token_id: "", token_secret: "", token_secret_configured: false, environment: "main", app_name: "tryon-generation-runtime", runtime_url: "", volume_name: "tryon-models", gpu: "L40S", region_mode: "automatic", region: "us", snapshot_resident_models: ["diffusion_models/realDream_klein9BV1.safetensors", "text_encoders/qwen_3_8b.safetensors"], timeout_seconds: 900 };
 const runpodDefault: RunPodProviderConfig = { enabled: false, api_key: "", api_key_configured: false, s3_access_key: "", s3_secret_key: "", s3_secret_key_configured: false, endpoint_id: "", endpoint_name: "tryon-generation-runtime", template_id: "", template_name: "tryon-generation-runtime", registry_auth_id: "", ghcr_username: "", ghcr_token: "", ghcr_token_configured: false, network_volume_id: "", network_volume_name: "tryon-models", network_volume_size_gb: 100, data_center_id: "", gpu_type_ids: ["NVIDIA L40S"], allowed_cuda_versions: ["12.8"], workers_min: 0, workers_max: 5, idle_timeout_seconds: 5, execution_timeout_seconds: 900, scaler_type: "QUEUE_DELAY", scaler_value: 4, flashboot: true, container_disk_gb: 100, timeout_seconds: 900 };
@@ -24,6 +26,8 @@ const beamDefault: BeamProviderConfig = { enabled: false, api_key: "", api_key_c
 export default function Page() {
   const [tab, setTab] = useState<Tab>("docker");
   const [docker, setDocker] = useState<RuntimeModelExportSettings | null>(null);
+  const [dockerProvider, setDockerProvider] = useState<LocalComfyProviderConfig>(localDefault);
+  const [ownerLocal, setOwnerLocal] = useState<LocalComfyProviderConfig>(localDefault);
   const [modal, setModal] = useState(modalDefault);
   const [modalEngine, setModalEngine] = useState<AiEngineSettingsUpdate | null>(null);
   const [runpod, setRunpod] = useState(runpodDefault);
@@ -35,9 +39,11 @@ export default function Page() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [d, v, m, engine, r, b] = await Promise.all([
+      const [d, v, ld, ol, m, engine, r, b] = await Promise.all([
         browserApiRequest<RuntimeModelExportSettings>("/api/admin/runtime-builder/models-volume/settings"),
         browserApiRequest<{ items: Array<{ name: string }> }>("/api/admin/docker-file-manager/volumes"),
+        browserApiRequest<LocalComfyProviderConfig>("/api/admin/infrastructure-providers/local-docker"),
+        browserApiRequest<LocalComfyProviderConfig>("/api/admin/infrastructure-providers/owner-local"),
         browserApiRequest<ModalProviderConfig>("/api/admin/infrastructure-providers/modal"),
         browserApiRequest<AiEngineSettings>("/api/admin/ai-providers/engine-settings"),
         browserApiRequest<RunPodProviderConfig>("/api/admin/infrastructure-providers/runpod"),
@@ -45,6 +51,8 @@ export default function Page() {
       ]);
       setDocker(d);
       setVolumes(v.items);
+      setDockerProvider({ ...localDefault, ...ld });
+      setOwnerLocal({ ...localDefault, ...ol });
       setModal({ ...modalDefault, ...m, token_secret: "" });
       setModalEngine(engine);
       setRunpod({ ...runpodDefault, ...r, api_key: "", s3_secret_key: "", ghcr_token: "" });
@@ -57,6 +65,25 @@ export default function Page() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  const saveLocal = async (key:"local-docker"|"owner-local", value:LocalComfyProviderConfig) => {
+    setBusy(`${key}-save`);
+    try {
+      const saved=await browserApiRequest<LocalComfyProviderConfig>(`/api/admin/infrastructure-providers/${key}`,{method:"PUT",body:JSON.stringify(value)});
+      if(key==="local-docker") setDockerProvider(saved); else setOwnerLocal(saved);
+      toast.success("Configuración local guardada.");
+    } catch(e){ toast.error(e instanceof Error?e.message:"No se pudo guardar."); }
+    finally{ setBusy(null); }
+  };
+
+  const testLocal = async (key:"local-docker"|"owner-local") => {
+    setBusy(`${key}-test`);
+    try{
+      const response=await browserApiRequest<ProviderActionResponse>(`/api/admin/infrastructure-providers/${key}/test`,{method:"POST"});
+      (response.success?toast.success:toast.error)(response.message);
+    }catch(e){toast.error(e instanceof Error?e.message:"Operación fallida.");}
+    finally{setBusy(null);}
+  };
 
   const save = async (key: "modal" | "runpod" | "beam", value: unknown) => {
     setBusy(`${key}-save`);
@@ -98,14 +125,15 @@ export default function Page() {
   };
 
   return <div>
-    <TryOnModuleHeader title="Proveedores de infraestructura" description="Configura Local, Modal, RunPod Serverless y Beam de forma independiente." />
+    <TryOnModuleHeader title="Proveedores de infraestructura" description="Configura Docker Local, Owner Local, Modal, RunPod Serverless y Beam de forma independiente." />
     <div className="mt-5 flex flex-wrap gap-2 rounded-2xl border border-white/8 bg-black/20 p-2">
-      {([['docker', 'Docker local'], ['modal', 'Modal'], ['runpod', 'RunPod Serverless'], ['beam', 'Beam']] as const).map(([key, label]) => <button key={key} onClick={() => setTab(key)} className={`h-11 rounded-xl px-4 text-sm ${tab === key ? 'bg-red-500/15 text-red-300' : 'text-zinc-400'}`}>{label}</button>)}
+      {([['docker', 'Docker local'], ['owner', 'Owner Local · Pinokio'], ['modal', 'Modal'], ['runpod', 'RunPod Serverless'], ['beam', 'Beam']] as const).map(([key, label]) => <button key={key} onClick={() => setTab(key)} className={`h-11 rounded-xl px-4 text-sm ${tab === key ? 'bg-red-500/15 text-red-300' : 'text-zinc-400'}`}>{label}</button>)}
       <button onClick={() => void load()} className="ml-auto h-11 rounded-xl border border-white/8 px-4 text-zinc-400"><RefreshCcw size={15} className="mr-2 inline" />Recargar</button>
     </div>
 
     {loading ? <section className="luxia-panel mt-5 flex min-h-72 items-center justify-center rounded-3xl"><LoaderCircle className="animate-spin text-red-500" /></section>
-      : tab === 'docker' && docker ? <section className="luxia-panel mt-5 rounded-3xl p-6"><Title name="Docker local" /><div className="mt-6 grid gap-5 lg:grid-cols-2"><F label="Ruta local de ComfyUI"><input className={input} value={docker.comfyui_path} onChange={e => setDocker({ ...docker, comfyui_path: e.target.value })} /></F><F label="Directorio de salida"><input className={input} value={docker.output_directory} onChange={e => setDocker({ ...docker, output_directory: e.target.value })} /></F><F label="Volumen Docker"><select className={input} value={docker.docker_volume} onChange={e => setDocker({ ...docker, docker_volume: e.target.value })}><option value="">Seleccionar</option>{volumes.map(v => <option key={v.name}>{v.name}</option>)}</select></F></div></section>
+      : tab === 'docker' && docker ? <section className="luxia-panel mt-5 rounded-3xl p-6"><Title name="Docker local" /><div className="mt-6 grid gap-5 lg:grid-cols-2"><Check value={dockerProvider.enabled} onChange={v=>setDockerProvider({...dockerProvider,enabled:v})}/><F label="Endpoint ComfyUI Docker"><input className={input} value={dockerProvider.endpoint} onChange={e=>setDockerProvider({...dockerProvider,endpoint:e.target.value})}/></F><F label="GPU"><select className={input} value={dockerProvider.gpu} onChange={e=>setDockerProvider({...dockerProvider,gpu:e.target.value})}>{LOCAL_GPUS.map(gpu=><option key={gpu}>{gpu}</option>)}</select></F><F label="Ruta local de ComfyUI"><input className={input} value={docker.comfyui_path} onChange={e => setDocker({ ...docker, comfyui_path: e.target.value })} /></F><F label="Directorio de salida"><input className={input} value={docker.output_directory} onChange={e => setDocker({ ...docker, output_directory: e.target.value })} /></F><F label="Volumen Docker"><select className={input} value={docker.docker_volume} onChange={e => setDocker({ ...docker, docker_volume: e.target.value })}><option value="">Seleccionar</option>{volumes.map(v => <option key={v.name}>{v.name}</option>)}</select></F><div className="lg:col-span-2"><ProviderGpuPricingTable provider="local_docker" gpuKeys={LOCAL_GPUS}/></div></div><div className="mt-6 flex gap-3"><button disabled={busy!==null} onClick={()=>void saveLocal("local-docker",dockerProvider)} className="h-11 rounded-xl bg-red-600 px-5 text-sm text-white"><Save size={16} className="mr-2 inline"/>Guardar proveedor</button><button disabled={busy!==null} onClick={()=>void testLocal("local-docker")} className="h-11 rounded-xl border border-white/10 px-5 text-sm text-zinc-300">Probar conexión</button></div></section>
+      : tab === 'owner' ? <section className="luxia-panel mt-5 rounded-3xl p-6"><Title name="Owner Local · Pinokio Windows"/><p className="mt-2 text-sm text-zinc-500">Usa el ComfyUI de Pinokio/Windows. Comparte la cola y el límite de concurrencia local con Docker Local.</p><div className="mt-6 grid gap-5 lg:grid-cols-2"><Check value={ownerLocal.enabled} onChange={v=>setOwnerLocal({...ownerLocal,enabled:v})}/><F label="Endpoint ComfyUI Pinokio"><input className={input} value={ownerLocal.endpoint} onChange={e=>setOwnerLocal({...ownerLocal,endpoint:e.target.value})}/></F><F label="GPU"><select className={input} value={ownerLocal.gpu} onChange={e=>setOwnerLocal({...ownerLocal,gpu:e.target.value})}>{LOCAL_GPUS.map(gpu=><option key={gpu}>{gpu}</option>)}</select></F><NumberInput label="Timeout de ejecución (segundos)" value={ownerLocal.timeout_seconds} onChange={v=>setOwnerLocal({...ownerLocal,timeout_seconds:v})}/><div className="lg:col-span-2"><ProviderGpuPricingTable provider="owner_local" gpuKeys={LOCAL_GPUS}/></div></div><div className="mt-6 flex gap-3"><button disabled={busy!==null} onClick={()=>void saveLocal("owner-local",ownerLocal)} className="h-11 rounded-xl bg-red-600 px-5 text-sm text-white"><Save size={16} className="mr-2 inline"/>Guardar</button><button disabled={busy!==null} onClick={()=>void testLocal("owner-local")} className="h-11 rounded-xl border border-white/10 px-5 text-sm text-zinc-300">Probar conexión</button></div></section>
       : tab === 'modal' && modalEngine ? <ProviderCard providerKey="modal" name="Modal" busy={busy} onSave={() => save('modal', modal)} onTest={() => action('modal', 'test')} onVolume={() => action('modal', 'volume')}>
         <Check value={modal.enabled} onChange={v => setModal({ ...modal, enabled: v })} />
         <F label="Token ID"><input className={input} value={modal.token_id} onChange={e => setModal({ ...modal, token_id: e.target.value })} /></F>

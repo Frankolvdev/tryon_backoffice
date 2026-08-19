@@ -51,6 +51,7 @@ function roleLabel(role: UserRole): string {
   const labels: Record<UserRole, string> = {
     user: "Usuario",
     admin: "Administrador",
+    owner: "Propietario",
     superadmin: "Superadministrador",
   };
 
@@ -313,6 +314,7 @@ function CreateUserDialog({
                 <option value="user">
                   Usuario
                 </option>
+                <option value="owner">Propietario</option>
                 <option value="admin">
                   Administrador
                 </option>

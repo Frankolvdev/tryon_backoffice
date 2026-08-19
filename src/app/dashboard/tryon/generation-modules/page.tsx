@@ -20,6 +20,7 @@ import type {
 const engines: { value: GenerationExecutionEngine; label: string }[] = [
   { value: "simulated", label: "Simulado" },
   { value: "local_docker", label: "Docker local" },
+  { value: "owner_local", label: "Owner Local · Pinokio Windows" },
   { value: "runpod_serverless", label: "RunPod Serverless" },
   { value: "beam", label: "Beam" },
   { value: "modal", label: "Modal" },

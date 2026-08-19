@@ -40,7 +40,8 @@ function formatDuration(ms?: number | null) {
 }
 
 function engineLabel(engine: string) {
-  if (engine === "local_docker") return "Local";
+  if (engine === "local_docker") return "Docker Local";
+  if (engine === "owner_local") return "Owner Local";
   if (engine === "runpod_serverless") return "RunPod Serverless";
   if (engine === "simulated") return "Simulado";
   if (engine === "modal") return "Modal";
@@ -52,7 +53,7 @@ function statusLabel(status: string) {
 }
 
 function queueLabel(item: GenerationModuleExecution) {
-  if (item.engine === "local_docker") return item.status === "queued" ? "Cola local" : "Worker local";
+  if (item.engine === "local_docker" || item.engine === "owner_local") return item.status === "queued" ? "Cola local" : "Worker local";
   if (item.engine === "runpod_serverless") {
     if (item.provider_status === "IN_QUEUE" || item.status === "queued") return "Cola RunPod";
     return "RunPod";
@@ -286,7 +287,7 @@ export default function UnifiedAiJobsPage() {
         <select value={moduleId} onChange={(e)=>setModuleId(e.target.value)} className="h-11 rounded-xl border border-white/10 bg-[#09090a] px-3 text-sm text-zinc-300"><option value="">Todos los módulos</option>{modules.map((item)=><option key={item.id} value={item.id}>{item.name}</option>)}</select>
         <input type="number" min="1" value={userId} onChange={(e)=>setUserId(e.target.value)} placeholder="ID de usuario" className="h-11 rounded-xl border border-white/10 bg-black/30 px-4 text-sm text-white"/>
         <select value={status} onChange={(e)=>setStatus(e.target.value)} className="h-11 rounded-xl border border-white/10 bg-[#09090a] px-3 text-sm text-zinc-300"><option value="">Todos los estados</option><option value="queued">En cola</option><option value="running">Ejecutando</option><option value="completed">Completados</option><option value="failed">Fallidos</option><option value="cancelled">Cancelados</option></select>
-        <select value={engine} onChange={(e)=>setEngine(e.target.value)} className="h-11 rounded-xl border border-white/10 bg-[#09090a] px-3 text-sm text-zinc-300"><option value="">Todos los motores</option><option value="simulated">Simulado</option><option value="local_docker">Local</option><option value="runpod_serverless">RunPod Serverless</option><option value="modal">Modal</option></select>
+        <select value={engine} onChange={(e)=>setEngine(e.target.value)} className="h-11 rounded-xl border border-white/10 bg-[#09090a] px-3 text-sm text-zinc-300"><option value="">Todos los motores</option><option value="simulated">Simulado</option><option value="local_docker">Docker Local</option><option value="owner_local">Owner Local</option><option value="runpod_serverless">RunPod Serverless</option><option value="modal">Modal</option></select>
         <input type="date" value={dateFrom} onChange={(e)=>setDateFrom(e.target.value)} className="h-11 rounded-xl border border-white/10 bg-[#09090a] px-3 text-sm text-zinc-300" title="Desde"/>
         <div className="flex gap-3"><input type="date" value={dateTo} onChange={(e)=>setDateTo(e.target.value)} className="h-11 min-w-0 flex-1 rounded-xl border border-white/10 bg-[#09090a] px-3 text-sm text-zinc-300" title="Hasta"/><button onClick={clearFilters} title="Limpiar filtros" className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-white/10 text-zinc-400 hover:text-white"><FilterX size={17}/></button></div>
       </div>
