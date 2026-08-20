@@ -35,6 +35,36 @@ type Port = { key: string; label: string; type: string; path: string; origin: st
 type ExecutionTarget = { provider: string; value: string; label: string; build_id: number; deployment_id?: string | null; runtime_name?: string | null; version?: string | null; image_tag?: string | null };
 type ExecutionTargetResponse = { items: Record<string, ExecutionTarget[]> };
 
+function generatedInputPreviewValue(input: GenerationModuleInput): unknown {
+  if (input.default_value !== undefined && input.default_value !== null) {
+    return input.default_value;
+  }
+
+  switch (input.input_type) {
+    case "integer":
+    case "float":
+      return 0;
+    case "boolean":
+      return false;
+    case "json":
+      return {};
+    case "image":
+    case "file":
+      return `<multipart:${input.key}>`;
+    default:
+      return "";
+  }
+}
+
+function generatedExecutionPayload(module: GenerationModule): { inputs: Record<string, unknown> } {
+  const inputs = Object.fromEntries(
+    [...module.inputs]
+      .sort((a, b) => a.position - b.position)
+      .map((input) => [input.key, generatedInputPreviewValue(input)]),
+  );
+  return { inputs };
+}
+
 function moduleDraftFingerprint(module: GenerationModule | null): string {
   if (!module) return "";
   return JSON.stringify({
@@ -201,6 +231,36 @@ function ModuleEditor({ module, savedModule, hasUnsavedChanges, pricingRules, ex
         </div>
       </div>
       <ContractEditor module={module} setModule={setModule}/>
+
+      <section className="rounded-2xl border border-cyan-500/15 bg-cyan-500/[.025] p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[.22em] text-cyan-300/80">Inputs generados</p>
+            <h3 className="mt-1 text-sm font-semibold text-white">JSON exacto de ejecución</h3>
+            <p className="mt-1 max-w-3xl text-xs leading-5 text-zinc-500">
+              Se genera únicamente desde las entradas definidas arriba. Conserva las claves exactas y los default_value del módulo.
+              Los campos image/file aparecen como &lt;multipart:clave&gt; porque el Backend los recibe como archivos multipart separados del JSON.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const json = JSON.stringify(generatedExecutionPayload(module), null, 2);
+              void navigator.clipboard.writeText(json)
+                .then(() => toast.success("JSON de inputs copiado."))
+                .catch(() => toast.error("No fue posible copiar el JSON."));
+            }}
+            className="gm-secondary shrink-0"
+          >
+            <Copy size={15}/>
+            Copiar JSON
+          </button>
+        </div>
+        <pre className="mt-4 max-h-[360px] overflow-auto rounded-xl border border-white/6 bg-black/40 p-4 font-mono text-[12px] leading-5 text-zinc-300">
+          {JSON.stringify(generatedExecutionPayload(module), null, 2)}
+        </pre>
+      </section>
+
       <div>
         <div className="mb-3 flex flex-col gap-3 rounded-2xl border border-white/7 bg-black/25 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div><p className="text-[10px] font-semibold uppercase tracking-[.22em] text-zinc-500">Nodos disponibles</p><p className="mt-1 text-xs text-zinc-600">Agrega nuevos pasos al pipeline antes de conectarlos en el canvas.</p></div>
