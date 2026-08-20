@@ -281,21 +281,16 @@ function CreateUserDialog({
               />
             </label>
 
-            <label>
-              <span className="mb-2 block text-sm text-zinc-400">
-                Tokens iniciales
-              </span>
-
-              <input
-                type="number"
-                min={0}
-                value={tokenBalance}
-                onChange={(event) =>
-                  setTokenBalance(event.target.value)
-                }
-                className="h-12 w-full rounded-xl border border-white/8 bg-black/35 px-4 text-sm text-white outline-none focus:border-red-500/50"
-              />
-            </label>
+            {role !== "owner" ? (
+              <label>
+                <span className="mb-2 block text-sm text-zinc-400">Tokens iniciales</span>
+                <input type="number" min={0} value={tokenBalance} onChange={(event) => setTokenBalance(event.target.value)} className="h-12 w-full rounded-xl border border-white/8 bg-black/35 px-4 text-sm text-white outline-none focus:border-red-500/50" />
+              </label>
+            ) : (
+              <div className="rounded-xl border border-amber-500/15 bg-amber-500/[.04] p-4 text-xs leading-5 text-amber-200/80">
+                La cuenta Propietario no usa tokens, planes ni compras. Sus generaciones privadas usan Owner Local.
+              </div>
+            )}
 
             <label>
               <span className="mb-2 block text-sm text-zinc-400">
@@ -304,11 +299,11 @@ function CreateUserDialog({
 
               <select
                 value={role}
-                onChange={(event) =>
-                  setRole(
-                    event.target.value as UserRole,
-                  )
-                }
+                onChange={(event) => {
+                  const nextRole = event.target.value as UserRole;
+                  setRole(nextRole);
+                  if (nextRole === "owner") setTokenBalance("0");
+                }}
                 className="h-12 w-full rounded-xl border border-white/8 bg-[#09090a] px-4 text-sm text-white outline-none focus:border-red-500/50"
               >
                 <option value="user">

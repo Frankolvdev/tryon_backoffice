@@ -138,7 +138,15 @@ function ModuleEditor({ module, pricingRules, executionTargets, setModule, savin
   return <section className="luxia-panel overflow-hidden rounded-3xl">
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/6 p-5"><div className="flex items-center gap-3"><span className={`h-3 w-3 rounded-full ${module.is_active ? "bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,.9)]" : "bg-red-500 shadow-[0_0_14px_rgba(239,68,68,.55)]"}`}/><div><h2 className="text-xl font-semibold text-white">{module.name}</h2><p className="mt-1 font-mono text-xs text-zinc-600">{module.key} · ID {module.id} · {module.is_active ? "ACTIVO" : "INACTIVO"}</p></div></div><div className="flex flex-wrap gap-2"><button onClick={onDelete} disabled={deleting || saving} className="inline-flex h-10 items-center gap-2 rounded-xl border border-red-500/20 bg-red-950/15 px-4 text-sm font-semibold text-red-300 disabled:opacity-50">{deleting ? <LoaderCircle size={16} className="animate-spin"/> : <Trash2 size={16}/>}Eliminar módulo</button><button onClick={onSave} disabled={saving || deleting} className="inline-flex h-10 items-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-50">{saving ? <LoaderCircle size={16} className="animate-spin"/> : <Save size={16}/>}Guardar módulo</button></div></div>
     <div className="space-y-7 p-5">
-      <div className="grid gap-4 md:grid-cols-6"><Field label="Nombre"><input value={module.name} onChange={e => patch({ name: e.target.value })} className="gm-input"/></Field><Field label="Categoría"><input value={module.category} onChange={e => patch({ category: e.target.value })} className="gm-input"/></Field><Field label="Motor"><select value={module.default_execution_engine ?? ""} onChange={e => patch({ default_execution_engine: e.target.value ? e.target.value as GenerationExecutionEngine : null, is_active: e.target.value ? module.is_active : false })} className="gm-input"><option value="">Sin motor todavía</option>{engines.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select><span className="mt-1 block text-[10px] text-zinc-600">Puedes elegirlo después. Sin motor el módulo permanece inactivo.</span></Field><ExecutionTargetField module={module} targets={executionTargets} patch={patch}/><Field label="Pricing rule"><select value={module.pricing_rule_id ?? ""} onChange={e => patch({ pricing_rule_id: e.target.value ? Number(e.target.value) : null })} className="gm-input"><option value="">Sin regla</option>{pricingRules.map(rule => <option key={rule.id} value={rule.id}>{rule.title} · {rule.required_tokens} tokens</option>)}</select></Field><Field label="Estado"><select value={String(module.is_active)} onChange={e => patch({ is_active: e.target.value === "true" })} className={`gm-input ${module.is_active ? "border-emerald-500/40 text-emerald-300" : ""}`}><option value="true" disabled={!module.default_execution_engine}>Activo</option><option value="false">Inactivo</option></select>{!module.default_execution_engine && <span className="mt-1 block text-[10px] text-zinc-600">Elige un motor antes de activarlo.</span>}</Field></div>
+      <div className="grid gap-4 md:grid-cols-6"><Field label="Nombre"><input value={module.name} onChange={e => patch({ name: e.target.value })} className="gm-input"/></Field><Field label="Categoría"><input value={module.category} onChange={e => patch({ category: e.target.value })} className="gm-input"/></Field><Field label="Motor"><select value={module.default_execution_engine ?? ""} onChange={e => {
+        const nextEngine = e.target.value ? e.target.value as GenerationExecutionEngine : null;
+        patch({
+          default_execution_engine: nextEngine,
+          endpoint: null,
+          metadata: { ...module.metadata, execution_target: {} },
+          is_active: nextEngine ? module.is_active : false,
+        });
+      }} className="gm-input"><option value="">Sin motor todavía</option>{engines.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select><span className="mt-1 block text-[10px] text-zinc-600">Al cambiar de proveedor se limpia el destino anterior para impedir usar accidentalmente un runtime de otro proveedor.</span></Field><ExecutionTargetField module={module} targets={executionTargets} patch={patch}/><Field label="Pricing rule"><select value={module.pricing_rule_id ?? ""} onChange={e => patch({ pricing_rule_id: e.target.value ? Number(e.target.value) : null })} className="gm-input"><option value="">Sin regla</option>{pricingRules.map(rule => <option key={rule.id} value={rule.id}>{rule.title} · {rule.required_tokens} tokens</option>)}</select></Field><Field label="Estado"><select value={String(module.is_active)} onChange={e => patch({ is_active: e.target.value === "true" })} className={`gm-input ${module.is_active ? "border-emerald-500/40 text-emerald-300" : ""}`}><option value="true" disabled={!module.default_execution_engine}>Activo</option><option value="false">Inactivo</option></select>{!module.default_execution_engine && <span className="mt-1 block text-[10px] text-zinc-600">Elige un motor antes de activarlo.</span>}</Field></div>
       <ContractEditor module={module} setModule={setModule}/>
       <div>
         <div className="mb-3 flex flex-col gap-3 rounded-2xl border border-white/7 bg-black/25 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -162,8 +170,23 @@ function ExecutionTargetField({ module, targets, patch }: { module: GenerationMo
   }
   if (engine === "local_docker") {
     const options = targets.local_docker ?? [];
-    const selectedImage = String((module.metadata?.execution_target as Record<string, unknown> | undefined)?.image_tag ?? "");
-    return <Field label="Runtime Docker"><select value={selectedImage} onChange={e => patch({ metadata: { ...module.metadata, execution_target: { ...((module.metadata?.execution_target as Record<string, unknown> | undefined) ?? {}), image_tag: e.target.value || null } } })} className="gm-input"><option value="">Seleccionar imagen</option>{options.map(item => <option key={`${item.build_id}-${item.value}`} value={item.value}>{item.label}</option>)}</select><input value={module.endpoint ?? ""} onChange={e => patch({ endpoint: e.target.value || null })} placeholder="URL del contenedor activo, ej. http://127.0.0.1:8188" className="gm-input mt-2"/><span className="mt-1 block text-[10px] text-zinc-600">La imagen identifica el runtime. En esta fase segura, Docker debe estar levantado y esta URL indica su ComfyUI; no se administran contenedores automáticamente.</span></Field>;
+    return <Field label="Runtime Docker"><select value={module.endpoint ?? ""} onChange={e => {
+      const target = e.target.value || null;
+      const selected = options.find(item => item.value === target);
+      patch({
+        endpoint: target,
+        metadata: {
+          ...module.metadata,
+          execution_target: selected ? {
+            provider: "local_docker",
+            image_tag: selected.image_tag ?? null,
+            build_id: selected.build_id,
+            runtime_name: selected.runtime_name ?? null,
+            version: selected.version ?? null,
+          } : {},
+        },
+      });
+    }} className="gm-input"><option value="">Seleccionar runtime Docker</option>{options.map(item => <option key={`${item.build_id}-${item.value}`} value={item.value}>{item.label}</option>)}</select><span className="mt-1 block text-[10px] text-zinc-600">{options.length ? "El Docker Local Manager levanta o reutiliza automáticamente esta imagen y Docker asigna un puerto libre." : "No hay imágenes Docker construidas disponibles en Runtime Builder."}</span></Field>;
   }
   return <Field label="Destino"><div className="gm-input flex items-center text-zinc-600">No requerido</div></Field>;
 }

@@ -25,6 +25,8 @@ export function UserAccountManagementPanel({
   const router = useRouter();
   const [email, setEmail] = useState(user.email);
   const [fullName, setFullName] = useState(user.full_name ?? "");
+  const [isActive, setIsActive] = useState(user.is_active);
+  const [isVerified, setIsVerified] = useState(user.is_verified);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
@@ -35,6 +37,8 @@ export function UserAccountManagementPanel({
   useEffect(() => {
     setEmail(user.email);
     setFullName(user.full_name ?? "");
+    setIsActive(user.is_active);
+    setIsVerified(user.is_verified);
   }, [user]);
 
   const saveProfile = async (event: FormEvent) => {
@@ -48,6 +52,8 @@ export function UserAccountManagementPanel({
     const payload: AdminUserUpdateRequest = {
       email: email.trim().toLowerCase(),
       full_name: fullName.trim() || null,
+      is_active: isActive,
+      is_verified: isVerified,
     };
 
     setSavingProfile(true);
@@ -191,6 +197,17 @@ export function UserAccountManagementPanel({
             className="h-11 w-full rounded-xl border border-white/8 bg-black/30 px-4 text-sm text-white"
           />
         </label>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-white/7 bg-black/25 p-4">
+            <div><p className="text-sm text-zinc-300">Cuenta activa</p><p className="mt-1 text-xs text-zinc-600">Permite utilizar la plataforma</p></div>
+            <input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} className="size-4 accent-red-700" />
+          </label>
+          <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-white/7 bg-black/25 p-4">
+            <div><p className="text-sm text-zinc-300">Correo verificado</p><p className="mt-1 text-xs text-zinc-600">Omite la verificación inicial</p></div>
+            <input type="checkbox" checked={isVerified} onChange={(event) => setIsVerified(event.target.checked)} className="size-4 accent-red-700" />
+          </label>
+        </div>
 
         <button
           type="submit"

@@ -207,8 +207,9 @@ export default function UserDetailPage() {
   }
 
   const { user } = data;
+  const isOwner = user.role === "owner";
 
-  const tabs: Array<{
+  const allTabs: Array<{
     key: DetailTab;
     label: string;
     icon: React.ComponentType<{
@@ -271,6 +272,10 @@ export default function UserDetailPage() {
     },
   ];
 
+  const tabs = allTabs.filter(
+    (tab) => !isOwner || !["tokens", "subscription", "purchases"].includes(tab.key),
+  );
+
   return (
     <div className="mx-auto max-w-[1700px]">
       <header>
@@ -327,12 +332,10 @@ export default function UserDetailPage() {
         {[
           ["Rol", friendlyRole(user.role)],
           ["Estado", friendlyUserStatus(user.status)],
-          [
+          ...(isOwner ? [] : [[
             "Tokens disponibles",
-            user.token_balance.toLocaleString(
-              "es-MX",
-            ),
-          ],
+            user.token_balance.toLocaleString("es-MX"),
+          ]]),
           [
             "Correo verificado",
             user.is_verified ? "Sí" : "No",
@@ -488,6 +491,7 @@ export default function UserDetailPage() {
         {activeTab === "rbac" && (
           <UserRbacPanel
             userId={user.id}
+            userRole={user.role}
           />
         )}
 
@@ -497,20 +501,20 @@ export default function UserDetailPage() {
           />
         )}
 
-        {activeTab ===
+        {!isOwner && activeTab ===
           "subscription" && (
           <UserSubscriptionPanel
             userId={user.id}
           />
         )}
 
-        {activeTab === "purchases" && (
+        {!isOwner && activeTab === "purchases" && (
           <UserTokenPurchasesPanel
             userId={user.id}
           />
         )}
 
-        {activeTab === "tokens" && (
+        {!isOwner && activeTab === "tokens" && (
           <div className="space-y-5">
             <UserPromotionalTokensPanel userId={user.id} onChanged={loadUser} />
             <UserTokenAdjustmentPanel userId={user.id} onChanged={async () => { await loadUser(); }} />

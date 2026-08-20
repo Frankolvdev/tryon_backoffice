@@ -12,6 +12,14 @@ export function GenerationTestConsole({ module }: { module: GenerationModule }) 
   const [values, setValues] = useState<Record<string, unknown>>(() => buildInitialGenerationValues(module.inputs));
   const [execution, setExecution] = useState<GenerationModuleExecution | null>(null);
   const [busy, setBusy] = useState(false);
+  const engineNeedsTarget = ["modal", "runpod_serverless", "beam", "local_docker"].includes(
+    module.default_execution_engine ?? "",
+  );
+  const targetValue = String(module.endpoint ?? "").trim();
+  const targetMissing = engineNeedsTarget && (
+    !targetValue ||
+    (module.default_execution_engine === "local_docker" && !targetValue.startsWith("docker-local://"))
+  );
 
   useEffect(() => setValues(buildInitialGenerationValues(module.inputs)), [module.id, module.inputs]);
 
@@ -33,6 +41,10 @@ export function GenerationTestConsole({ module }: { module: GenerationModule }) 
   const run = async () => {
     if (!module.default_execution_engine) {
       toast.error("Selecciona y guarda un motor antes de ejecutar una prueba.");
+      return;
+    }
+    if (targetMissing) {
+      toast.error("Selecciona y guarda el runtime/destino requerido por este proveedor antes de ejecutar la prueba.");
       return;
     }
     const error = validateGenerationValues(module.inputs, values);
@@ -93,13 +105,13 @@ export function GenerationTestConsole({ module }: { module: GenerationModule }) 
                 La ejecución técnica sí queda disponible en el historial para diagnóstico.
               </p>
             </div>
-            <button onClick={() => void run()} disabled={busy || !module.is_active || !module.default_execution_engine} className="inline-flex h-10 items-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-40">
+            <button onClick={() => void run()} disabled={busy || !module.is_active || !module.default_execution_engine || targetMissing} className="inline-flex h-10 items-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-40">
               {busy ? <LoaderCircle className="animate-spin" size={16} /> : <Play size={16} />}
               Ejecutar prueba
             </button>
           </div>
           <DynamicGenerationForm inputs={module.inputs} values={values} onChange={setValues} disabled={busy} />
-          {!module.default_execution_engine ? <p className="mt-4 text-xs text-amber-300">Este módulo todavía no tiene motor. Elige uno arriba y guarda antes de probarlo.</p> : !module.is_active && <p className="mt-4 text-xs text-amber-300">El módulo está inactivo. Actívalo y guarda antes de probarlo.</p>}
+          {!module.default_execution_engine ? <p className="mt-4 text-xs text-amber-300">Este módulo todavía no tiene motor. Elige uno arriba y guarda antes de probarlo.</p> : targetMissing ? <p className="mt-4 text-xs text-amber-300">Falta seleccionar y guardar el runtime/destino obligatorio para {module.default_execution_engine.replaceAll("_", " ")}.</p> : !module.is_active && <p className="mt-4 text-xs text-amber-300">El módulo está inactivo. Actívalo y guarda antes de probarlo.</p>}
         </div>
 
         <aside className="rounded-2xl border border-white/8 bg-black/30 p-5">

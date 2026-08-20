@@ -30,6 +30,7 @@ import type {
 
 interface UserRbacPanelProps {
   userId: number;
+  userRole: string;
 }
 
 interface SeedRbacResponse {
@@ -43,6 +44,7 @@ interface SeedRbacResponse {
 
 export function UserRbacPanel({
   userId,
+  userRole,
 }: UserRbacPanelProps) {
   const [rbac, setRbac] =
     useState<UserRbacResponse | null>(null);
@@ -104,7 +106,7 @@ export function UserRbacPanel({
     }
 
     return roles.filter((role) =>
-      rbac.role_keys.includes(role.key),
+      role.key !== userRole && rbac.role_keys.includes(role.key),
     );
   }, [roles, rbac]);
 
@@ -118,6 +120,7 @@ export function UserRbacPanel({
     return roles.filter(
       (role) =>
         role.is_active &&
+        role.key !== userRole &&
         !rbac.role_keys.includes(role.key),
     );
   }, [roles, rbac]);
@@ -310,6 +313,12 @@ export function UserRbacPanel({
 
   return (
     <div className="space-y-6 p-6">
+      <section className="rounded-2xl border border-emerald-500/15 bg-emerald-500/[.03] p-5">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-400">Rol principal de cuenta</p>
+        <p className="mt-2 text-base font-semibold text-white">{userRole === "owner" ? "Propietario" : userRole === "superadmin" ? "Superadministrador" : userRole === "admin" ? "Administrador" : "Usuario"}</p>
+        <p className="mt-2 text-xs leading-5 text-zinc-500">El rol principal define el tipo de cuenta. Los roles RBAC de abajo son permisos administrativos adicionales y no sustituyen ese rol.</p>
+      </section>
+
       <section className="rounded-2xl border border-white/7 bg-black/20 p-5">
         <div className="flex items-start justify-between gap-5">
           <div>
@@ -328,7 +337,19 @@ export function UserRbacPanel({
             </p>
           </div>
 
-          <ShieldCheck className="text-red-400" />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void seedDefaultRbac()}
+              disabled={isMutating}
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-white/8 px-3 text-xs text-zinc-400 disabled:opacity-50"
+              title="Añade de forma idempotente los roles y permisos nuevos de la plataforma sin borrar los existentes."
+            >
+              {isMutating ? <LoaderCircle size={14} className="animate-spin" /> : <DatabaseZap size={14} />}
+              Actualizar catálogo RBAC
+            </button>
+            <ShieldCheck className="text-red-400" />
+          </div>
         </div>
 
         <div className="mt-5 flex flex-col gap-3 sm:flex-row">
@@ -383,8 +404,7 @@ export function UserRbacPanel({
         <div className="mt-5 space-y-3">
           {assignedRoles.length === 0 ? (
             <p className="rounded-xl border border-dashed border-white/8 p-5 text-center text-sm text-zinc-600">
-              Este usuario todavía no tiene roles
-              RBAC adicionales.
+              Este usuario no tiene roles RBAC adicionales.
             </p>
           ) : (
             assignedRoles.map((role) => (
