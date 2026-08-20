@@ -2,6 +2,7 @@ export interface LocalComfyProviderConfig {
   enabled:boolean;
   endpoint:string;
   gpu:string;
+  operating_system?:"linux"|"windows";
   timeout_seconds:number;
 }
 
