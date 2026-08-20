@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRound, LoaderCircle, Save, Trash2 } from "lucide-react";
+import { KeyRound, LoaderCircle, MailCheck, Save, Trash2 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -30,6 +30,7 @@ export function UserAccountManagementPanel({
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
+  const [resendingVerification, setResendingVerification] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deletingPermanently, setDeletingPermanently] = useState(false);
@@ -77,6 +78,35 @@ export function UserAccountManagementPanel({
       );
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const resendVerification = async () => {
+    if (user.is_verified) {
+      toast.info("El correo de este usuario ya está verificado.");
+      return;
+    }
+
+    setResendingVerification(true);
+    try {
+      await browserApiRequest(
+        `/api/admin/account-security/users/${user.id}/resend`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            reason: "Reenvío solicitado desde la administración del usuario.",
+          }),
+        },
+      );
+      toast.success("Correo de verificación reenviado.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No fue posible reenviar el correo de verificación.",
+      );
+    } finally {
+      setResendingVerification(false);
     }
   };
 
@@ -203,10 +233,21 @@ export function UserAccountManagementPanel({
             <div><p className="text-sm text-zinc-300">Cuenta activa</p><p className="mt-1 text-xs text-zinc-600">Permite utilizar la plataforma</p></div>
             <input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} className="size-4 accent-red-700" />
           </label>
-          <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-white/7 bg-black/25 p-4">
-            <div><p className="text-sm text-zinc-300">Correo verificado</p><p className="mt-1 text-xs text-zinc-600">Omite la verificación inicial</p></div>
-            <input type="checkbox" checked={isVerified} onChange={(event) => setIsVerified(event.target.checked)} className="size-4 accent-red-700" />
-          </label>
+          <div className="rounded-2xl border border-white/7 bg-black/25 p-4">
+            <label className="flex cursor-pointer items-center justify-between gap-3">
+              <div><p className="text-sm text-zinc-300">Correo verificado</p><p className="mt-1 text-xs text-zinc-600">Omite la verificación inicial</p></div>
+              <input type="checkbox" checked={isVerified} onChange={(event) => setIsVerified(event.target.checked)} className="size-4 accent-red-700" />
+            </label>
+            <button
+              type="button"
+              onClick={() => void resendVerification()}
+              disabled={resendingVerification || user.is_verified}
+              className="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-white/8 bg-white/[.03] px-3 text-xs font-medium text-zinc-300 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {resendingVerification ? <LoaderCircle size={14} className="animate-spin" /> : <MailCheck size={14} />}
+              {user.is_verified ? "Correo ya verificado" : "Reenviar correo de verificación"}
+            </button>
+          </div>
         </div>
 
         <button

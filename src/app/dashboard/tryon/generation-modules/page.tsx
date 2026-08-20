@@ -35,6 +35,22 @@ type Port = { key: string; label: string; type: string; path: string; origin: st
 type ExecutionTarget = { provider: string; value: string; label: string; build_id: number; deployment_id?: string | null; runtime_name?: string | null; version?: string | null; image_tag?: string | null };
 type ExecutionTargetResponse = { items: Record<string, ExecutionTarget[]> };
 
+function moduleDraftFingerprint(module: GenerationModule | null): string {
+  if (!module) return "";
+  return JSON.stringify({
+    name: module.name,
+    description: module.description ?? null,
+    category: module.category,
+    default_execution_engine: module.default_execution_engine ?? null,
+    endpoint: module.endpoint ?? null,
+    metadata: module.metadata ?? {},
+    is_active: module.is_active,
+    pricing_rule_id: module.pricing_rule_id ?? null,
+    inputs: module.inputs.map(({ id: _id, ...item }) => item),
+    outputs: module.outputs.map(({ id: _id, ...item }) => item),
+  });
+}
+
 export default function GenerationModulesPage() {
   const [items, setItems] = useState<GenerationModule[]>([]);
   const [pricingRules, setPricingRules] = useState<PricingRuleResponse[]>([]);
@@ -82,11 +98,21 @@ export default function GenerationModulesPage() {
         }),
       });
       setSelected(updated);
+      setItems((current) => current.map((item) => item.id === updated.id ? updated : item));
       toast.success("Módulo guardado.");
       await load();
     } catch (error) { toast.error(error instanceof Error ? error.message : "No fue posible guardar."); }
     finally { setSaving(false); }
   };
+
+  const persistedSelected = selected
+    ? items.find((item) => item.id === selected.id) ?? null
+    : null;
+  const hasUnsavedModuleChanges = Boolean(
+    selected &&
+    persistedSelected &&
+    moduleDraftFingerprint(selected) !== moduleDraftFingerprint(persistedSelected),
+  );
 
   const deleteSelectedModule = async () => {
     if (!selected) return;
@@ -124,7 +150,7 @@ export default function GenerationModulesPage() {
           </button>;
         })}</div>
       </section>
-      {!selected ? <EmptyState/> : <ModuleEditor module={selected} pricingRules={pricingRules} executionTargets={executionTargets} setModule={setSelected} saving={saving} deleting={deletingModule} onSave={saveModule} onDelete={deleteSelectedModule} onOpenEditor={setEditor}/>} 
+      {!selected ? <EmptyState/> : <ModuleEditor module={selected} savedModule={persistedSelected} hasUnsavedChanges={hasUnsavedModuleChanges} pricingRules={pricingRules} executionTargets={executionTargets} setModule={setSelected} saving={saving} deleting={deletingModule} onSave={saveModule} onDelete={deleteSelectedModule} onOpenEditor={setEditor}/>} 
     </div>
     {editor && selected && <StepEditor module={selected} target={editor} onClose={() => setEditor(null)} onSaved={module => { setSelected(module); setEditor(null); void load(); }}/>} 
     {createOpen && <CreateModuleModal onClose={() => setCreateOpen(false)} onCreated={module => { setItems(current => [module, ...current]); setSelected(module); setCreateOpen(false); }}/>} 
@@ -133,7 +159,7 @@ export default function GenerationModulesPage() {
 
 function EmptyState() { return <section className="luxia-panel flex min-h-[560px] flex-col items-center justify-center rounded-3xl p-10 text-center"><Boxes size={44} className="text-zinc-800"/><h2 className="mt-5 text-xl font-semibold text-white">Selecciona un módulo</h2><p className="mt-2 max-w-md text-sm text-zinc-600">Aquí aparecerá el editor visual del pipeline.</p></section>; }
 
-function ModuleEditor({ module, pricingRules, executionTargets, setModule, saving, deleting, onSave, onDelete, onOpenEditor }: { module: GenerationModule; pricingRules: PricingRuleResponse[]; executionTargets: Record<string, ExecutionTarget[]>; setModule: (module: GenerationModule) => void; saving: boolean; deleting: boolean; onSave: () => void; onDelete: () => void; onOpenEditor: (target: EditorTarget) => void }) {
+function ModuleEditor({ module, savedModule, hasUnsavedChanges, pricingRules, executionTargets, setModule, saving, deleting, onSave, onDelete, onOpenEditor }: { module: GenerationModule; savedModule: GenerationModule | null; hasUnsavedChanges: boolean; pricingRules: PricingRuleResponse[]; executionTargets: Record<string, ExecutionTarget[]>; setModule: (module: GenerationModule) => void; saving: boolean; deleting: boolean; onSave: () => void; onDelete: () => void; onOpenEditor: (target: EditorTarget) => void }) {
   const patch = (value: Partial<GenerationModule>) => setModule({ ...module, ...value });
   return <section className="luxia-panel overflow-hidden rounded-3xl">
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/6 p-5"><div className="flex items-center gap-3"><span className={`h-3 w-3 rounded-full ${module.is_active ? "bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,.9)]" : "bg-red-500 shadow-[0_0_14px_rgba(239,68,68,.55)]"}`}/><div><h2 className="text-xl font-semibold text-white">{module.name}</h2><p className="mt-1 font-mono text-xs text-zinc-600">{module.key} · ID {module.id} · {module.is_active ? "ACTIVO" : "INACTIVO"}</p></div></div><div className="flex flex-wrap gap-2"><button onClick={onDelete} disabled={deleting || saving} className="inline-flex h-10 items-center gap-2 rounded-xl border border-red-500/20 bg-red-950/15 px-4 text-sm font-semibold text-red-300 disabled:opacity-50">{deleting ? <LoaderCircle size={16} className="animate-spin"/> : <Trash2 size={16}/>}Eliminar módulo</button><button onClick={onSave} disabled={saving || deleting} className="inline-flex h-10 items-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-50">{saving ? <LoaderCircle size={16} className="animate-spin"/> : <Save size={16}/>}Guardar módulo</button></div></div>
@@ -147,6 +173,33 @@ function ModuleEditor({ module, pricingRules, executionTargets, setModule, savin
           is_active: nextEngine ? module.is_active : false,
         });
       }} className="gm-input"><option value="">Sin motor todavía</option>{engines.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select><span className="mt-1 block text-[10px] text-zinc-600">Al cambiar de proveedor se limpia el destino anterior para impedir usar accidentalmente un runtime de otro proveedor.</span></Field><ExecutionTargetField module={module} targets={executionTargets} patch={patch}/><Field label="Pricing rule"><select value={module.pricing_rule_id ?? ""} onChange={e => patch({ pricing_rule_id: e.target.value ? Number(e.target.value) : null })} className="gm-input"><option value="">Sin regla</option>{pricingRules.map(rule => <option key={rule.id} value={rule.id}>{rule.title} · {rule.required_tokens} tokens</option>)}</select></Field><Field label="Estado"><select value={String(module.is_active)} onChange={e => patch({ is_active: e.target.value === "true" })} className={`gm-input ${module.is_active ? "border-emerald-500/40 text-emerald-300" : ""}`}><option value="true" disabled={!module.default_execution_engine}>Activo</option><option value="false">Inactivo</option></select>{!module.default_execution_engine && <span className="mt-1 block text-[10px] text-zinc-600">Elige un motor antes de activarlo.</span>}</Field></div>
+
+      <div className="mt-4 rounded-2xl border border-white/7 bg-black/20 p-4">
+        <div className="mb-3">
+          <p className="text-xs font-semibold uppercase tracking-[.18em] text-zinc-500">Integración AppWeb</p>
+          <p className="mt-1 text-xs leading-5 text-zinc-600">Automático crea una pestaña y utiliza el formulario dinámico actual. Administrado no crea interfaz automáticamente: el módulo sigue disponible por la API de Generation Modules para construir una pantalla personalizada.</p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Título de pestaña">
+            <input
+              value={String(module.metadata?.appweb_tab_title ?? module.name)}
+              onChange={e => patch({ metadata: { ...module.metadata, appweb_tab_title: e.target.value } })}
+              placeholder="Ej. Crear Try-On"
+              className="gm-input"
+            />
+          </Field>
+          <Field label="Modo de interfaz">
+            <select
+              value={module.metadata?.appweb_mode === "managed" ? "managed" : "automatic"}
+              onChange={e => patch({ metadata: { ...module.metadata, appweb_mode: e.target.value } })}
+              className="gm-input"
+            >
+              <option value="automatic">Automático · formulario dinámico</option>
+              <option value="managed">Administrado · interfaz personalizada</option>
+            </select>
+          </Field>
+        </div>
+      </div>
       <ContractEditor module={module} setModule={setModule}/>
       <div>
         <div className="mb-3 flex flex-col gap-3 rounded-2xl border border-white/7 bg-black/25 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -155,7 +208,7 @@ function ModuleEditor({ module, pricingRules, executionTargets, setModule, savin
         </div>
         <div className="mb-4"><h3 className="text-sm font-semibold uppercase tracking-[.18em] text-zinc-400">Canvas de nodos</h3><p className="mt-1 text-xs text-zinc-600">Conecta outputs con inputs arrastrando entre los puertos, igual que en ComfyUI.</p></div><GenerationNodeCanvas module={module} onModule={setModule} onEdit={step=>onOpenEditor({mode:"edit",type:step.step_type,step})}/>
       </div>
-      <GenerationTestConsole module={module}/>
+      <GenerationTestConsole module={savedModule ?? module} hasUnsavedChanges={hasUnsavedChanges}/>
     </div>
   </section>;
 }
@@ -383,7 +436,7 @@ function collectAvailablePorts(module: GenerationModule, current?: GenerationMod
 function JsonMapping({ title, value, onChange }: { title: string; value: Record<string, unknown>; onChange: (value: Record<string, unknown>) => void }) { const [text, setText] = useState(JSON.stringify(value, null, 2)); useEffect(() => setText(JSON.stringify(value, null, 2)), [value]); return <div className="mt-4"><p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">{title}</p><textarea className="gm-input min-h-28 py-3 font-mono text-xs" value={text} onChange={e => { setText(e.target.value); try { onChange(JSON.parse(e.target.value)); } catch {} }}/></div>; }
 
 function CreateModuleModal({ onClose, onCreated }: { onClose: () => void; onCreated: (module: GenerationModule) => void }) {
-  const [form, setForm] = useState({ key: "", name: "", description: "", category: "tryon" });
+  const [form, setForm] = useState({ key: "", name: "", description: "", category: "tryon", appwebTabTitle: "", appwebMode: "automatic" as "automatic" | "managed" });
   const [busy, setBusy] = useState(false);
 
   const create = async () => {
@@ -392,17 +445,23 @@ function CreateModuleModal({ onClose, onCreated }: { onClose: () => void; onCrea
       const module = await browserApiRequest<GenerationModule>("/api/admin/generation-modules", {
         method: "POST",
         body: JSON.stringify({
-          ...form,
+          key: form.key,
+          name: form.name,
+          description: form.description,
+          category: form.category,
           version: 1,
           is_active: false,
-          metadata: {},
+          metadata: {
+            appweb_mode: form.appwebMode,
+            appweb_tab_title: form.appwebTabTitle.trim() || form.name.trim(),
+          },
           inputs: [],
           outputs: [],
           steps: [],
         }),
       });
       onCreated(module);
-      toast.success("Módulo creado como borrador. Configura motor, endpoint y precio cuando estés listo.");
+      toast.success("Módulo creado como borrador. Configura motor, runtime, precio e integración AppWeb cuando estés listo.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No fue posible crear el módulo.");
     } finally {
@@ -419,6 +478,8 @@ function CreateModuleModal({ onClose, onCreated }: { onClose: () => void; onCrea
       <Field label="Nombre"><input className="gm-input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}/></Field>
       <Field label="Categoría"><input className="gm-input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}/></Field>
       <Field label="Descripción"><input className="gm-input" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}/></Field>
+      <Field label="Título de pestaña"><input className="gm-input" value={form.appwebTabTitle} onChange={e => setForm({ ...form, appwebTabTitle: e.target.value })} placeholder={form.name || "Ej. Crear Try-On"}/></Field>
+      <Field label="Integración AppWeb"><select className="gm-input" value={form.appwebMode} onChange={e => setForm({ ...form, appwebMode: e.target.value as "automatic" | "managed" })}><option value="automatic">Automático · formulario dinámico</option><option value="managed">Administrado · interfaz personalizada</option></select></Field>
     </div>
     <button disabled={busy || form.key.length < 2 || form.name.length < 2 || form.category.length < 2} onClick={() => void create()} className="mt-5 h-11 w-full rounded-xl bg-red-600 font-semibold text-white disabled:opacity-40">{busy ? "Creando..." : "Crear borrador"}</button>
   </ModalShell>;
