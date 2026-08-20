@@ -95,6 +95,7 @@ function CreateUserDialog({
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] =
     useState<UserRole>("user");
   const [status, setStatus] =
@@ -103,8 +104,6 @@ function CreateUserDialog({
     useState(true);
   const [isVerified, setIsVerified] =
     useState(false);
-  const [tokenBalance, setTokenBalance] =
-    useState("0");
   const [isSubmitting, setIsSubmitting] =
     useState(false);
 
@@ -116,11 +115,11 @@ function CreateUserDialog({
     setEmail("");
     setFullName("");
     setPassword("");
+    setConfirmPassword("");
     setRole("user");
     setStatus("active");
     setIsActive(true);
     setIsVerified(false);
-    setTokenBalance("0");
   }, [open]);
 
   if (!open) {
@@ -147,18 +146,8 @@ function CreateUserDialog({
       return;
     }
 
-    const parsedBalance = Number.parseInt(
-      tokenBalance,
-      10,
-    );
-
-    if (
-      !Number.isFinite(parsedBalance) ||
-      parsedBalance < 0
-    ) {
-      toast.error(
-        "El saldo inicial debe ser un número mayor o igual a cero.",
-      );
+    if (password !== confirmPassword) {
+      toast.error("Las contraseñas no coinciden.");
       return;
     }
 
@@ -170,7 +159,6 @@ function CreateUserDialog({
       status,
       is_active: isActive,
       is_verified: isVerified,
-      token_balance: parsedBalance,
     };
 
     setIsSubmitting(true);
@@ -281,16 +269,21 @@ function CreateUserDialog({
               />
             </label>
 
-            {role !== "owner" ? (
-              <label>
-                <span className="mb-2 block text-sm text-zinc-400">Tokens iniciales</span>
-                <input type="number" min={0} value={tokenBalance} onChange={(event) => setTokenBalance(event.target.value)} className="h-12 w-full rounded-xl border border-white/8 bg-black/35 px-4 text-sm text-white outline-none focus:border-red-500/50" />
-              </label>
-            ) : (
-              <div className="rounded-xl border border-amber-500/15 bg-amber-500/[.04] p-4 text-xs leading-5 text-amber-200/80">
-                La cuenta Propietario no usa tokens, planes ni compras. Sus generaciones privadas usan Owner Local.
-              </div>
-            )}
+            <label>
+              <span className="mb-2 block text-sm text-zinc-400">
+                Confirmar contraseña
+              </span>
+
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(event) =>
+                  setConfirmPassword(event.target.value)
+                }
+                className="h-12 w-full rounded-xl border border-white/8 bg-black/35 px-4 text-sm text-white outline-none focus:border-red-500/50"
+                placeholder="Repite la contraseña"
+              />
+            </label>
 
             <label>
               <span className="mb-2 block text-sm text-zinc-400">
@@ -299,11 +292,9 @@ function CreateUserDialog({
 
               <select
                 value={role}
-                onChange={(event) => {
-                  const nextRole = event.target.value as UserRole;
-                  setRole(nextRole);
-                  if (nextRole === "owner") setTokenBalance("0");
-                }}
+                onChange={(event) =>
+                  setRole(event.target.value as UserRole)
+                }
                 className="h-12 w-full rounded-xl border border-white/8 bg-[#09090a] px-4 text-sm text-white outline-none focus:border-red-500/50"
               >
                 <option value="user">

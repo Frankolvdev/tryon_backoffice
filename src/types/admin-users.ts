@@ -54,7 +54,7 @@ export interface AdminUserCreateRequest {
   status: UserStatus;
   is_active: boolean;
   is_verified: boolean;
-  token_balance: number;
+  token_balance?: number;
 }
 
 export interface AdminUserUpdateRequest {
