@@ -32,6 +32,8 @@ const emptyOutput = (position: number): GenerationModuleOutput => ({ key: `outpu
 
 type EditorTarget = { mode: "create" | "edit"; type: "workflow" | "python"; step?: GenerationModuleStep } | null;
 type Port = { key: string; label: string; type: string; path: string; origin: string };
+type ExecutionTarget = { provider: string; value: string; label: string; build_id: number; deployment_id?: string | null; runtime_name?: string | null; version?: string | null; image_tag?: string | null };
+type ExecutionTargetResponse = { items: Record<string, ExecutionTarget[]> };
 
 export default function GenerationModulesPage() {
   const [items, setItems] = useState<GenerationModule[]>([]);
@@ -43,18 +45,21 @@ export default function GenerationModulesPage() {
   const [deletingModule, setDeletingModule] = useState(false);
   const [editor, setEditor] = useState<EditorTarget>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [executionTargets, setExecutionTargets] = useState<Record<string, ExecutionTarget[]>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const q = new URLSearchParams({ limit: "200" });
       if (search.trim()) q.set("search", search.trim());
-      const [response, rules] = await Promise.all([
+      const [response, rules, targets] = await Promise.all([
         browserApiRequest<GenerationModuleListResponse>(`/api/admin/generation-modules?${q}`),
         browserApiRequest<PricingRuleResponse[]>("/api/admin/pricing-rules"),
+        browserApiRequest<ExecutionTargetResponse>("/api/admin/generation-module-execution-targets"),
       ]);
       setItems(response.items);
       setPricingRules(rules);
+      setExecutionTargets(targets.items ?? {});
       setSelected(current => current ? response.items.find(item => item.id === current.id) ?? null : current);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No fue posible cargar los módulos.");
@@ -71,7 +76,7 @@ export default function GenerationModulesPage() {
         method: "PATCH",
         body: JSON.stringify({
           name: selected.name, description: selected.description, category: selected.category,
-          default_execution_engine: selected.default_execution_engine, endpoint: selected.endpoint ?? null, is_active: selected.is_active, pricing_rule_id: selected.pricing_rule_id ?? null,
+          default_execution_engine: selected.default_execution_engine, endpoint: selected.endpoint ?? null, metadata: selected.metadata, is_active: selected.is_active, pricing_rule_id: selected.pricing_rule_id ?? null,
           inputs: selected.inputs.map(({ id, ...item }) => item),
           outputs: selected.outputs.map(({ id, ...item }) => item),
         }),
@@ -119,7 +124,7 @@ export default function GenerationModulesPage() {
           </button>;
         })}</div>
       </section>
-      {!selected ? <EmptyState/> : <ModuleEditor module={selected} pricingRules={pricingRules} setModule={setSelected} saving={saving} deleting={deletingModule} onSave={saveModule} onDelete={deleteSelectedModule} onOpenEditor={setEditor}/>} 
+      {!selected ? <EmptyState/> : <ModuleEditor module={selected} pricingRules={pricingRules} executionTargets={executionTargets} setModule={setSelected} saving={saving} deleting={deletingModule} onSave={saveModule} onDelete={deleteSelectedModule} onOpenEditor={setEditor}/>} 
     </div>
     {editor && selected && <StepEditor module={selected} target={editor} onClose={() => setEditor(null)} onSaved={module => { setSelected(module); setEditor(null); void load(); }}/>} 
     {createOpen && <CreateModuleModal onClose={() => setCreateOpen(false)} onCreated={module => { setItems(current => [module, ...current]); setSelected(module); setCreateOpen(false); }}/>} 
@@ -128,12 +133,12 @@ export default function GenerationModulesPage() {
 
 function EmptyState() { return <section className="luxia-panel flex min-h-[560px] flex-col items-center justify-center rounded-3xl p-10 text-center"><Boxes size={44} className="text-zinc-800"/><h2 className="mt-5 text-xl font-semibold text-white">Selecciona un módulo</h2><p className="mt-2 max-w-md text-sm text-zinc-600">Aquí aparecerá el editor visual del pipeline.</p></section>; }
 
-function ModuleEditor({ module, pricingRules, setModule, saving, deleting, onSave, onDelete, onOpenEditor }: { module: GenerationModule; pricingRules: PricingRuleResponse[]; setModule: (module: GenerationModule) => void; saving: boolean; deleting: boolean; onSave: () => void; onDelete: () => void; onOpenEditor: (target: EditorTarget) => void }) {
+function ModuleEditor({ module, pricingRules, executionTargets, setModule, saving, deleting, onSave, onDelete, onOpenEditor }: { module: GenerationModule; pricingRules: PricingRuleResponse[]; executionTargets: Record<string, ExecutionTarget[]>; setModule: (module: GenerationModule) => void; saving: boolean; deleting: boolean; onSave: () => void; onDelete: () => void; onOpenEditor: (target: EditorTarget) => void }) {
   const patch = (value: Partial<GenerationModule>) => setModule({ ...module, ...value });
   return <section className="luxia-panel overflow-hidden rounded-3xl">
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/6 p-5"><div className="flex items-center gap-3"><span className={`h-3 w-3 rounded-full ${module.is_active ? "bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,.9)]" : "bg-red-500 shadow-[0_0_14px_rgba(239,68,68,.55)]"}`}/><div><h2 className="text-xl font-semibold text-white">{module.name}</h2><p className="mt-1 font-mono text-xs text-zinc-600">{module.key} · ID {module.id} · {module.is_active ? "ACTIVO" : "INACTIVO"}</p></div></div><div className="flex flex-wrap gap-2"><button onClick={onDelete} disabled={deleting || saving} className="inline-flex h-10 items-center gap-2 rounded-xl border border-red-500/20 bg-red-950/15 px-4 text-sm font-semibold text-red-300 disabled:opacity-50">{deleting ? <LoaderCircle size={16} className="animate-spin"/> : <Trash2 size={16}/>}Eliminar módulo</button><button onClick={onSave} disabled={saving || deleting} className="inline-flex h-10 items-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-50">{saving ? <LoaderCircle size={16} className="animate-spin"/> : <Save size={16}/>}Guardar módulo</button></div></div>
     <div className="space-y-7 p-5">
-      <div className="grid gap-4 md:grid-cols-6"><Field label="Nombre"><input value={module.name} onChange={e => patch({ name: e.target.value })} className="gm-input"/></Field><Field label="Categoría"><input value={module.category} onChange={e => patch({ category: e.target.value })} className="gm-input"/></Field><Field label="Motor"><select value={module.default_execution_engine ?? ""} onChange={e => patch({ default_execution_engine: e.target.value ? e.target.value as GenerationExecutionEngine : null, is_active: e.target.value ? module.is_active : false })} className="gm-input"><option value="">Sin motor todavía</option>{engines.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select><span className="mt-1 block text-[10px] text-zinc-600">Puedes elegirlo después. Sin motor el módulo permanece inactivo.</span></Field><Field label="Endpoint (opcional)"><input value={module.endpoint ?? ""} onChange={e => patch({ endpoint: e.target.value || null })} placeholder="ID o URL del endpoint" className="gm-input"/><span className="mt-1 block text-[10px] text-zinc-600">Se usa junto con el motor seleccionado.</span></Field><Field label="Pricing rule"><select value={module.pricing_rule_id ?? ""} onChange={e => patch({ pricing_rule_id: e.target.value ? Number(e.target.value) : null })} className="gm-input"><option value="">Sin regla</option>{pricingRules.map(rule => <option key={rule.id} value={rule.id}>{rule.title} · {rule.required_tokens} tokens</option>)}</select></Field><Field label="Estado"><select value={String(module.is_active)} onChange={e => patch({ is_active: e.target.value === "true" })} className={`gm-input ${module.is_active ? "border-emerald-500/40 text-emerald-300" : ""}`}><option value="true" disabled={!module.default_execution_engine}>Activo</option><option value="false">Inactivo</option></select>{!module.default_execution_engine && <span className="mt-1 block text-[10px] text-zinc-600">Elige un motor antes de activarlo.</span>}</Field></div>
+      <div className="grid gap-4 md:grid-cols-6"><Field label="Nombre"><input value={module.name} onChange={e => patch({ name: e.target.value })} className="gm-input"/></Field><Field label="Categoría"><input value={module.category} onChange={e => patch({ category: e.target.value })} className="gm-input"/></Field><Field label="Motor"><select value={module.default_execution_engine ?? ""} onChange={e => patch({ default_execution_engine: e.target.value ? e.target.value as GenerationExecutionEngine : null, is_active: e.target.value ? module.is_active : false })} className="gm-input"><option value="">Sin motor todavía</option>{engines.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select><span className="mt-1 block text-[10px] text-zinc-600">Puedes elegirlo después. Sin motor el módulo permanece inactivo.</span></Field><ExecutionTargetField module={module} targets={executionTargets} patch={patch}/><Field label="Pricing rule"><select value={module.pricing_rule_id ?? ""} onChange={e => patch({ pricing_rule_id: e.target.value ? Number(e.target.value) : null })} className="gm-input"><option value="">Sin regla</option>{pricingRules.map(rule => <option key={rule.id} value={rule.id}>{rule.title} · {rule.required_tokens} tokens</option>)}</select></Field><Field label="Estado"><select value={String(module.is_active)} onChange={e => patch({ is_active: e.target.value === "true" })} className={`gm-input ${module.is_active ? "border-emerald-500/40 text-emerald-300" : ""}`}><option value="true" disabled={!module.default_execution_engine}>Activo</option><option value="false">Inactivo</option></select>{!module.default_execution_engine && <span className="mt-1 block text-[10px] text-zinc-600">Elige un motor antes de activarlo.</span>}</Field></div>
       <ContractEditor module={module} setModule={setModule}/>
       <div>
         <div className="mb-3 flex flex-col gap-3 rounded-2xl border border-white/7 bg-black/25 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -145,6 +150,22 @@ function ModuleEditor({ module, pricingRules, setModule, saving, deleting, onSav
       <GenerationTestConsole module={module}/>
     </div>
   </section>;
+}
+
+function ExecutionTargetField({ module, targets, patch }: { module: GenerationModule; targets: Record<string, ExecutionTarget[]>; patch: (value: Partial<GenerationModule>) => void }) {
+  const engine = module.default_execution_engine;
+  if (engine === "owner_local") return <Field label="Destino"><div className="gm-input flex items-center text-zinc-400">Owner Local global</div><span className="mt-1 block text-[10px] text-zinc-600">Owner Private usa el endpoint global de Pinokio configurado en Proveedores de infraestructura.</span></Field>;
+  if (engine === "modal" || engine === "runpod_serverless" || engine === "beam") {
+    const options = targets[engine] ?? [];
+    const labels: Record<string,string> = { modal: "App / Runtime Modal", runpod_serverless: "Endpoint RunPod", beam: "Deployment Beam" };
+    return <Field label={labels[engine]}><select value={module.endpoint ?? ""} onChange={e => patch({ endpoint: e.target.value || null })} className="gm-input"><option value="">Seleccionar destino</option>{options.map(item => <option key={`${item.build_id}-${item.deployment_id ?? item.value}`} value={item.value}>{item.label}</option>)}</select><span className="mt-1 block text-[10px] text-zinc-600">{options.length ? "Catálogo leído de deployments del Runtime Builder." : "No hay deployments disponibles de este proveedor en Runtime Builder."}</span></Field>;
+  }
+  if (engine === "local_docker") {
+    const options = targets.local_docker ?? [];
+    const selectedImage = String((module.metadata?.execution_target as Record<string, unknown> | undefined)?.image_tag ?? "");
+    return <Field label="Runtime Docker"><select value={selectedImage} onChange={e => patch({ metadata: { ...module.metadata, execution_target: { ...((module.metadata?.execution_target as Record<string, unknown> | undefined) ?? {}), image_tag: e.target.value || null } } })} className="gm-input"><option value="">Seleccionar imagen</option>{options.map(item => <option key={`${item.build_id}-${item.value}`} value={item.value}>{item.label}</option>)}</select><input value={module.endpoint ?? ""} onChange={e => patch({ endpoint: e.target.value || null })} placeholder="URL del contenedor activo, ej. http://127.0.0.1:8188" className="gm-input mt-2"/><span className="mt-1 block text-[10px] text-zinc-600">La imagen identifica el runtime. En esta fase segura, Docker debe estar levantado y esta URL indica su ComfyUI; no se administran contenedores automáticamente.</span></Field>;
+  }
+  return <Field label="Destino"><div className="gm-input flex items-center text-zinc-600">No requerido</div></Field>;
 }
 
 function ModuleInputNode({ module }: { module: GenerationModule }) { return <div className="rounded-2xl border border-blue-500/20 bg-blue-500/[.05] p-4"><div className="flex items-center gap-2 text-sm font-semibold text-blue-300"><Braces size={16}/>Entradas del módulo</div><div className="mt-3 flex flex-wrap gap-2">{module.inputs.map(input => <PortChip key={input.key} label={input.key} type={input.input_type}/>)}</div></div>; }
