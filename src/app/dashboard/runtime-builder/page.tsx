@@ -104,7 +104,8 @@ export default function RuntimeBuilderPage() {
     setSaving(true);
     try {
       const { id, created_at, updated_at, ...payload } = config;
-      setConfig(await browserApiRequest<RuntimeBuilderConfig>("/api/admin/runtime-builder/config", { method: "PUT", body: JSON.stringify(payload) }));
+      const persisted = await browserApiRequest<RuntimeBuilderConfig>("/api/admin/runtime-builder/config", { method: "PUT", body: JSON.stringify(payload) });
+      setConfig({ ...persisted, runtime_name:safeRuntimeName(persisted.runtime_name) });
       toast.success("Configuración del runtime guardada.");
     } catch (error) { toast.error(error instanceof Error ? error.message : "No fue posible guardar."); }
     finally { setSaving(false); }
@@ -147,6 +148,7 @@ export default function RuntimeBuilderPage() {
         <div className="flex gap-4"><div className="luxia-red-glow flex size-14 items-center justify-center rounded-2xl border border-red-500/20 bg-red-950/25 text-red-400"><ServerCog /></div><div>
           <p className="text-[10px] font-semibold tracking-[.2em] text-red-500 uppercase">Infraestructura IA</p><h1 className="mt-2 text-2xl font-semibold text-white">Runtime Builder</h1>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-zinc-500">Configura ComfyUI, nodos, modelos y dependencias; valida y genera el contexto Docker sin editar archivos manualmente.</p>
+          <p className="mt-2 max-w-3xl text-xs leading-6 text-zinc-600">“Aplicar al Runtime Builder” guarda automáticamente lo resuelto. “Guardar configuración” persiste los cambios manuales posteriores. Cambiar Legacy/Modern solo modifica los campos protegidos del perfil y conserva nodos, modelos y dependencias.</p>
         </div></div>
         <div className="flex flex-wrap gap-2"><button onClick={() => void load()} className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/10 px-4 text-sm text-zinc-300"><RefreshCcw size={16}/>Recargar</button>
           <button onClick={() => void validate()} className="inline-flex h-11 items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-950/20 px-4 text-sm text-amber-300"><CheckCircle2 size={16}/>5. Validar</button>
