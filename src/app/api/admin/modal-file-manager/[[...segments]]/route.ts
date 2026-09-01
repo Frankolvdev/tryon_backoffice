@@ -40,9 +40,11 @@ async function streamUpload(
     const headers = new Headers();
     const contentType = request.headers.get("content-type");
     const contentLength = request.headers.get("content-length");
+    const uploadFilename = request.headers.get("x-upload-filename");
 
     if (contentType) headers.set("Content-Type", contentType);
     if (contentLength) headers.set("Content-Length", contentLength);
+    if (uploadFilename) headers.set("X-Upload-Filename", uploadFilename);
     headers.set("Accept", "application/json");
     headers.set("Authorization", `Bearer ${accessToken}`);
 
