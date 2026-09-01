@@ -431,7 +431,7 @@ function WorkflowStepEditor({ module, target, onClose, onSaved }: { module: Gene
       const url = target.mode === "edit" ? `/api/admin/generation-modules/${module.id}/steps/${step!.id}/workflow` : `/api/admin/generation-modules/${module.id}/steps/workflow`;
       const body = target.mode === "edit"
         ? { name, description, workflow_name: name, workflow_json: parsed, input_bindings: inputBindings, output_bindings: outputBindings, input_ports: inputPorts, output_ports: outputPorts, is_enabled: enabled }
-        : { key, name, description, position: module.steps.length, workflow_name: name, workflow_json: parsed, input_bindings: inputBindings, output_bindings: outputBindings, input_ports: inputPorts, output_ports: outputPorts, is_enabled: enabled };
+        : { key, name, description, position: Math.max(-1, ...module.steps.map(item => item.position)) + 1, workflow_name: name, workflow_json: parsed, input_bindings: inputBindings, output_bindings: outputBindings, input_ports: inputPorts, output_ports: outputPorts, is_enabled: enabled };
       onSaved(await browserApiRequest<GenerationModule>(url, { method: target.mode === "edit" ? "PATCH" : "POST", body: JSON.stringify(body) }));
       toast.success(target.mode === "edit" ? "Workflow actualizado." : "Workflow agregado.");
     } catch (error) { toast.error(error instanceof Error ? error.message : "No fue posible guardar."); } finally { setBusy(false); }
@@ -470,7 +470,7 @@ function PythonStepEditor({ module, target, onClose, onSaved }: { module: Genera
       const url = target.mode === "edit" ? `/api/admin/generation-modules/${module.id}/steps/${step!.id}/python` : `/api/admin/generation-modules/${module.id}/steps/python`;
       const body = target.mode === "edit"
         ? { name, description, source_code: source, entrypoint, timeout_seconds: Number(config.timeout_seconds ?? 300), input_mapping: inputMapping, output_mapping: outputMapping, input_ports: inputPorts, output_ports: outputPorts, is_enabled: enabled }
-        : { key, name, description, position: module.steps.length, source_code: source, entrypoint, timeout_seconds: 300, input_mapping: inputMapping, output_mapping: outputMapping, input_ports: inputPorts, output_ports: outputPorts, is_enabled: enabled };
+        : { key, name, description, position: Math.max(-1, ...module.steps.map(item => item.position)) + 1, source_code: source, entrypoint, timeout_seconds: 300, input_mapping: inputMapping, output_mapping: outputMapping, input_ports: inputPorts, output_ports: outputPorts, is_enabled: enabled };
       onSaved(await browserApiRequest<GenerationModule>(url, { method: target.mode === "edit" ? "PATCH" : "POST", body: JSON.stringify(body) }));
       toast.success(target.mode === "edit" ? "Python actualizado." : "Python agregado.");
     } catch (error) { toast.error(error instanceof Error ? error.message : "No fue posible guardar."); } finally { setBusy(false); }
