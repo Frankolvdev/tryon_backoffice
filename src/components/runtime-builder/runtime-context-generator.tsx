@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { browserApiRequest } from "@/lib/api/browser-api";
 import type { RuntimeBuilderConfig, RuntimeContextGenerateResponse, RuntimeContextJob, RuntimeProject } from "@/types/admin-runtime-builder";
-import type { ModalProviderConfig } from "@/types/admin-infrastructure-providers";
+import type { BeamProviderConfig, ModalProviderConfig, RunPodProviderConfig } from "@/types/admin-infrastructure-providers";
 
 const inputClass = "h-11 w-full rounded-xl border border-white/10 bg-black/25 px-3 text-sm text-white outline-none transition focus:border-red-500/50";
 
@@ -21,13 +21,31 @@ export function RuntimeContextGenerator() {
   const [result, setResult] = useState<RuntimeContextGenerateResponse | null>(null);
   const [job, setJob] = useState<RuntimeContextJob | null>(null);
   const [provider, setProvider] = useState<string>("modal");
+  const [deploymentName, setDeploymentName] = useState("");
+  const [providerDefaultDeploymentName, setProviderDefaultDeploymentName] = useState("");
   const [modalConfig, setModalConfig] = useState<ModalProviderConfig | null>(null);
   const [residentModelsText, setResidentModelsText] = useState("");
 
   useEffect(() => {
-    void Promise.all([browserApiRequest<RuntimeProject>("/api/admin/runtime-builder/project"), browserApiRequest<RuntimeBuilderConfig>("/api/admin/runtime-builder/config"), browserApiRequest<ModalProviderConfig>("/api/admin/infrastructure-providers/modal")])
-      .then(([config, runtimeConfig, modal]) => {
-        setProvider(runtimeConfig.provider || "modal");
+    void Promise.all([
+      browserApiRequest<RuntimeProject>("/api/admin/runtime-builder/project"),
+      browserApiRequest<RuntimeBuilderConfig>("/api/admin/runtime-builder/config"),
+      browserApiRequest<ModalProviderConfig>("/api/admin/infrastructure-providers/modal"),
+      browserApiRequest<RunPodProviderConfig>("/api/admin/infrastructure-providers/runpod"),
+      browserApiRequest<BeamProviderConfig>("/api/admin/infrastructure-providers/beam"),
+    ])
+      .then(([config, runtimeConfig, modal, runpod, beam]) => {
+        const selectedProvider = runtimeConfig.provider || "modal";
+        const providerDefault = selectedProvider === "modal"
+          ? modal.app_name
+          : selectedProvider === "runpod"
+            ? runpod.endpoint_name
+            : selectedProvider === "beam"
+              ? beam.deployment_name
+              : runtimeConfig.runtime_name;
+        setProvider(selectedProvider);
+        setProviderDefaultDeploymentName(providerDefault || runtimeConfig.runtime_name || "generation-runtime");
+        setDeploymentName(config.deployment_name?.trim() || providerDefault || runtimeConfig.runtime_name || "generation-runtime");
         setModalConfig(modal);
         setResidentModelsText((modal.snapshot_resident_models || []).join("\n"));
         setComfyuiPath(config.source_comfyui_path || "");
@@ -50,14 +68,20 @@ export function RuntimeContextGenerator() {
       .catch(() => undefined);
   }, []);
 
-  const saveWorkspace = async () => browserApiRequest<RuntimeProject>("/api/admin/runtime-builder/project", {
-    method: "PATCH",
-    body: JSON.stringify({
-      source_comfyui_path: comfyuiPath.trim() || null,
-      export_root_directory: outputDirectory.trim() || null,
-      container_workdir: containerWorkdir.trim() || "/app",
-    }),
-  });
+  const saveWorkspace = async () => {
+    const effectiveDeploymentName = deploymentName.trim() || providerDefaultDeploymentName.trim() || null;
+    const saved = await browserApiRequest<RuntimeProject>("/api/admin/runtime-builder/project", {
+      method: "PATCH",
+      body: JSON.stringify({
+        source_comfyui_path: comfyuiPath.trim() || null,
+        export_root_directory: outputDirectory.trim() || null,
+        container_workdir: containerWorkdir.trim() || "/app",
+        deployment_name: effectiveDeploymentName,
+      }),
+    });
+    setDeploymentName(saved.deployment_name?.trim() || providerDefaultDeploymentName.trim());
+    return saved;
+  };
 
   const waitForJob = async (created: RuntimeContextJob) => {
     let current = created;
@@ -108,7 +132,7 @@ export function RuntimeContextGenerator() {
   return <div className="space-y-5">
     <section className="luxia-panel rounded-3xl p-5">
       <div className="mb-5 flex items-start gap-4"><div className="flex size-12 items-center justify-center rounded-2xl border border-red-500/20 bg-red-950/25 text-red-400"><Archive /></div><div><h2 className="font-semibold text-white">6. Generar runtime autocontenido</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-500">Copia los recursos seleccionados y crea el contexto Docker listo para construir. La exportación de modelos se administra únicamente desde “Modelos y Docker”.</p></div></div>
-      <div className="grid gap-4 lg:grid-cols-3"><Field label="Ruta local de ComfyUI"><input className={inputClass} placeholder="F:\\ComfyUI" value={comfyuiPath} onChange={e=>setComfyuiPath(e.target.value)} onBlur={()=>void saveWorkspace()}/></Field><Field label="Directorio raíz de exportación"><input className={inputClass} placeholder="F:\\runtime_exports" value={outputDirectory} onChange={e=>setOutputDirectory(e.target.value)} onBlur={()=>void saveWorkspace()}/></Field><Field label="Ruta interna del contenedor"><input className={inputClass} value={containerWorkdir} onChange={e=>setContainerWorkdir(e.target.value)} onBlur={()=>void saveWorkspace()}/></Field></div>
+      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4"><Field label="Ruta local de ComfyUI"><input className={inputClass} placeholder="F:\\ComfyUI" value={comfyuiPath} onChange={e=>setComfyuiPath(e.target.value)} onBlur={()=>void saveWorkspace()}/></Field><Field label="Directorio raíz de exportación"><input className={inputClass} placeholder="F:\\runtime_exports" value={outputDirectory} onChange={e=>setOutputDirectory(e.target.value)} onBlur={()=>void saveWorkspace()}/></Field><Field label="Ruta interna del contenedor"><input className={inputClass} value={containerWorkdir} onChange={e=>setContainerWorkdir(e.target.value)} onBlur={()=>void saveWorkspace()}/></Field><Field label="App / nombre para despliegue"><input className={inputClass} value={deploymentName} placeholder={providerDefaultDeploymentName || "generation-runtime"} onChange={e=>setDeploymentName(e.target.value)} onBlur={()=>void saveWorkspace()}/><span className="mt-2 block text-xs text-zinc-500">Por defecto usa el nombre configurado en Proveedores de infraestructura para {provider}. Puedes cambiarlo solo para este runtime.</span></Field></div>
       {provider === "modal" && <div className="mt-5"><Field label="Modelos residentes del snapshot de Modal (una ruta por línea)"><textarea className={`${inputClass} min-h-36 py-3`} value={residentModelsText} onChange={e=>setResidentModelsText(e.target.value)} /><span className="mt-2 block text-xs text-zinc-500">Se guarda antes de exportar y se respeta exactamente la lista indicada.</span></Field></div>}
       <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Toggle label="Copiar modelos locales" checked={copyModels} onChange={setCopyModels}/><Toggle label="Copiar Custom Nodes" checked={copyNodes} onChange={setCopyNodes}/><Toggle label="Calcular SHA-256" checked={sha256} onChange={setSha256}/><Toggle label="Sobrescribir salida" checked={overwrite} onChange={setOverwrite}/></div>
       <button onClick={()=>void generate()} disabled={loading} className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl bg-red-700 px-5 text-sm font-semibold text-white disabled:opacity-60">{loading?<LoaderCircle size={16} className="animate-spin"/>:<HardDrive size={16}/>} {loading?`${job?.progress??0}% · ${job?.message??"Iniciando…"}`:"6. Generar contexto Docker"}</button>
