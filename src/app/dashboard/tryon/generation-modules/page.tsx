@@ -382,7 +382,7 @@ const nodePortTypes = ["image", "images", "mask", "file", "text", "integer", "fl
 function NodePortsEditor({ title, side, ports, setPorts, comfy }: { title: string; side: "input" | "output"; ports: GenerationNodePort[]; setPorts: (ports: GenerationNodePort[]) => void; comfy: boolean }) {
   const update = (index: number, patch: Partial<GenerationNodePort>) => setPorts(ports.map((port, current) => current === index ? { ...port, ...patch } : port));
   return <Contract title={title} onAdd={() => setPorts([...ports, emptyPort(side, ports.length)])}>
-    {ports.map((port, index) => <div key={`${port.id}-${index}`} className="space-y-2 rounded-xl border border-white/5 p-3">
+    {ports.map((port, index) => <div key={`${side}-${index}`} className="space-y-2 rounded-xl border border-white/5 p-3">
       <div className="grid gap-2 md:grid-cols-2"><input className="gm-input" value={port.id} onChange={e => update(index, { id: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, "_") })} placeholder="id_puerto"/><input className="gm-input" value={port.label} onChange={e => update(index, { label: e.target.value })} placeholder="Título visible"/></div>
       <div className={`grid gap-2 ${comfy ? "md:grid-cols-[1fr_1fr_1fr_auto]" : "md:grid-cols-[1fr_auto]"}`}>
         <select className="gm-input" value={port.data_type} onChange={e => update(index, { data_type: e.target.value })}>{nodePortTypes.map(type => <option key={type}>{type}</option>)}</select>

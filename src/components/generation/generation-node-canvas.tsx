@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
+  ControlButton,
   Controls,
   Handle,
   MiniMap,
@@ -17,7 +18,7 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
-import { Box, Code2, PackageOpen, Power, PowerOff, Trash2, Workflow } from "lucide-react";
+import { Box, Code2, Maximize2, Minimize2, PackageOpen, Power, PowerOff, Trash2, Workflow } from "lucide-react";
 import { toast } from "sonner";
 import { browserApiRequest } from "@/lib/api/browser-api";
 import type {
@@ -357,11 +358,41 @@ export function GenerationNodeCanvas({
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(buildNodes());
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const pendingEdgesRef = useRef<Map<string, Edge>>(new Map());
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
+    const onFullscreenChange = () => setIsFullscreen(document.fullscreenElement === canvasRef.current);
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      if (document.fullscreenElement === canvasRef.current) {
+        await document.exitFullscreen();
+      } else {
+        await canvasRef.current?.requestFullscreen();
+      }
+    } catch {
+      toast.error("El navegador no permitió abrir el canvas en pantalla completa.");
+    }
+  }, []);
+
+  useEffect(() => {
+    // Refrescar datos/puertos nunca debe recolocar nodos que el usuario ya movió.
+    // Esto es especialmente importante después de guardar o borrar un wire, porque
+    // onModule actualiza el módulo y vuelve a ejecutar este efecto.
+    setNodes((currentNodes) => {
+      const positions = new Map(currentNodes.map((node) => [node.id, node.position]));
+      return buildNodes().map((node) => ({
+        ...node,
+        position: positions.get(node.id) ?? node.position,
+      }));
+    });
+
     // Primero se renderizan los nodos y sus Handles. Los edges se incorporan
     // en el siguiente frame, cuando React Flow ya registró los puertos.
-    setNodes(buildNodes());
     const frame = requestAnimationFrame(() => {
       const persistedEdges = buildEdges();
       const persistedTargets = new Set(
@@ -520,7 +551,14 @@ export function GenerationNodeCanvas({
   }, [findPort, module.id, module.steps, onModule, outputsPayload, setEdges]);
 
   return (
-    <div className="relative h-[680px] overflow-hidden rounded-2xl border border-white/10 bg-[#08090c]">
+    <div
+      ref={canvasRef}
+      className={`generation-node-canvas relative overflow-hidden bg-[#08090c] ${
+        isFullscreen
+          ? "h-screen w-screen rounded-none border-0"
+          : "h-[680px] rounded-2xl border border-white/10"
+      }`}
+    >
       <div className="pointer-events-none absolute left-4 top-4 z-10 rounded-lg border border-white/10 bg-black/70 px-3 py-2 text-[11px] text-zinc-400 backdrop-blur">
         Assets define el formulario. Conecta puertos del mismo tipo. Doble clic en un cable para desconectar.
       </div>
@@ -538,7 +576,15 @@ export function GenerationNodeCanvas({
       >
         <Background gap={20} size={1}/>
         <MiniMap pannable zoomable/>
-        <Controls/>
+        <Controls>
+          <ControlButton
+            onClick={() => void toggleFullscreen()}
+            title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+            aria-label={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+          >
+            {isFullscreen ? <Minimize2 size={14}/> : <Maximize2 size={14}/>}
+          </ControlButton>
+        </Controls>
       </ReactFlow>
     </div>
   );

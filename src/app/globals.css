@@ -157,3 +157,23 @@ a {
 .gm-icon:hover { color:#fff; background:rgba(255,255,255,.05); }
 .gm-delete { color:#f87171; border-color:rgba(239,68,68,.18); }
 .gm-delete:hover { background:rgba(239,68,68,.08); }
+
+/* Generation module node canvas: keep React Flow controls visible on the dark UI. */
+.generation-node-canvas .react-flow__controls {
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: .7rem;
+  box-shadow: 0 10px 30px rgba(0,0,0,.35);
+}
+.generation-node-canvas .react-flow__controls-button {
+  background: #18181b;
+  border-bottom-color: rgba(255,255,255,.1);
+  color: #e4e4e7;
+}
+.generation-node-canvas .react-flow__controls-button:hover {
+  background: #27272a;
+}
+.generation-node-canvas .react-flow__controls-button svg {
+  fill: currentColor;
+  stroke: currentColor;
+}
