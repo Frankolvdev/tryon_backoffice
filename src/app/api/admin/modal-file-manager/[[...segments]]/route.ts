@@ -133,7 +133,7 @@ async function streamUpload(
       responseHeaders.set("Content-Type", response.contentType);
     }
 
-    return new NextResponse(response.body, {
+    return new NextResponse(new Uint8Array(response.body), {
       status: response.status,
       headers: responseHeaders,
     });
