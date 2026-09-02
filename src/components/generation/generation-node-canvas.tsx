@@ -17,7 +17,6 @@ import {
   type Edge,
   type Node,
   type NodeProps,
-  type NodeDragHandler,
 } from "@xyflow/react";
 import { Box, Code2, Maximize2, Minimize2, PackageOpen, Power, PowerOff, Sparkles, Trash2, Workflow } from "lucide-react";
 import { toast } from "sonner";
@@ -626,7 +625,7 @@ export function GenerationNodeCanvas({
     }
   }, [findPort, module.id, module.steps, onModule, outputsPayload, persistCanonicalOrder, setEdges]);
 
-  const onNodeDragStop = useCallback<NodeDragHandler<FlowNode>>(async (_event, draggedNode) => {
+  const onNodeDragStop = useCallback(async (_event: MouseEvent | TouchEvent, draggedNode: FlowNode, _nodes: FlowNode[]) => {
     if (!draggedNode.id.startsWith("step:")) return;
     const visualOrder = nodes
       .filter((node) => node.id.startsWith("step:"))
