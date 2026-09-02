@@ -50,6 +50,9 @@ type CanvasData = {
 
 type FlowNode = Node<CanvasData>;
 
+const VRAM_PURGE_SOURCE_MARKER = "TRYON_BUILTIN_COMFYUI_VRAM_PURGE_PASSTHROUGH_V1";
+const isPipelineUtilityStep = (step: GenerationModuleStep) => step.step_type === "utility" || (step.step_type === "python" && String(step.configuration?.source_code ?? "").includes(VRAM_PURGE_SOURCE_MARKER));
+
 const compatibleTypes = (source: string, target: string) => {
   if (source === "auto" || target === "auto") return true;
   if (source === target) return true;
@@ -251,8 +254,8 @@ export function GenerationNodeCanvas({
         position: { x: 390 + index * 350, y: 100 + (index % 2) * 150 },
         data: {
           title: step.name,
-          subtitle: `${step.key} · ${step.step_type}`,
-          kind: step.step_type,
+          subtitle: `${step.key} · ${isPipelineUtilityStep(step) ? "pipeline utility" : step.step_type}`,
+          kind: isPipelineUtilityStep(step) ? "utility" : step.step_type,
           enabled: step.is_enabled,
           inputs: configuredPorts(step, "input"),
           outputs: configuredPorts(step, "output"),

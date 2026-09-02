@@ -31,6 +31,9 @@ const emptyInput = (position: number): GenerationModuleInput => ({ key: `input_$
 const emptyOutput = (position: number): GenerationModuleOutput => ({ key: `output_${position + 1}`, name: "Nueva salida", output_type: "image", position, is_required: true, metadata: {} });
 
 type EditorTarget = { mode: "create" | "edit"; type: "workflow" | "python" | "utility"; step?: GenerationModuleStep } | null;
+const VRAM_PURGE_SOURCE_MARKER = "TRYON_BUILTIN_COMFYUI_VRAM_PURGE_PASSTHROUGH_V1";
+const VRAM_PURGE_SOURCE = `# ${VRAM_PURGE_SOURCE_MARKER}\ndef run(inputs):\n    return inputs\n`;
+const isPipelineUtilityStep = (step: GenerationModuleStep) => step.step_type === "utility" || (step.step_type === "python" && String(step.configuration?.source_code ?? "").includes(VRAM_PURGE_SOURCE_MARKER));
 type Port = { key: string; label: string; type: string; path: string; origin: string };
 type ExecutionTarget = { provider: string; value: string; label: string; build_id: number; deployment_id?: string | null; runtime_name?: string | null; version?: string | null; image_tag?: string | null };
 type ExecutionTargetResponse = { items: Record<string, ExecutionTarget[]> };
@@ -261,7 +264,7 @@ function ModuleEditor({ module, savedModule, hasUnsavedChanges, pricingRules, ex
           <div><p className="text-[10px] font-semibold uppercase tracking-[.22em] text-zinc-500">Nodos disponibles</p><p className="mt-1 text-xs text-zinc-600">Agrega nuevos pasos al pipeline antes de conectarlos en el canvas.</p></div>
           <div className="flex flex-wrap gap-2"><button onClick={() => onOpenEditor({ mode: "create", type: "workflow" })} className="gm-secondary"><Workflow size={15}/>Workflow</button><button onClick={() => onOpenEditor({ mode: "create", type: "python" })} className="gm-secondary"><Code2 size={15}/>Python</button><button onClick={() => onOpenEditor({ mode: "create", type: "utility" })} className="gm-secondary"><Sparkles size={15}/>Pipeline Utility</button></div>
         </div>
-        <div className="mb-4"><h3 className="text-sm font-semibold uppercase tracking-[.18em] text-zinc-400">Canvas de nodos</h3><p className="mt-1 text-xs text-zinc-600">Conecta outputs con inputs arrastrando entre los puertos, igual que en ComfyUI.</p></div><GenerationNodeCanvas module={module} onModule={setModule} onEdit={step=>onOpenEditor({mode:"edit",type:step.step_type,step})}/>
+        <div className="mb-4"><h3 className="text-sm font-semibold uppercase tracking-[.18em] text-zinc-400">Canvas de nodos</h3><p className="mt-1 text-xs text-zinc-600">Conecta outputs con inputs arrastrando entre los puertos, igual que en ComfyUI.</p></div><GenerationNodeCanvas module={module} onModule={setModule} onEdit={step=>onOpenEditor({mode:"edit",type:isPipelineUtilityStep(step) ? "utility" : step.step_type,step})}/>
       </div>
       <GenerationTestConsole module={savedModule ?? module} hasUnsavedChanges={hasUnsavedChanges}/>
     </div>
@@ -451,70 +454,44 @@ function WorkflowStepEditor({ module, target, onClose, onSaved }: { module: Gene
 }
 
 function UtilityStepEditor({ module, target, onClose, onSaved }: { module: GenerationModule; target: NonNullable<EditorTarget>; onClose: () => void; onSaved: (module: GenerationModule) => void }) {
-  const step = target.step;
-  const config = step?.configuration ?? {};
-  const [key, setKey] = useState(step?.key ?? `utility_${module.steps.length + 1}`);
+  const step = target.step; const config = step?.configuration ?? {};
+  const [key, setKey] = useState(step?.key ?? `cleanup_${module.steps.length + 1}`);
   const [name, setName] = useState(step?.name ?? "Liberar VRAM");
-  const [description, setDescription] = useState(step?.description ?? "Libera modelos y caché de VRAM entre etapas del pipeline.");
-  const [timeoutSeconds, setTimeoutSeconds] = useState(Number(config.timeout_seconds ?? 120));
-  const [inputPorts, setInputPorts] = useState<GenerationNodePort[]>(
-    ((config.input_ports ?? []) as GenerationNodePort[]).length
-      ? (config.input_ports as GenerationNodePort[])
-      : [{ id: "image", label: "Imagen", data_type: "image", is_required: true }],
-  );
+  const [description, setDescription] = useState(step?.description ?? "Libera completamente la VRAM entre etapas y deja pasar los datos sin modificarlos.");
+  const seedPorts = ((config.input_ports ?? []) as GenerationNodePort[]).length ? (config.input_ports as GenerationNodePort[]) : [{ id: "image", label: "Imagen", data_type: "image", is_required: true }];
+  const [inputPorts, setInputPorts] = useState<GenerationNodePort[]>(seedPorts);
   const [enabled, setEnabled] = useState(step?.is_enabled ?? true);
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
-    if (!inputPorts.length) return toast.error("El nodo necesita al menos un input.");
-    if (!inputPorts.every(port => port.id && port.label)) return toast.error("Completa IDs y títulos de todos los inputs.");
+    if (!inputPorts.length || !inputPorts.every(port => port.id && port.label)) return toast.error("Completa IDs y títulos de todos los inputs.");
     const ids = inputPorts.map(port => port.id);
-    if (new Set(ids).size !== ids.length) return toast.error("No puede haber inputs con el mismo ID.");
+    if (new Set(ids).size !== ids.length) return toast.error("Los IDs de input no pueden repetirse.");
+    if (step?.step_type === "utility") return toast.error("Este es un Utility legado. Elimínalo y crea uno nuevo para usar la versión basada en Python.");
     setBusy(true);
     try {
-      const existingInputMapping = step?.input_mapping ?? {};
-      const inputMapping = Object.fromEntries(
-        inputPorts
-          .filter(port => existingInputMapping[port.id] !== undefined)
-          .map(port => [port.id, existingInputMapping[port.id]]),
-      );
-      const url = target.mode === "edit"
-        ? `/api/admin/generation-modules/${module.id}/steps/${step!.id}/utility`
-        : `/api/admin/generation-modules/${module.id}/steps/utility`;
+      const currentInputMapping = step?.input_mapping ?? {};
+      const inputMapping = Object.fromEntries(inputPorts.filter(port => currentInputMapping[port.id] !== undefined).map(port => [port.id, currentInputMapping[port.id]]));
+      const outputPorts = inputPorts.map(port => ({ ...port }));
+      const outputMapping = Object.fromEntries(inputPorts.map(port => [port.id, port.id]));
+      const url = target.mode === "edit" ? `/api/admin/generation-modules/${module.id}/steps/${step!.id}/python` : `/api/admin/generation-modules/${module.id}/steps/python`;
       const body = target.mode === "edit"
-        ? { name, description, action: "comfyui_vram_purge", timeout_seconds: timeoutSeconds, input_mapping: inputMapping, input_ports: inputPorts, is_enabled: enabled }
-        : { key, name, description, position: Math.max(-1, ...module.steps.map(item => item.position)) + 1, action: "comfyui_vram_purge", timeout_seconds: timeoutSeconds, input_mapping: inputMapping, input_ports: inputPorts, is_enabled: enabled };
-      onSaved(await browserApiRequest<GenerationModule>(url, {
-        method: target.mode === "edit" ? "PATCH" : "POST",
-        body: JSON.stringify(body),
-      }));
-      toast.success(target.mode === "edit" ? "Utility actualizada." : "Utility agregada.");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No fue posible guardar.");
-    } finally {
-      setBusy(false);
-    }
+        ? { name, description, source_code: VRAM_PURGE_SOURCE, entrypoint: "run", timeout_seconds: Number(config.timeout_seconds ?? 120), input_mapping: inputMapping, output_mapping: outputMapping, input_ports: inputPorts, output_ports: outputPorts, is_enabled: enabled }
+        : { key, name, description, position: Math.max(-1, ...module.steps.map(item => item.position)) + 1, source_code: VRAM_PURGE_SOURCE, entrypoint: "run", timeout_seconds: 120, input_mapping: inputMapping, output_mapping: outputMapping, input_ports: inputPorts, output_ports: outputPorts, is_enabled: enabled };
+      onSaved(await browserApiRequest<GenerationModule>(url, { method: target.mode === "edit" ? "PATCH" : "POST", body: JSON.stringify(body) }));
+      toast.success(target.mode === "edit" ? "Pipeline Utility actualizado." : "Pipeline Utility agregado.");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "No fue posible guardar."); } finally { setBusy(false); }
   };
 
   return <ModalShell title={target.mode === "edit" ? "Editar Pipeline Utility" : "Agregar Pipeline Utility"} onClose={onClose}>
-    <div className="rounded-2xl border border-amber-500/15 bg-amber-500/[.04] p-4 text-sm leading-6 text-amber-100/80">
-      Nodo de frontera puro: solo declaras los inputs. Cada input crea automáticamente un output idéntico con el mismo ID, nombre y tipo. El nodo nunca transforma el dato; únicamente ejecuta la limpieza completa de VRAM antes de dejarlo continuar.
-    </div>
-    <div className="mt-4 grid gap-3 md:grid-cols-3">
-      {target.mode === "create" && <Field label="Clave"><input className="gm-input" value={key} onChange={e => setKey(e.target.value)}/></Field>}
-      <Field label="Nombre"><input className="gm-input" value={name} onChange={e => setName(e.target.value)}/></Field>
-      <Field label="Acción"><div className="gm-input flex items-center text-zinc-300">Liberar VRAM · FULL</div></Field>
-    </div>
+    <div className="grid gap-3 md:grid-cols-2">{target.mode === "create" && <Field label="Clave"><input className="gm-input" value={key} onChange={e => setKey(e.target.value)}/></Field>}<Field label="Nombre"><input className="gm-input" value={name} onChange={e => setName(e.target.value)}/></Field></div>
     <Field label="Descripción"><input className="gm-input" value={description} onChange={e => setDescription(e.target.value)}/></Field>
-    <div className="mt-4 max-w-xs"><Field label="Timeout de limpieza (s)"><input type="number" min={1} max={3600} className="gm-input" value={timeoutSeconds} onChange={e => setTimeoutSeconds(Math.max(1, Number(e.target.value || 120)))}/></Field></div>
-    <div className="mt-5">
-      <NodePortsEditor title="Inputs · outputs automáticos" side="input" ports={inputPorts} setPorts={setInputPorts} comfy={false}/>
-    </div>
-    <div className="mt-4 rounded-xl border border-cyan-500/15 bg-cyan-500/5 p-3 text-xs leading-5 text-cyan-100/70">
-      Ejemplo: si agregas <code>image · image</code>, el canvas crea automáticamente también <code>image · image</code> como salida. Si agregas mask, json u otro puerto, su salida espejo aparece sola.
-    </div>
+    {step?.step_type === "utility" && <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-200">Este nodo pertenece a la implementación anterior. Elimínalo y crea un Pipeline Utility nuevo.</div>}
+    <div className="mt-5"><NodePortsEditor title="Inputs" side="input" ports={inputPorts} setPorts={setInputPorts} comfy={false}/></div>
+    <div className="mt-4 rounded-xl border border-emerald-500/15 bg-emerald-500/5 p-3"><p className="text-xs font-semibold uppercase tracking-wider text-emerald-300">Outputs automáticos</p><div className="mt-2 space-y-1">{inputPorts.map(port => <code key={port.id} className="block text-xs text-zinc-300">{port.id} <span className="text-zinc-600">→ {port.id} · {port.data_type}</span></code>)}</div></div>
+    <div className="mt-4 rounded-xl border border-amber-500/15 bg-amber-500/5 p-3 text-xs text-zinc-400">Usa internamente el mismo tipo de paso Python que ya funciona. Solo cambia la operación central por una purga FULL de VRAM y devuelve los inputs sin modificación.</div>
     <label className="mt-4 flex items-center gap-2 text-sm text-zinc-400"><input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)}/>Nodo activo</label>
-    <button onClick={() => void save()} disabled={busy} className="mt-5 h-11 w-full rounded-xl bg-red-600 font-semibold text-white disabled:opacity-40">{busy ? "Guardando..." : "Guardar Utility"}</button>
+    <button onClick={() => void save()} disabled={busy || step?.step_type === "utility"} className="mt-5 h-11 w-full rounded-xl bg-red-600 font-semibold text-white disabled:opacity-40">{busy ? "Guardando..." : "Guardar Pipeline Utility"}</button>
   </ModalShell>;
 }
 
