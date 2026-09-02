@@ -18,7 +18,7 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
-import { Box, Code2, Maximize2, Minimize2, PackageOpen, Power, PowerOff, Trash2, Workflow } from "lucide-react";
+import { Box, Code2, Maximize2, Minimize2, PackageOpen, Power, PowerOff, Sparkles, Trash2, Workflow } from "lucide-react";
 import { toast } from "sonner";
 import { browserApiRequest } from "@/lib/api/browser-api";
 import type {
@@ -40,7 +40,7 @@ type Port = {
 type CanvasData = {
   title: string;
   subtitle: string;
-  kind: "assets" | "output" | "workflow" | "python";
+  kind: "assets" | "output" | "workflow" | "python" | "utility";
   enabled: boolean;
   inputs: Port[];
   outputs: Port[];
@@ -98,6 +98,7 @@ function NodeCard({ id, data, selected }: NodeProps<FlowNode>) {
   const icon =
     data.kind === "workflow" ? <Workflow size={17} /> :
     data.kind === "python" ? <Code2 size={17} /> :
+    data.kind === "utility" ? <Sparkles size={17} /> :
     data.kind === "assets" ? <PackageOpen size={17} /> :
     <Box size={17} />;
 
@@ -106,6 +107,7 @@ function NodeCard({ id, data, selected }: NodeProps<FlowNode>) {
       <div className={`flex items-center justify-between rounded-t-xl px-3 py-2 ${
         data.kind === "workflow" ? "bg-violet-500/15" :
         data.kind === "python" ? "bg-red-500/15" :
+        data.kind === "utility" ? "bg-amber-500/15" :
         data.kind === "assets" ? "bg-cyan-500/15" : "bg-emerald-500/15"
       }`}>
         <div className="flex items-center gap-2 text-sm font-semibold text-white">{icon}{data.title}</div>
@@ -316,7 +318,7 @@ export function GenerationNodeCanvas({
     };
     for (const step of module.steps) {
       const ports = configuredPorts(step, "input");
-      if (step.step_type === "python") {
+      if (step.step_type === "python" || step.step_type === "utility") {
         for (const port of ports) {
           const path = String(step.input_mapping?.[port.id] ?? "");
           const source = sourceForPath(path);
@@ -446,10 +448,11 @@ export function GenerationNodeCanvas({
         const target = module.steps.find((step) => `step:${step.id}` === edge.target);
         const portId = findPortId(edge.target, edge.targetHandle ?? null, "input");
         if (!target) return;
-        if (target.step_type === "python") {
+        if (target.step_type === "python" || target.step_type === "utility") {
           const mapping = { ...(target.input_mapping ?? {}) };
           delete mapping[portId];
-          updated = await browserApiRequest<GenerationModule>(`/api/admin/generation-modules/${module.id}/steps/${target.id}/python`, {
+          const endpoint = target.step_type === "utility" ? "utility" : "python";
+          updated = await browserApiRequest<GenerationModule>(`/api/admin/generation-modules/${module.id}/steps/${target.id}/${endpoint}`, {
             method: "PATCH", body: JSON.stringify({ input_mapping: mapping }),
           });
         } else {
@@ -493,8 +496,9 @@ export function GenerationNodeCanvas({
       } else {
         const target = module.steps.find((step) => `step:${step.id}` === connection.target);
         if (!target) return;
-        if (target.step_type === "python") {
-          updated = await browserApiRequest<GenerationModule>(`/api/admin/generation-modules/${module.id}/steps/${target.id}/python`, {
+        if (target.step_type === "python" || target.step_type === "utility") {
+          const endpoint = target.step_type === "utility" ? "utility" : "python";
+          updated = await browserApiRequest<GenerationModule>(`/api/admin/generation-modules/${module.id}/steps/${target.id}/${endpoint}`, {
             method: "PATCH",
             body: JSON.stringify({ input_mapping: { ...(target.input_mapping ?? {}), [targetPort.id]: sourcePath } }),
           });

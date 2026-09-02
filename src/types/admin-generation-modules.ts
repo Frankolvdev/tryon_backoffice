@@ -1,7 +1,7 @@
 export type GenerationExecutionEngine = "simulated" | "local_docker" | "owner_local" | "runpod_serverless" | "modal" | "beam";
 export type GenerationModuleInputType = "image" | "file" | "text" | "integer" | "float" | "boolean" | "json";
 export type GenerationModuleOutputType = "image" | "images" | "file" | "json" | "metadata";
-export type GenerationModuleStepType = "workflow" | "python";
+export type GenerationModuleStepType = "workflow" | "python" | "utility";
 
 export interface GenerationModuleInput {
   id?: number; key: string; name: string; description?: string | null;

@@ -30,7 +30,7 @@ const outputTypes = ["image", "images", "file", "json", "metadata"] as const;
 const emptyInput = (position: number): GenerationModuleInput => ({ key: `input_${position + 1}`, name: "Nueva entrada", input_type: "image", position, is_required: true, validation: {} });
 const emptyOutput = (position: number): GenerationModuleOutput => ({ key: `output_${position + 1}`, name: "Nueva salida", output_type: "image", position, is_required: true, metadata: {} });
 
-type EditorTarget = { mode: "create" | "edit"; type: "workflow" | "python"; step?: GenerationModuleStep } | null;
+type EditorTarget = { mode: "create" | "edit"; type: "workflow" | "python" | "utility"; step?: GenerationModuleStep } | null;
 type Port = { key: string; label: string; type: string; path: string; origin: string };
 type ExecutionTarget = { provider: string; value: string; label: string; build_id: number; deployment_id?: string | null; runtime_name?: string | null; version?: string | null; image_tag?: string | null };
 type ExecutionTargetResponse = { items: Record<string, ExecutionTarget[]> };
@@ -259,7 +259,7 @@ function ModuleEditor({ module, savedModule, hasUnsavedChanges, pricingRules, ex
       <div>
         <div className="mb-3 flex flex-col gap-3 rounded-2xl border border-white/7 bg-black/25 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div><p className="text-[10px] font-semibold uppercase tracking-[.22em] text-zinc-500">Nodos disponibles</p><p className="mt-1 text-xs text-zinc-600">Agrega nuevos pasos al pipeline antes de conectarlos en el canvas.</p></div>
-          <div className="flex flex-wrap gap-2"><button onClick={() => onOpenEditor({ mode: "create", type: "workflow" })} className="gm-secondary"><Workflow size={15}/>Workflow</button><button onClick={() => onOpenEditor({ mode: "create", type: "python" })} className="gm-secondary"><Code2 size={15}/>Python</button></div>
+          <div className="flex flex-wrap gap-2"><button onClick={() => onOpenEditor({ mode: "create", type: "workflow" })} className="gm-secondary"><Workflow size={15}/>Workflow</button><button onClick={() => onOpenEditor({ mode: "create", type: "python" })} className="gm-secondary"><Code2 size={15}/>Python</button><button onClick={() => onOpenEditor({ mode: "create", type: "utility" })} className="gm-secondary"><Sparkles size={15}/>Pipeline Utility</button></div>
         </div>
         <div className="mb-4"><h3 className="text-sm font-semibold uppercase tracking-[.18em] text-zinc-400">Canvas de nodos</h3><p className="mt-1 text-xs text-zinc-600">Conecta outputs con inputs arrastrando entre los puertos, igual que en ComfyUI.</p></div><GenerationNodeCanvas module={module} onModule={setModule} onEdit={step=>onOpenEditor({mode:"edit",type:step.step_type,step})}/>
       </div>
@@ -311,7 +311,7 @@ function FlowConnector({ previous, current, module }: { previous: GenerationModu
 function StepNode({ step, module, ...props }: { step: GenerationModuleStep; module: GenerationModule; draggable: boolean; onDragStart: () => void; onDragOver: (event: DragEvent<HTMLDivElement>) => void; onDrop: () => void; onEdit: () => void; onDuplicate: () => void; onDelete: () => void }) {
   const inputs = describeStepInputs(step, module); const outputs = describeStepOutputs(step, module);
   return <div draggable={props.draggable} onDragStart={props.onDragStart} onDragOver={props.onDragOver} onDrop={props.onDrop} className="group rounded-2xl border border-white/8 bg-black/25 p-4 transition hover:border-red-500/25">
-    <div className="flex items-start gap-3"><GripVertical className="mt-1 cursor-grab text-zinc-700 group-active:cursor-grabbing" size={19}/><div className={`flex h-10 w-10 items-center justify-center rounded-xl ${step.step_type === "workflow" ? "bg-purple-500/10 text-purple-300" : "bg-red-500/10 text-red-300"}`}>{step.step_type === "workflow" ? <Workflow size={19}/> : <Code2 size={19}/>}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-medium text-white">{step.name}</p><span className="rounded-full bg-white/5 px-2 py-1 font-mono text-[10px] text-zinc-500">{step.key}</span><span className={`rounded-full px-2 py-1 text-[10px] ${step.is_enabled ? "bg-emerald-500/10 text-emerald-400" : "bg-zinc-800 text-zinc-500"}`}>{step.is_enabled ? "Activo" : "Inactivo"}</span></div><div className="mt-3 grid gap-3 md:grid-cols-2"><PortGroup title="Recibe" ports={inputs}/><PortGroup title="Produce" ports={outputs}/></div></div><div className="flex gap-1"><button onClick={props.onEdit} className="gm-icon" title="Editar"><Pencil size={15}/></button><button onClick={props.onDuplicate} className="gm-icon" title="Duplicar"><Copy size={15}/></button><button onClick={props.onDelete} className="gm-icon text-red-400" title="Eliminar"><Trash2 size={15}/></button></div></div>
+    <div className="flex items-start gap-3"><GripVertical className="mt-1 cursor-grab text-zinc-700 group-active:cursor-grabbing" size={19}/><div className={`flex h-10 w-10 items-center justify-center rounded-xl ${step.step_type === "workflow" ? "bg-purple-500/10 text-purple-300" : step.step_type === "utility" ? "bg-amber-500/10 text-amber-300" : "bg-red-500/10 text-red-300"}`}>{step.step_type === "workflow" ? <Workflow size={19}/> : step.step_type === "utility" ? <Sparkles size={19}/> : <Code2 size={19}/>}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-medium text-white">{step.name}</p><span className="rounded-full bg-white/5 px-2 py-1 font-mono text-[10px] text-zinc-500">{step.key}</span><span className={`rounded-full px-2 py-1 text-[10px] ${step.is_enabled ? "bg-emerald-500/10 text-emerald-400" : "bg-zinc-800 text-zinc-500"}`}>{step.is_enabled ? "Activo" : "Inactivo"}</span></div><div className="mt-3 grid gap-3 md:grid-cols-2"><PortGroup title="Recibe" ports={inputs}/><PortGroup title="Produce" ports={outputs}/></div></div><div className="flex gap-1"><button onClick={props.onEdit} className="gm-icon" title="Editar"><Pencil size={15}/></button><button onClick={props.onDuplicate} className="gm-icon" title="Duplicar"><Copy size={15}/></button><button onClick={props.onDelete} className="gm-icon text-red-400" title="Eliminar"><Trash2 size={15}/></button></div></div>
   </div>;
 }
 function PortGroup({ title, ports }: { title: string; ports: Port[] }) { return <div><p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">{title}</p><div className="flex flex-wrap gap-1.5">{ports.length ? ports.slice(0, 6).map(port => <PortChip key={`${port.origin}-${port.key}`} label={port.label} type={port.type}/>) : <span className="text-xs text-zinc-700">Contexto completo</span>}</div></div>; }
@@ -371,7 +371,9 @@ function ContractEditor({ module, setModule }: { module: GenerationModule; setMo
 }
 
 function StepEditor({ module, target, onClose, onSaved }: { module: GenerationModule; target: NonNullable<EditorTarget>; onClose: () => void; onSaved: (module: GenerationModule) => void }) {
-  return target.type === "workflow" ? <WorkflowStepEditor module={module} target={target} onClose={onClose} onSaved={onSaved}/> : <PythonStepEditor module={module} target={target} onClose={onClose} onSaved={onSaved}/>;
+  if (target.type === "workflow") return <WorkflowStepEditor module={module} target={target} onClose={onClose} onSaved={onSaved}/>;
+  if (target.type === "utility") return <UtilityStepEditor module={module} target={target} onClose={onClose} onSaved={onSaved}/>;
+  return <PythonStepEditor module={module} target={target} onClose={onClose} onSaved={onSaved}/>;
 }
 function emptyPort(side: "input" | "output", index: number): GenerationNodePort {
   return { id: `${side}_${index + 1}`, label: `${side === "input" ? "Entrada" : "Salida"} ${index + 1}`, data_type: "image", node_id: "", field: side === "input" ? "image" : "images", is_required: true };
@@ -445,6 +447,85 @@ function WorkflowStepEditor({ module, target, onClose, onSaved }: { module: Gene
     <div className="mt-5 grid gap-4 xl:grid-cols-2"><NodePortsEditor title="Inputs del Workflow" side="input" ports={inputPorts} setPorts={setInputPorts} comfy/><NodePortsEditor title="Outputs del Workflow" side="output" ports={outputPorts} setPorts={setOutputPorts} comfy/></div>
     <label className="mt-4 flex items-center gap-2 text-sm text-zinc-400"><input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)}/>Nodo activo</label>
     <button onClick={() => void save()} disabled={busy || !parsed} className="mt-5 h-11 w-full rounded-xl bg-red-600 font-semibold text-white disabled:opacity-40">{busy ? "Guardando..." : "Guardar Workflow"}</button>
+  </ModalShell>;
+}
+
+function UtilityStepEditor({ module, target, onClose, onSaved }: { module: GenerationModule; target: NonNullable<EditorTarget>; onClose: () => void; onSaved: (module: GenerationModule) => void }) {
+  const step = target.step;
+  const config = step?.configuration ?? {};
+  const [key, setKey] = useState(step?.key ?? `utility_${module.steps.length + 1}`);
+  const [name, setName] = useState(step?.name ?? "Liberar VRAM");
+  const [description, setDescription] = useState(step?.description ?? "Libera modelos y caché de VRAM entre etapas del pipeline.");
+  const [timeoutSeconds, setTimeoutSeconds] = useState(Number(config.timeout_seconds ?? 120));
+  const [inputPorts, setInputPorts] = useState<GenerationNodePort[]>(
+    ((config.input_ports ?? []) as GenerationNodePort[]).length
+      ? (config.input_ports as GenerationNodePort[])
+      : [{ id: "image", label: "Imagen", data_type: "image", is_required: true }],
+  );
+  const [outputPorts, setOutputPorts] = useState<GenerationNodePort[]>(
+    ((config.output_ports ?? []) as GenerationNodePort[]).length
+      ? (config.output_ports as GenerationNodePort[])
+      : [{ id: "image", label: "Imagen", data_type: "image", is_required: true }],
+  );
+  const [enabled, setEnabled] = useState(step?.is_enabled ?? true);
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    if (!inputPorts.length || !outputPorts.length) return toast.error("El nodo necesita al menos un input y un output.");
+    if (!inputPorts.every(port => port.id && port.label) || !outputPorts.every(port => port.id && port.label)) return toast.error("Completa IDs y títulos de todos los puertos.");
+    setBusy(true);
+    try {
+      const existingInputMapping = step?.input_mapping ?? {};
+      const inputMapping = Object.fromEntries(
+        inputPorts
+          .filter(port => existingInputMapping[port.id] !== undefined)
+          .map(port => [port.id, existingInputMapping[port.id]]),
+      );
+      const outputMapping = Object.fromEntries(
+        outputPorts.map((port, index) => {
+          const existing = step?.output_mapping?.[port.id];
+          const matchedInput = inputPorts.find(input => input.id === port.id) ?? inputPorts[index] ?? inputPorts[0];
+          return [port.id, String(existing ?? matchedInput?.id ?? "")];
+        }),
+      );
+      const url = target.mode === "edit"
+        ? `/api/admin/generation-modules/${module.id}/steps/${step!.id}/utility`
+        : `/api/admin/generation-modules/${module.id}/steps/utility`;
+      const body = target.mode === "edit"
+        ? { name, description, action: "comfyui_vram_purge", timeout_seconds: timeoutSeconds, input_mapping: inputMapping, output_mapping: outputMapping, input_ports: inputPorts, output_ports: outputPorts, is_enabled: enabled }
+        : { key, name, description, position: Math.max(-1, ...module.steps.map(item => item.position)) + 1, action: "comfyui_vram_purge", timeout_seconds: timeoutSeconds, input_mapping: inputMapping, output_mapping: outputMapping, input_ports: inputPorts, output_ports: outputPorts, is_enabled: enabled };
+      onSaved(await browserApiRequest<GenerationModule>(url, {
+        method: target.mode === "edit" ? "PATCH" : "POST",
+        body: JSON.stringify(body),
+      }));
+      toast.success(target.mode === "edit" ? "Utility actualizada." : "Utility agregada.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible guardar.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return <ModalShell title={target.mode === "edit" ? "Editar Pipeline Utility" : "Agregar Pipeline Utility"} onClose={onClose}>
+    <div className="rounded-2xl border border-amber-500/15 bg-amber-500/[.04] p-4 text-sm leading-6 text-amber-100/80">
+      Nodo simple de frontera: recibe datos, ejecuta una limpieza completa de VRAM en el mismo ComfyUI del runtime y entrega los mismos datos por sus outputs. No necesita workflow JSON ni IDs internos de ComfyUI.
+    </div>
+    <div className="mt-4 grid gap-3 md:grid-cols-3">
+      {target.mode === "create" && <Field label="Clave"><input className="gm-input" value={key} onChange={e => setKey(e.target.value)}/></Field>}
+      <Field label="Nombre"><input className="gm-input" value={name} onChange={e => setName(e.target.value)}/></Field>
+      <Field label="Acción"><div className="gm-input flex items-center text-zinc-300">Liberar VRAM · FULL</div></Field>
+    </div>
+    <Field label="Descripción"><input className="gm-input" value={description} onChange={e => setDescription(e.target.value)}/></Field>
+    <div className="mt-4 max-w-xs"><Field label="Timeout de limpieza (s)"><input type="number" min={1} max={3600} className="gm-input" value={timeoutSeconds} onChange={e => setTimeoutSeconds(Math.max(1, Number(e.target.value || 120)))}/></Field></div>
+    <div className="mt-5 grid gap-4 xl:grid-cols-2">
+      <NodePortsEditor title="Inputs" side="input" ports={inputPorts} setPorts={setInputPorts} comfy={false}/>
+      <NodePortsEditor title="Outputs passthrough" side="output" ports={outputPorts} setPorts={setOutputPorts} comfy={false}/>
+    </div>
+    <div className="mt-4 rounded-xl border border-cyan-500/15 bg-cyan-500/5 p-3 text-xs leading-5 text-cyan-100/70">
+      Si el input y el output tienen el mismo ID (por ejemplo <code>image</code>), el output reenvía automáticamente ese mismo valor. Luego solo conectas Pony → Utility → Flux desde el canvas.
+    </div>
+    <label className="mt-4 flex items-center gap-2 text-sm text-zinc-400"><input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)}/>Nodo activo</label>
+    <button onClick={() => void save()} disabled={busy} className="mt-5 h-11 w-full rounded-xl bg-red-600 font-semibold text-white disabled:opacity-40">{busy ? "Guardando..." : "Guardar Pipeline Utility"}</button>
   </ModalShell>;
 }
 
