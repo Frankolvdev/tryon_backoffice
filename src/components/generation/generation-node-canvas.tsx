@@ -17,6 +17,7 @@ import {
   type Edge,
   type Node,
   type NodeProps,
+  type NodeDragHandler,
 } from "@xyflow/react";
 import { Box, Code2, Maximize2, Minimize2, PackageOpen, Power, PowerOff, Sparkles, Trash2, Workflow } from "lucide-react";
 import { toast } from "sonner";
@@ -51,6 +52,58 @@ type CanvasData = {
 type FlowNode = Node<CanvasData>;
 
 const VRAM_PURGE_SOURCE_MARKER = "TRYON_BUILTIN_COMFYUI_VRAM_PURGE_PASSTHROUGH_V1";
+
+type CanonicalOrderResult = { ordered: GenerationModuleStep[]; cycleKeys: string[] };
+
+function canonicalStepOrder(module: GenerationModule): CanonicalOrderResult {
+  const steps = [...module.steps];
+  const byKey = new Map(steps.map((step) => [step.key, step]));
+  const dependencies = new Map<number, Set<number>>(steps.map((step) => [step.id, new Set<number>()]));
+
+  const registerSource = (target: GenerationModuleStep, rawPath: unknown) => {
+    if (typeof rawPath !== "string" || !rawPath.includes(".")) return;
+    const sourceKey = rawPath.split(".", 1)[0];
+    const source = byKey.get(sourceKey);
+    if (source && source.id !== target.id) dependencies.get(target.id)?.add(source.id);
+  };
+
+  for (const step of steps) {
+    Object.values(step.input_mapping ?? {}).forEach((path) => registerSource(step, path));
+    const bindings = (step.configuration?.input_bindings ?? []) as Array<Record<string, unknown>>;
+    bindings.forEach((binding) => registerSource(step, binding.source_path ?? binding.module_input_key));
+  }
+
+  const byId = new Map(steps.map((step) => [step.id, step]));
+  const dependents = new Map<number, Set<number>>(steps.map((step) => [step.id, new Set<number>()]));
+  const indegree = new Map<number, number>();
+  dependencies.forEach((sources, targetId) => {
+    indegree.set(targetId, sources.size);
+    sources.forEach((sourceId) => dependents.get(sourceId)?.add(targetId));
+  });
+
+  const compare = (a: number, b: number) => {
+    const left = byId.get(a)!;
+    const right = byId.get(b)!;
+    return left.position - right.position || left.key.localeCompare(right.key);
+  };
+  const ready = steps.filter((step) => (indegree.get(step.id) ?? 0) === 0).map((step) => step.id).sort(compare);
+  const ordered: GenerationModuleStep[] = [];
+  while (ready.length) {
+    const id = ready.shift()!;
+    ordered.push(byId.get(id)!);
+    [...(dependents.get(id) ?? [])].sort(compare).forEach((targetId) => {
+      const next = (indegree.get(targetId) ?? 0) - 1;
+      indegree.set(targetId, next);
+      if (next === 0) {
+        ready.push(targetId);
+        ready.sort(compare);
+      }
+    });
+  }
+
+  const cycleKeys = steps.filter((step) => (indegree.get(step.id) ?? 0) > 0).map((step) => step.key);
+  return { ordered, cycleKeys };
+}
 const isPipelineUtilityStep = (step: GenerationModuleStep) => step.step_type === "utility" || (step.step_type === "python" && String(step.configuration?.source_code ?? "").includes(VRAM_PURGE_SOURCE_MARKER));
 
 const compatibleTypes = (source: string, target: string) => {
@@ -215,16 +268,32 @@ export function GenerationNodeCanvas({
 }) {
   const orderedSteps = useMemo(() => [...module.steps].sort((a, b) => a.position - b.position), [module.steps]);
 
+  const persistCanonicalOrder = useCallback(async (candidate: GenerationModule) => {
+    const { ordered, cycleKeys } = canonicalStepOrder(candidate);
+    if (cycleKeys.length) {
+      throw new Error(`El pipeline contiene una dependencia circular: ${cycleKeys.join(" → ")}.`);
+    }
+    const normalized = ordered.map((step, position) => ({ step_id: step.id, position }));
+    const alreadyCanonical = normalized.every(({ step_id, position }) =>
+      candidate.steps.find((step) => step.id === step_id)?.position === position,
+    );
+    if (alreadyCanonical) return candidate;
+    return browserApiRequest<GenerationModule>(`/api/admin/generation-modules/${candidate.id}/steps/reorder`, {
+      method: "PUT",
+      body: JSON.stringify({ items: normalized }),
+    });
+  }, []);
+
   const deleteStep = useCallback(async (step: GenerationModuleStep) => {
     if (!confirm(`¿Eliminar el nodo “${step.name}”?`)) return;
     try {
       const updated = await browserApiRequest<GenerationModule>(`/api/admin/generation-modules/${module.id}/steps/${step.id}`, { method: "DELETE" });
-      onModule(updated);
+      onModule(await persistCanonicalOrder(updated));
       toast.success("Nodo eliminado.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo eliminar.");
     }
-  }, [module.id, onModule]);
+  }, [module.id, onModule, persistCanonicalOrder]);
 
   const buildNodes = useCallback((): FlowNode[] => {
     const nodes: FlowNode[] = [{
@@ -468,13 +537,13 @@ export function GenerationNodeCanvas({
         }
       }
       pendingEdgesRef.current.delete(edgeTargetKey(edge.target, edge.targetHandle));
-      onModule(updated);
+      onModule(await persistCanonicalOrder(updated));
       toast.success("Conexión eliminada.");
     } catch (error) {
       setEdges(buildEdges());
       toast.error(error instanceof Error ? error.message : "No se pudo desconectar.");
     }
-  }, [buildEdges, findPortId, module.id, module.steps, onModule, outputsPayload, setEdges]);
+  }, [buildEdges, findPortId, module.id, module.steps, onModule, outputsPayload, persistCanonicalOrder, setEdges]);
 
   const onConnect = useCallback(async (connection: Connection) => {
     const sourcePort = findPort(connection.source, connection.sourceHandle, "output");
@@ -550,12 +619,31 @@ export function GenerationNodeCanvas({
           return addEdge(optimisticEdge, next);
         });
       }
-      onModule(updated);
+      onModule(await persistCanonicalOrder(updated));
       toast.success("Conexión guardada.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo guardar la conexión.");
     }
-  }, [findPort, module.id, module.steps, onModule, outputsPayload, setEdges]);
+  }, [findPort, module.id, module.steps, onModule, outputsPayload, persistCanonicalOrder, setEdges]);
+
+  const onNodeDragStop = useCallback<NodeDragHandler<FlowNode>>(async (_event, draggedNode) => {
+    if (!draggedNode.id.startsWith("step:")) return;
+    const visualOrder = nodes
+      .filter((node) => node.id.startsWith("step:"))
+      .map((node) => node.id === draggedNode.id ? draggedNode : node)
+      .sort((left, right) => left.position.x - right.position.x || left.position.y - right.position.y);
+    const visualPositions = new Map(visualOrder.map((node, position) => [Number(node.id.slice(5)), position]));
+    const candidate: GenerationModule = {
+      ...module,
+      steps: module.steps.map((step) => ({ ...step, position: visualPositions.get(step.id) ?? step.position })),
+    };
+    try {
+      onModule(await persistCanonicalOrder(candidate));
+    } catch (error) {
+      setNodes(buildNodes());
+      toast.error(error instanceof Error ? error.message : "No se pudo guardar el orden del pipeline.");
+    }
+  }, [buildNodes, module, nodes, onModule, persistCanonicalOrder, setNodes]);
 
   return (
     <div
@@ -574,6 +662,7 @@ export function GenerationNodeCanvas({
         edges={edges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
+        onNodeDragStop={onNodeDragStop}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onEdgesDelete={(deleted) => void Promise.all(deleted.map(persistDisconnect))}
