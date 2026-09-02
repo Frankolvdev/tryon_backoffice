@@ -13,7 +13,7 @@ import type { RuntimeModelExportSettings } from "@/types/admin-runtime-builder";
 const input = "h-11 w-full rounded-xl border border-white/10 bg-black/25 px-3 text-sm text-white outline-none focus:border-red-500/50";
 type Tab = "docker" | "owner" | "modal" | "runpod" | "beam";
 const MODAL_REGIONS = ["us", "us-east", "us-central", "us-south", "us-west", "eu", "eu-west", "eu-north", "eu-south", "uk", "ca", "mx", "ap", "ap-northeast", "ap-southeast", "ap-south", "ap-melbourne", "jp", "au", "me", "sa", "af"];
-const MODAL_GPUS = ["T4", "L4", "A10G", "L40S", "A100-40GB", "A100-80GB", "H100", "H200", "B200"];
+const MODAL_GPUS = ["T4", "L4", "A10G", "L40S", "A100-40GB", "A100-80GB", "RTX-PRO-6000", "H100", "H200", "B200", "B300"] as const;
 const RUNPOD_GPUS = ["NVIDIA GeForce RTX 4090", "NVIDIA RTX A6000", "NVIDIA A40", "NVIDIA L4", "NVIDIA L40", "NVIDIA L40S", "NVIDIA A100 40GB", "NVIDIA A100 80GB", "NVIDIA H100 80GB", "NVIDIA H200"];
 const BEAM_SERVERLESS_GPUS = ["A10G", "RTX4090", "T4"] as const;
 const LOCAL_GPUS = ["NVIDIA GeForce RTX 5090"] as const;

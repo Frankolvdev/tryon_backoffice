@@ -1,4 +1,4 @@
-export type ModalGpu = "L4" | "L40S" | "A10G" | "A100-40GB" | "A100-80GB" | "H100";
+export type ModalGpu = "T4" | "L4" | "A10G" | "L40S" | "A100-40GB" | "A100-80GB" | "RTX-PRO-6000" | "H100" | "H200" | "B200" | "B300";
 
 export interface AiEngineSettings {
   local_parallel_executions: number;
