@@ -462,17 +462,14 @@ function UtilityStepEditor({ module, target, onClose, onSaved }: { module: Gener
       ? (config.input_ports as GenerationNodePort[])
       : [{ id: "image", label: "Imagen", data_type: "image", is_required: true }],
   );
-  const [outputPorts, setOutputPorts] = useState<GenerationNodePort[]>(
-    ((config.output_ports ?? []) as GenerationNodePort[]).length
-      ? (config.output_ports as GenerationNodePort[])
-      : [{ id: "image", label: "Imagen", data_type: "image", is_required: true }],
-  );
   const [enabled, setEnabled] = useState(step?.is_enabled ?? true);
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
-    if (!inputPorts.length || !outputPorts.length) return toast.error("El nodo necesita al menos un input y un output.");
-    if (!inputPorts.every(port => port.id && port.label) || !outputPorts.every(port => port.id && port.label)) return toast.error("Completa IDs y títulos de todos los puertos.");
+    if (!inputPorts.length) return toast.error("El nodo necesita al menos un input.");
+    if (!inputPorts.every(port => port.id && port.label)) return toast.error("Completa IDs y títulos de todos los inputs.");
+    const ids = inputPorts.map(port => port.id);
+    if (new Set(ids).size !== ids.length) return toast.error("No puede haber inputs con el mismo ID.");
     setBusy(true);
     try {
       const existingInputMapping = step?.input_mapping ?? {};
@@ -481,19 +478,12 @@ function UtilityStepEditor({ module, target, onClose, onSaved }: { module: Gener
           .filter(port => existingInputMapping[port.id] !== undefined)
           .map(port => [port.id, existingInputMapping[port.id]]),
       );
-      const outputMapping = Object.fromEntries(
-        outputPorts.map((port, index) => {
-          const existing = step?.output_mapping?.[port.id];
-          const matchedInput = inputPorts.find(input => input.id === port.id) ?? inputPorts[index] ?? inputPorts[0];
-          return [port.id, String(existing ?? matchedInput?.id ?? "")];
-        }),
-      );
       const url = target.mode === "edit"
         ? `/api/admin/generation-modules/${module.id}/steps/${step!.id}/utility`
         : `/api/admin/generation-modules/${module.id}/steps/utility`;
       const body = target.mode === "edit"
-        ? { name, description, action: "comfyui_vram_purge", timeout_seconds: timeoutSeconds, input_mapping: inputMapping, output_mapping: outputMapping, input_ports: inputPorts, output_ports: outputPorts, is_enabled: enabled }
-        : { key, name, description, position: Math.max(-1, ...module.steps.map(item => item.position)) + 1, action: "comfyui_vram_purge", timeout_seconds: timeoutSeconds, input_mapping: inputMapping, output_mapping: outputMapping, input_ports: inputPorts, output_ports: outputPorts, is_enabled: enabled };
+        ? { name, description, action: "comfyui_vram_purge", timeout_seconds: timeoutSeconds, input_mapping: inputMapping, input_ports: inputPorts, is_enabled: enabled }
+        : { key, name, description, position: Math.max(-1, ...module.steps.map(item => item.position)) + 1, action: "comfyui_vram_purge", timeout_seconds: timeoutSeconds, input_mapping: inputMapping, input_ports: inputPorts, is_enabled: enabled };
       onSaved(await browserApiRequest<GenerationModule>(url, {
         method: target.mode === "edit" ? "PATCH" : "POST",
         body: JSON.stringify(body),
@@ -508,7 +498,7 @@ function UtilityStepEditor({ module, target, onClose, onSaved }: { module: Gener
 
   return <ModalShell title={target.mode === "edit" ? "Editar Pipeline Utility" : "Agregar Pipeline Utility"} onClose={onClose}>
     <div className="rounded-2xl border border-amber-500/15 bg-amber-500/[.04] p-4 text-sm leading-6 text-amber-100/80">
-      Nodo simple de frontera: recibe datos, ejecuta una limpieza completa de VRAM en el mismo ComfyUI del runtime y entrega los mismos datos por sus outputs. No necesita workflow JSON ni IDs internos de ComfyUI.
+      Nodo de frontera puro: solo declaras los inputs. Cada input crea automáticamente un output idéntico con el mismo ID, nombre y tipo. El nodo nunca transforma el dato; únicamente ejecuta la limpieza completa de VRAM antes de dejarlo continuar.
     </div>
     <div className="mt-4 grid gap-3 md:grid-cols-3">
       {target.mode === "create" && <Field label="Clave"><input className="gm-input" value={key} onChange={e => setKey(e.target.value)}/></Field>}
@@ -517,15 +507,14 @@ function UtilityStepEditor({ module, target, onClose, onSaved }: { module: Gener
     </div>
     <Field label="Descripción"><input className="gm-input" value={description} onChange={e => setDescription(e.target.value)}/></Field>
     <div className="mt-4 max-w-xs"><Field label="Timeout de limpieza (s)"><input type="number" min={1} max={3600} className="gm-input" value={timeoutSeconds} onChange={e => setTimeoutSeconds(Math.max(1, Number(e.target.value || 120)))}/></Field></div>
-    <div className="mt-5 grid gap-4 xl:grid-cols-2">
-      <NodePortsEditor title="Inputs" side="input" ports={inputPorts} setPorts={setInputPorts} comfy={false}/>
-      <NodePortsEditor title="Outputs passthrough" side="output" ports={outputPorts} setPorts={setOutputPorts} comfy={false}/>
+    <div className="mt-5">
+      <NodePortsEditor title="Inputs · outputs automáticos" side="input" ports={inputPorts} setPorts={setInputPorts} comfy={false}/>
     </div>
     <div className="mt-4 rounded-xl border border-cyan-500/15 bg-cyan-500/5 p-3 text-xs leading-5 text-cyan-100/70">
-      Si el input y el output tienen el mismo ID (por ejemplo <code>image</code>), el output reenvía automáticamente ese mismo valor. Luego solo conectas Pony → Utility → Flux desde el canvas.
+      Ejemplo: si agregas <code>image · image</code>, el canvas crea automáticamente también <code>image · image</code> como salida. Si agregas mask, json u otro puerto, su salida espejo aparece sola.
     </div>
     <label className="mt-4 flex items-center gap-2 text-sm text-zinc-400"><input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)}/>Nodo activo</label>
-    <button onClick={() => void save()} disabled={busy} className="mt-5 h-11 w-full rounded-xl bg-red-600 font-semibold text-white disabled:opacity-40">{busy ? "Guardando..." : "Guardar Pipeline Utility"}</button>
+    <button onClick={() => void save()} disabled={busy} className="mt-5 h-11 w-full rounded-xl bg-red-600 font-semibold text-white disabled:opacity-40">{busy ? "Guardando..." : "Guardar Utility"}</button>
   </ModalShell>;
 }
 
