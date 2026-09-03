@@ -22,7 +22,7 @@ export interface RuntimeValidatedProfileList {
 }
 
 export interface RuntimeBuilderConfig {
-  id: number; name: string; provider: "modal" | "runpod" | "beam" | "local"; runtime_name: string; runtime_version: string; validated_profile_id: string; python_version: string; cuda_version: string;
+  id: number; name: string; provider: "modal" | "runpod" | "beam" | "local"; gpu: string; runtime_name: string; runtime_version: string; validated_profile_id: string; python_version: string; cuda_version: string;
   pytorch_index_url: string; comfyui_repository: string; comfyui_commit: string | null;
   target_platform: string; registry_image: string; include_comfyui_manager: boolean;
   custom_nodes: RuntimeCustomNode[]; python_dependencies: RuntimePythonDependency[];
@@ -221,5 +221,5 @@ export interface RuntimeDeployment {
   finished_at: string | null;
 }
 
-export interface RuntimeBuilderProfileSummary { id:number; name:string; provider:string; runtime_name:string; runtime_version:string; registry_image:string; is_active:boolean; updated_at:string; }
+export interface RuntimeBuilderProfileSummary { id:number; name:string; provider:string; gpu:string; runtime_name:string; runtime_version:string; registry_image:string; is_active:boolean; updated_at:string; }
 export interface RuntimeBuilderProfileList { items: RuntimeBuilderProfileSummary[]; }

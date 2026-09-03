@@ -142,6 +142,16 @@ export default function GenerationModulesPage() {
     moduleDraftFingerprint(selected) !== moduleDraftFingerprint(persistedSelected),
   );
 
+  const cloneSelectedModule = async () => {
+    if (!selected) return;
+    const name = window.prompt("Nombre del módulo clonado (debe ser diferente):", `${selected.name} copia`)?.trim();
+    if (!name) return;
+    try {
+      const cloned = await browserApiRequest<GenerationModule>(`/api/admin/generation-modules/${selected.id}/clone`, { method:"POST", body:JSON.stringify({name, activate:false}) });
+      await load(); setSelected(cloned); toast.success("Módulo clonado completo; se creó inactivo para revisión.");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "No fue posible clonar el módulo."); }
+  };
+
   const deleteSelectedModule = async () => {
     if (!selected) return;
     const accepted = window.confirm(
@@ -178,7 +188,7 @@ export default function GenerationModulesPage() {
           </button>;
         })}</div>
       </section>
-      {!selected ? <EmptyState/> : <ModuleEditor module={selected} savedModule={persistedSelected} hasUnsavedChanges={hasUnsavedModuleChanges} pricingRules={pricingRules} executionTargets={executionTargets} setModule={setSelected} saving={saving} deleting={deletingModule} onSave={saveModule} onDelete={deleteSelectedModule} onOpenEditor={setEditor}/>} 
+      {!selected ? <EmptyState/> : <ModuleEditor module={selected} savedModule={persistedSelected} hasUnsavedChanges={hasUnsavedModuleChanges} pricingRules={pricingRules} executionTargets={executionTargets} setModule={setSelected} saving={saving} deleting={deletingModule} onSave={saveModule} onClone={cloneSelectedModule} onDelete={deleteSelectedModule} onOpenEditor={setEditor}/>} 
     </div>
     {editor && selected && <StepEditor module={selected} target={editor} onClose={() => setEditor(null)} onSaved={module => { setSelected(module); setEditor(null); void load(); }}/>} 
     {createOpen && <CreateModuleModal onClose={() => setCreateOpen(false)} onCreated={module => { setItems(current => [module, ...current]); setSelected(module); setCreateOpen(false); }}/>} 
@@ -187,10 +197,10 @@ export default function GenerationModulesPage() {
 
 function EmptyState() { return <section className="luxia-panel flex min-h-[560px] flex-col items-center justify-center rounded-3xl p-10 text-center"><Boxes size={44} className="text-zinc-800"/><h2 className="mt-5 text-xl font-semibold text-white">Selecciona un módulo</h2><p className="mt-2 max-w-md text-sm text-zinc-600">Aquí aparecerá el editor visual del pipeline.</p></section>; }
 
-function ModuleEditor({ module, savedModule, hasUnsavedChanges, pricingRules, executionTargets, setModule, saving, deleting, onSave, onDelete, onOpenEditor }: { module: GenerationModule; savedModule: GenerationModule | null; hasUnsavedChanges: boolean; pricingRules: PricingRuleResponse[]; executionTargets: Record<string, ExecutionTarget[]>; setModule: (module: GenerationModule) => void; saving: boolean; deleting: boolean; onSave: () => void; onDelete: () => void; onOpenEditor: (target: EditorTarget) => void }) {
+function ModuleEditor({ module, savedModule, hasUnsavedChanges, pricingRules, executionTargets, setModule, saving, deleting, onSave, onClone, onDelete, onOpenEditor }: { module: GenerationModule; savedModule: GenerationModule | null; hasUnsavedChanges: boolean; pricingRules: PricingRuleResponse[]; executionTargets: Record<string, ExecutionTarget[]>; setModule: (module: GenerationModule) => void; saving: boolean; deleting: boolean; onSave: () => void; onClone: () => void; onDelete: () => void; onOpenEditor: (target: EditorTarget) => void }) {
   const patch = (value: Partial<GenerationModule>) => setModule({ ...module, ...value });
   return <section className="luxia-panel overflow-hidden rounded-3xl">
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/6 p-5"><div className="flex items-center gap-3"><span className={`h-3 w-3 rounded-full ${module.is_active ? "bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,.9)]" : "bg-red-500 shadow-[0_0_14px_rgba(239,68,68,.55)]"}`}/><div><h2 className="text-xl font-semibold text-white">{module.name}</h2><p className="mt-1 font-mono text-xs text-zinc-600">{module.key} · ID {module.id} · {module.is_active ? "ACTIVO" : "INACTIVO"}</p></div></div><div className="flex flex-wrap gap-2"><button onClick={onDelete} disabled={deleting || saving} className="inline-flex h-10 items-center gap-2 rounded-xl border border-red-500/20 bg-red-950/15 px-4 text-sm font-semibold text-red-300 disabled:opacity-50">{deleting ? <LoaderCircle size={16} className="animate-spin"/> : <Trash2 size={16}/>}Eliminar módulo</button><button onClick={onSave} disabled={saving || deleting} className="inline-flex h-10 items-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-50">{saving ? <LoaderCircle size={16} className="animate-spin"/> : <Save size={16}/>}Guardar módulo</button></div></div>
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/6 p-5"><div className="flex items-center gap-3"><span className={`h-3 w-3 rounded-full ${module.is_active ? "bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,.9)]" : "bg-red-500 shadow-[0_0_14px_rgba(239,68,68,.55)]"}`}/><div><h2 className="text-xl font-semibold text-white">{module.name}</h2><p className="mt-1 font-mono text-xs text-zinc-600">{module.key} · ID {module.id} · {module.is_active ? "ACTIVO" : "INACTIVO"}</p></div></div><div className="flex flex-wrap gap-2"><button onClick={onClone} disabled={deleting || saving} className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 px-4 text-sm font-semibold text-zinc-200 disabled:opacity-50"><Copy size={16}/>Clonar módulo</button><button onClick={onDelete} disabled={deleting || saving} className="inline-flex h-10 items-center gap-2 rounded-xl border border-red-500/20 bg-red-950/15 px-4 text-sm font-semibold text-red-300 disabled:opacity-50">{deleting ? <LoaderCircle size={16} className="animate-spin"/> : <Trash2 size={16}/>}Eliminar módulo</button><button onClick={onSave} disabled={saving || deleting} className="inline-flex h-10 items-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-50">{saving ? <LoaderCircle size={16} className="animate-spin"/> : <Save size={16}/>}Guardar módulo</button></div></div>
     <div className="space-y-7 p-5">
       <div className="grid gap-4 md:grid-cols-6"><Field label="Nombre"><input value={module.name} onChange={e => patch({ name: e.target.value })} className="gm-input"/></Field><Field label="Categoría"><input value={module.category} onChange={e => patch({ category: e.target.value })} className="gm-input"/></Field><Field label="Motor"><select value={module.default_execution_engine ?? ""} onChange={e => {
         const nextEngine = e.target.value ? e.target.value as GenerationExecutionEngine : null;

@@ -120,7 +120,7 @@ export default function Page() {
       if (key === "modal") {
         const [saved, savedEngine] = await Promise.all([
           browserApiRequest<ModalProviderConfig>("/api/admin/infrastructure-providers/modal", { method: "PUT", body: JSON.stringify(value) }),
-          browserApiRequest<AiEngineSettings>("/api/admin/ai-providers/engine-settings", { method: "PUT", body: JSON.stringify({ ...modalEngine, modal_gpu: (value as ModalProviderConfig).gpu }) }),
+          browserApiRequest<AiEngineSettings>("/api/admin/ai-providers/engine-settings", { method: "PUT", body: JSON.stringify(modalEngine) }),
         ]);
         setModal({ ...modalDefault, ...saved, token_secret: "" });
         setModalEngine(savedEngine);
@@ -169,7 +169,6 @@ export default function Page() {
         <F label="Token Secret"><input type="password" className={input} value={modal.token_secret} placeholder={modal.token_secret_configured ? 'Configurado; vacío conserva' : 'Token secret'} onChange={e => setModal({ ...modal, token_secret: e.target.value })} /></F>
         <F label="App por defecto para despliegue"><input className={input} value={modal.app_name} onChange={e => setModal({ ...modal, app_name: e.target.value })} /><span className="block text-xs text-zinc-500">Runtime Builder usa este nombre al desplegar. Las generaciones usan la App seleccionada en cada Módulo de Generación.</span></F>
         <F label="Volumen"><input className={input} value={modal.volume_name} onChange={e => setModal({ ...modal, volume_name: e.target.value })} /></F>
-        <F label="GPU"><select className={input} value={modal.gpu} onChange={e => setModal({ ...modal, gpu: e.target.value })}>{MODAL_GPUS.map(gpu => <option key={gpu} value={gpu}>{gpu}</option>)}</select></F>
         <label className="flex items-center gap-3 rounded-xl border border-white/8 p-4 text-sm text-zinc-300"><input type="checkbox" checked={modal.region_mode === "fixed"} onChange={e => setModal({ ...modal, region_mode: e.target.checked ? "fixed" : "automatic" })} />Fijar región de Modal</label>
         <F label="Región"><select className={input} disabled={modal.region_mode !== "fixed"} value={modal.region} onChange={e => setModal({ ...modal, region: e.target.value })}>{MODAL_REGIONS.map(region => <option key={region} value={region}>{region}</option>)}</select><span className="block text-xs text-zinc-500">En automático, Modal elige la región según disponibilidad.</span></F>
         <NumberInput label="Contenedores mínimos" value={modalEngine.modal_min_containers} onChange={v => updateModalEngine('modal_min_containers', v)} />
