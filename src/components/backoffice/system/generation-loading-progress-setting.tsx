@@ -44,7 +44,7 @@ export function GenerationLoadingProgressSetting({
             description: "Controla únicamente el progreso visual de generaciones. No afecta uploads ni otros loadings.",
             value_type: "string",
             value: next,
-            default_value: "backend",
+            default_value: "elapsed_estimate",
             is_public: true,
             is_editable: true,
             is_sensitive: false,
@@ -53,7 +53,7 @@ export function GenerationLoadingProgressSetting({
           }),
         });
       }
-      toast.success(next === "backend" ? "Las generaciones usarán el progreso del Backend." : "Las generaciones usarán tiempo transcurrido/ETA.");
+      toast.success(next === "backend" ? "Las generaciones usarán históricos de Tiempo backend." : "Las generaciones usarán el tiempo real de procesamiento, como antes.");
       await onSaved();
     } catch (error) {
       setMode(initial);
@@ -80,17 +80,17 @@ export function GenerationLoadingProgressSetting({
       <div className="grid gap-4 p-5 lg:grid-cols-2">
         <button type="button" disabled={saving} onClick={() => void save("backend")} className={`rounded-2xl border p-5 text-left transition ${mode === "backend" ? "border-red-500/35 bg-red-950/15" : "border-white/7 bg-black/20 hover:border-white/12"}`}>
           <div className="flex items-center justify-between gap-3">
-            <span className="flex items-center gap-2 text-sm font-semibold text-white"><Server size={17} className="text-red-400" />Progreso del Backend</span>
+            <span className="flex items-center gap-2 text-sm font-semibold text-white"><Server size={17} className="text-red-400" />Tiempo backend (nuevo)</span>
             {saving && mode === "backend" ? <LoaderCircle size={16} className="animate-spin text-red-400" /> : <span className={`size-3 rounded-full border ${mode === "backend" ? "border-red-400 bg-red-500" : "border-zinc-700"}`} />}
           </div>
-          <p className="mt-3 text-xs leading-5 text-zinc-500">La barra sigue directamente <code>execution.progress</code> reportado por Backend. Es el modo predeterminado.</p>
+          <p className="mt-3 text-xs leading-5 text-zinc-500">Usa exactamente la misma animación y cálculo visual del modo anterior, pero la ETA se aprende de la columna <code>Tiempo backend</code> de Trabajos IA (<code>duration_ms</code>). No cambia pricing ni costos.</p>
         </button>
         <button type="button" disabled={saving} onClick={() => void save("elapsed_estimate")} className={`rounded-2xl border p-5 text-left transition ${mode === "elapsed_estimate" ? "border-red-500/35 bg-red-950/15" : "border-white/7 bg-black/20 hover:border-white/12"}`}>
           <div className="flex items-center justify-between gap-3">
-            <span className="flex items-center gap-2 text-sm font-semibold text-white"><TimerReset size={17} className="text-red-400" />Tiempo transcurrido / ETA</span>
+            <span className="flex items-center gap-2 text-sm font-semibold text-white"><TimerReset size={17} className="text-red-400" />Tiempo real de procesamiento (anterior)</span>
             {saving && mode === "elapsed_estimate" ? <LoaderCircle size={16} className="animate-spin text-red-400" /> : <span className={`size-3 rounded-full border ${mode === "elapsed_estimate" ? "border-red-400 bg-red-500" : "border-zinc-700"}`} />}
           </div>
-          <p className="mt-3 text-xs leading-5 text-zinc-500">Mantiene el comportamiento anterior: calcula avance visual con el tiempo real transcurrido desde <code>started_at</code> frente a la estimación aprendida del Backend.</p>
+          <p className="mt-3 text-xs leading-5 text-zinc-500">Mantiene el comportamiento que ya funcionaba: calcula el avance visual con el reloj transcurrido frente a la ETA aprendida del tiempo real de procesamiento del proveedor/Modal.</p>
         </button>
       </div>
     </section>
