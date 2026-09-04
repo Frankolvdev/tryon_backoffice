@@ -301,3 +301,41 @@ export interface OperationalExpense {
   spent_at:string;
   created_at:string;
 }
+
+export type CashboxMovementKey =
+  | "utility"
+  | "infrastructure_cash"
+  | "infrastructure_funded"
+  | "pending_recovery"
+  | "blocked_profit"
+  | "withdrawals"
+  | "operational";
+
+export interface CashboxMovement {
+  id:string;
+  occurred_at:string;
+  movement_type:string;
+  label:string;
+  amount_usd:number;
+  balance_before_usd:number;
+  balance_after_usd:number;
+  source_type:string;
+  source_id?:string|null;
+  lot_id?:number|null;
+  execution_id?:string|null;
+  provider?:string|null;
+  user_id?:number|null;
+  user_email?:string|null;
+  details:Record<string,unknown>;
+}
+
+export interface CashboxMovementHistory {
+  cashbox_key:CashboxMovementKey;
+  label:string;
+  mode:"history"|"current_composition"|string;
+  current_balance_usd:number;
+  reconstructed_balance_usd:number;
+  reconciled:boolean;
+  note?:string|null;
+  movements:CashboxMovement[];
+}

@@ -4,6 +4,8 @@ import {useCallback,useEffect,useState,type ReactNode} from "react";
 import {createPortal} from "react-dom";
 import {
   Banknote,
+  Download,
+  History,
   Boxes,
   CircleDollarSign,
   CircleHelp,
@@ -36,6 +38,8 @@ import type {
   TokenBag,
   TokenBagList,
   Withdrawal,
+  CashboxMovementHistory,
+  CashboxMovementKey,
 } from "@/types/finance-cashbox";
 import type {AdminUser} from "@/types/admin-users";
 
@@ -88,6 +92,93 @@ function expirationLabel(bag:TokenBag){
   return "Vencimiento";
 }
 
+
+
+const movementTypeNames:Record<string,string>={
+  commercial_profit_release:"Ganancia liberada",
+  profitability_surplus:"Extra por rentabilidad",
+  rounding_surplus:"Redondeo",
+  expiration_release:"Liberación por vencimiento",
+  withdrawal:"Retiro",
+  provider_funding:"Envío a proveedor",
+  profit_blocked:"Ganancia bloqueada",
+  profit_unblocked:"Ganancia liberada de espera",
+  operational_release:"Fondo operativo liberado",
+  operational_expense:"Gasto operativo",
+  pending_recovery:"Cobro pendiente",
+  infrastructure_cash_obligation:"Reserva/obligación IA actual",
+};
+
+function xmlCell(value:string|number,type:"String"|"Number"="String"){
+  const escaped=String(value??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
+  return `<Cell><Data ss:Type="${type}">${escaped}</Data></Cell>`;
+}
+
+function exportMovementHistoryToExcel(history:CashboxMovementHistory){
+  const headers=["Fecha y hora","Tipo","Descripción","Antes (USD)","Movimiento (USD)","Después (USD)","Bolsa","Generación","Proveedor","Usuario","Origen","ID origen","Detalle"];
+  const detail=(value:Record<string,unknown>)=>Object.entries(value||{}).map(([key,item])=>`${key}: ${String(item??"")}`).join(" | ");
+  const rows=history.movements.map(item=>[
+    date(item.occurred_at), movementTypeNames[item.movement_type]||item.movement_type, item.label,
+    Number(item.balance_before_usd||0), Number(item.amount_usd||0), Number(item.balance_after_usd||0),
+    item.lot_id??"", item.execution_id??"", item.provider??"", item.user_email||item.user_id||"",
+    item.source_type, item.source_id??"", detail(item.details),
+  ]);
+  const workbook=`<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+<Worksheet ss:Name="Movimientos"><Table>
+<Row>${headers.map(value=>xmlCell(value)).join("")}</Row>
+${rows.map(row=>`<Row>${row.map((value,index)=>xmlCell(value,index>=3&&index<=5?"Number":"String")).join("")}</Row>`).join("\n")}
+</Table></Worksheet>
+<Worksheet ss:Name="Resumen"><Table>
+<Row>${xmlCell("Caja")}${xmlCell(history.label)}</Row>
+<Row>${xmlCell("Saldo actual")}${xmlCell(history.current_balance_usd,"Number")}</Row>
+<Row>${xmlCell("Saldo reconstruido")}${xmlCell(history.reconstructed_balance_usd,"Number")}</Row>
+<Row>${xmlCell("Cuadra")}${xmlCell(history.reconciled?"Sí":"No")}</Row>
+<Row>${xmlCell("Modo")}${xmlCell(history.mode)}</Row>
+<Row>${xmlCell("Nota")}${xmlCell(history.note||"")}</Row>
+</Table></Worksheet></Workbook>`;
+  const blob=new Blob([workbook],{type:"application/vnd.ms-excel;charset=utf-8"});
+  const url=URL.createObjectURL(blob);
+  const anchor=document.createElement("a");
+  anchor.href=url;
+  anchor.download=`finanzas-${history.cashbox_key}-${new Date().toISOString().slice(0,10)}.xls`;
+  document.body.appendChild(anchor);anchor.click();anchor.remove();URL.revokeObjectURL(url);
+}
+
+function MovementHistoryModal({history,loading,onClose}:{history:CashboxMovementHistory|null;loading:boolean;onClose:()=>void}){
+  if(typeof document==="undefined")return null;
+  return createPortal(<div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/75 p-4" onMouseDown={event=>{if(event.target===event.currentTarget)onClose();}}>
+    <section className="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-3xl border border-white/10 bg-zinc-950 shadow-2xl">
+      <header className="flex items-start justify-between gap-4 border-b border-white/8 p-6">
+        <div><p className="text-[10px] font-semibold uppercase tracking-[.2em] text-emerald-300">Auditoría financiera</p><h2 className="mt-2 text-xl font-semibold text-white">{history?.label||"Movimientos"}</h2><p className="mt-2 text-sm text-zinc-500">Cada fila conserva el saldo antes, el movimiento y el saldo después.</p></div>
+        <div className="flex items-center gap-2">{history&&<button type="button" onClick={()=>exportMovementHistoryToExcel(history)} className="inline-flex h-10 items-center gap-2 rounded-xl border border-emerald-500/20 px-4 text-sm text-emerald-300 hover:bg-emerald-500/10"><Download size={16}/>Exportar Excel</button>}<button type="button" onClick={onClose} className="rounded-xl border border-white/10 p-2.5 text-zinc-400 hover:text-white"><X size={18}/></button></div>
+      </header>
+      <div className="max-h-[calc(92vh-106px)] overflow-auto p-6">
+        {loading?<div className="py-16 text-center text-zinc-500">Cargando movimientos reales…</div>:history&&<>
+          <div className="grid gap-3 md:grid-cols-3">
+            <Info label="Saldo actual de la card" value={money(history.current_balance_usd)}/>
+            <Info label="Saldo reconstruido" value={money(history.reconstructed_balance_usd)}/>
+            <Info label="Comprobación" value={history.reconciled?"CUADRA ✓":"REVISAR"}/>
+          </div>
+          {history.note&&<p className="mt-4 rounded-2xl border border-sky-500/15 bg-sky-500/[0.035] p-4 text-xs leading-6 text-sky-200/75">{history.note}</p>}
+          <div className="mt-5 overflow-x-auto rounded-2xl border border-white/6">
+            <table className="min-w-full text-left text-xs"><thead className="bg-white/[0.025] text-zinc-500"><tr>{["Fecha","Tipo","Detalle","Antes","Movimiento","Después","Referencia"].map(label=><th key={label} className="whitespace-nowrap px-3 py-3">{label}</th>)}</tr></thead>
+              <tbody>{history.movements.length===0?<tr><td colSpan={7} className="px-4 py-12 text-center text-zinc-600">Todavía no hay movimientos para esta card.</td></tr>:history.movements.map(item=><tr key={item.id} className="border-t border-white/5 align-top">
+                <td className="whitespace-nowrap px-3 py-3 text-zinc-500">{date(item.occurred_at)}</td>
+                <td className="whitespace-nowrap px-3 py-3 text-zinc-300">{movementTypeNames[item.movement_type]||sourceText(item.movement_type)}</td>
+                <td className="min-w-[260px] px-3 py-3"><p className="text-zinc-200">{item.label}</p>{item.user_email&&<p className="mt-1 text-zinc-600">{item.user_email}</p>}{item.provider&&<p className="mt-1 text-zinc-600">Proveedor: {item.provider}</p>}{Number(item.details?.economic_surplus_usd||0)>0&&<p className="mt-1 text-zinc-600">Extra económico: {money(Number(item.details.economic_surplus_usd||0))} · a utilidad: {money(Number(item.details.cash_surplus_usd||0))} · en proveedor: {money(Number(item.details.provider_held_usd||0))}</p>}</td>
+                <td className="whitespace-nowrap px-3 py-3 text-zinc-500">{money(item.balance_before_usd)}</td>
+                <td className={`whitespace-nowrap px-3 py-3 font-semibold ${item.amount_usd>=0?"text-emerald-300":"text-rose-300"}`}>{item.amount_usd>=0?"+":""}{money(item.amount_usd)}</td>
+                <td className="whitespace-nowrap px-3 py-3 text-white">{money(item.balance_after_usd)}</td>
+                <td className="whitespace-nowrap px-3 py-3 text-zinc-600">{item.execution_id?`Gen. ${item.execution_id.slice(0,8)}…`:item.lot_id?`Bolsa #${item.lot_id}`:item.source_id?`#${item.source_id}`:"—"}</td>
+              </tr>)}</tbody>
+            </table>
+          </div>
+        </>}
+      </div>
+    </section>
+  </div>,document.body);
+}
 
 function HelpTip({text}:{text:string}){
   const [open,setOpen]=useState(false);
@@ -288,6 +379,16 @@ export default function CashboxPage(){
   const [fundingMethod,setFundingMethod]=useState("");
 
   const [action,setAction]=useState<string|null>(null);
+  const [movementHistory,setMovementHistory]=useState<CashboxMovementHistory|null>(null);
+  const [movementLoading,setMovementLoading]=useState(false);
+  const [movementOpen,setMovementOpen]=useState(false);
+
+  async function openMovements(key:CashboxMovementKey){
+    setMovementOpen(true);setMovementLoading(true);setMovementHistory(null);
+    try{setMovementHistory(await browserApiRequest<CashboxMovementHistory>(`/api/admin/finances/cashbox/movements/${key}`));}
+    catch(error){toast.error(error instanceof Error?error.message:"No fue posible cargar los movimientos.");setMovementOpen(false);}
+    finally{setMovementLoading(false);}
+  }
 
   const summaryCards:Array<{
     label:string;
@@ -296,9 +397,11 @@ export default function CashboxPage(){
     className:string;
     panelClassName:string;
     help:string;
+    movementKey:CashboxMovementKey;
   }>=summary?[
     {
       label:"Dinero libre para ti",
+      movementKey:"utility",
       value:summary.available_usd,
       icon:WalletCards,
       className:"text-emerald-300",
@@ -307,6 +410,7 @@ export default function CashboxPage(){
     },
     {
       label:"IA aún en tu caja",
+      movementKey:"infrastructure_cash",
       value:summary.infrastructure_cash_available_usd,
       icon:ShieldCheck,
       className:"text-sky-300",
@@ -315,6 +419,7 @@ export default function CashboxPage(){
     },
     {
       label:"IA ya enviada",
+      movementKey:"infrastructure_funded",
       value:summary.infrastructure_funded_usd,
       icon:ServerCog,
       className:"text-violet-300",
@@ -323,6 +428,7 @@ export default function CashboxPage(){
     },
     {
       label:"Cobros pendientes",
+      movementKey:"pending_recovery",
       value:summary.pending_recovery_economic_estimated_usd,
       icon:CircleDollarSign,
       className:"text-orange-300",
@@ -331,6 +437,7 @@ export default function CashboxPage(){
     },
     {
       label:"Ganancia todavía en espera",
+      movementKey:"blocked_profit",
       value:summary.blocked_profit_usd,
       icon:Boxes,
       className:"text-amber-300",
@@ -339,6 +446,7 @@ export default function CashboxPage(){
     },
     {
       label:"Dinero ya retirado",
+      movementKey:"withdrawals",
       value:summary.withdrawals_usd,
       icon:Banknote,
       className:"text-rose-300",
@@ -347,6 +455,7 @@ export default function CashboxPage(){
     },
     {
       label:"Gastos disponibles",
+      movementKey:"operational",
       value:operational?.available_operational_funds_usd??0,
       icon:CircleDollarSign,
       className:"text-fuchsia-300",
@@ -666,7 +775,7 @@ export default function CashboxPage(){
     }
   }
 
-  return <main className="space-y-6">
+  return <><main className="space-y-6">
     <section className="luxia-panel rounded-3xl p-6">
       <div className="flex items-center justify-between gap-4">
         <div>
@@ -685,13 +794,14 @@ export default function CashboxPage(){
     {loading
       ? <div className="luxia-panel rounded-3xl p-10 text-center text-zinc-500">Calculando las cajas…</div>
       : summary&&<section className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
-        {summaryCards.map(({label,value,icon:Icon,className,panelClassName,help})=>
-          <article key={label} className={`luxia-panel rounded-3xl border p-5 ${panelClassName}`}>
-            <Icon className={className} size={20}/>
+        {summaryCards.map(({label,value,icon:Icon,className,panelClassName,help,movementKey})=>
+          <button type="button" onClick={()=>void openMovements(movementKey)} key={label} className={`luxia-panel group rounded-3xl border p-5 text-left transition hover:-translate-y-0.5 hover:border-white/20 ${panelClassName}`}>
+            <div className="flex items-center justify-between"><Icon className={className} size={20}/><History size={16} className="text-zinc-700 transition group-hover:text-zinc-300"/></div>
             <p className="mt-5 text-xs uppercase tracking-widest text-zinc-600">{label}</p>
             <p className={`mt-2 text-2xl font-semibold ${className}`}>{money(value)}</p>
             <p className="mt-3 text-xs leading-5 text-zinc-600">{help}</p>
-          </article>,
+            <p className="mt-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-700 group-hover:text-zinc-400">Click para ver movimientos</p>
+          </button>,
         )}
       </section>}
 
@@ -1187,5 +1297,5 @@ export default function CashboxPage(){
           </div>
         </article>
       </div>}
-  </main>;
+  </main>{movementOpen&&<MovementHistoryModal history={movementHistory} loading={movementLoading} onClose={()=>{setMovementOpen(false);setMovementHistory(null);}}/>}</>;
 }
