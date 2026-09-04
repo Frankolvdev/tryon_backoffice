@@ -188,7 +188,10 @@ function AccordionSection({
 
 const metricHelp:Record<string,string>={
   "Ganancia que ya está disponible":"Parte de tu ganancia que ya puedes contar como disponible.",
-  "Dinero extra ya confirmado":"Ahorros o redondeos ya confirmados después de pagar el costo real de infraestructura.",
+  "Dinero extra ya confirmado":"Extra ya confirmado por redondeo de tokens. Se mantiene separado del extra por mayor rentabilidad.",
+  "Extra por mayor rentabilidad disponible":"Dinero adicional confirmado cuando una generación usa una regla con mayor ganancia por token que la ganancia normal congelada de la bolsa. Solo muestra la parte que sigue físicamente en tu caja.",
+  "Extra por mayor rentabilidad total":"Total económico descubierto por usar módulos más rentables, antes de separar lo que pudo quedar como crédito dentro de un proveedor.",
+  "Mayor rentabilidad que quedó dentro del proveedor":"Parte del extra por mayor rentabilidad que ya está físicamente dentro de Modal, RunPod, Beam u otro proveedor y por eso no es retirable.",
   "Respaldo IA de tokens que quedan":"Dato de control: cuánto respaldo de IA corresponde a los tokens que todavía quedan en esta bolsa. No es una caja adicional.",
   "Costo real de IA generado":"Lo que las generaciones hechas con esta bolsa ya costaron realmente en IA.",
   "Dinero enviado al proveedor desde esta bolsa":"Dinero de esta bolsa que ya registraste como enviado a Modal, RunPod, Beam u otro proveedor.",
@@ -208,7 +211,8 @@ const bagTableHelp:Record<string,string>={
   "Tokens":"Muestra cuántos quedan de los que tenía originalmente. Ejemplo: 80/100 significa que todavía puede gastar 80.",
   "Pagó el cliente":"Lo que realmente pagó el cliente por esta bolsa, después de descuentos o beneficios.",
   "Ganancia":"Tu ganancia de esta bolsa según las condiciones con las que se vendió. Si hubo descuento, se descuenta de aquí.",
-  "Dinero extra":"Dinero que terminó sobrando a tu favor, por ejemplo por redondeos o porque el costo real de IA fue un poco menor.",
+  "Dinero extra":"Dinero extra por redondear tokens enteros. No incluye el extra por mayor rentabilidad de un módulo.",
+  "Extra por rentabilidad":"Dinero adicional ya confirmado porque los tokens se usaron en un módulo cuya ganancia objetivo fue mayor que la ganancia normal congelada de la bolsa.",
   "Disponible para ti":"Lo que esta bolsa ya aportó a tu dinero libre. Es ganancia más extras ya confirmados.",
   "IA aún en tu caja":"Dinero de esta bolsa destinado a IA que todavía no has enviado físicamente a Modal, RunPod, Beam u otro proveedor.",
   "IA ya enviada":"Dinero de esta bolsa que ya registraste como enviado físicamente a un proveedor de IA.",
@@ -1037,12 +1041,12 @@ export default function CashboxPage(){
       </div>
 
       <div className="mt-5 overflow-auto">
-        <table className="w-full min-w-[1480px] text-left text-sm">
+        <table className="w-full min-w-[1600px] text-left text-sm">
           <thead className="text-xs uppercase text-zinc-600">
             <tr>
               {[
                 "Bolsa","Usuario","Origen","Estado","Tokens","Pagó el cliente",
-                "Ganancia","Dinero extra","Disponible para ti",
+                "Ganancia","Dinero extra","Extra por rentabilidad","Disponible para ti",
                 "IA aún en tu caja","IA ya enviada","Vencimiento","Acción",
               ].map(label=><BagTableHead key={label} label={label}/>)}
             </tr>
@@ -1057,6 +1061,7 @@ export default function CashboxPage(){
               <td className="px-3 py-4">{money(bag.amount_paid_usd)}</td>
               <td className="px-3 py-4 text-emerald-200">{money(bag.commercial_profit_released_usd)}</td>
               <td className="px-3 py-4 text-amber-200">{money(bag.realized_extra_profit_usd)}</td>
+              <td className="px-3 py-4 text-cyan-200">{money(bag.profitability_surplus_usd)}</td>
               <td className="px-3 py-4 font-semibold text-emerald-300">{money(bag.total_available_from_bag_usd)}</td>
               <td className="px-3 py-4 text-sky-300">{money(bag.infrastructure_unfunded_usd)}</td>
               <td className="px-3 py-4 text-violet-300">{money(bag.infrastructure_funded_usd)}</td>
@@ -1089,6 +1094,9 @@ export default function CashboxPage(){
               ["Ganancia original de la compra",detail.bag.commercial_profit_total_usd],
               ["Ganancia que ya está disponible",detail.bag.commercial_profit_released_usd],
               ["Dinero extra ya confirmado",detail.bag.realized_extra_profit_usd],
+              ["Extra por mayor rentabilidad disponible",detail.bag.profitability_surplus_usd],
+              ["Extra por mayor rentabilidad total",detail.bag.profitability_surplus_total_usd],
+              ["Mayor rentabilidad que quedó dentro del proveedor",detail.bag.provider_profitability_credit_usd],
               ["Total que puedes retirar de esta bolsa",detail.bag.total_available_from_bag_usd],
               ["Respaldo IA de tokens que quedan",detail.bag.protected_infrastructure_remaining_usd],
               ["Costo real de IA generado",detail.bag.infrastructure_used_usd],
@@ -1154,7 +1162,10 @@ export default function CashboxPage(){
                   <th className="p-2 text-left">Generación</th>
                   <th>Tokens</th>
                   <th>Parte atribuida al proveedor</th>
-                  <th>Ganancia de esta bolsa</th>
+                  <th>Ganancia de la bolsa</th>
+                  <th>Extra por rentabilidad</th>
+                  <th>Redondeo</th>
+                  <th>Ganancia total</th>
                   <th>Fecha</th>
                 </tr>
               </thead>
@@ -1164,7 +1175,10 @@ export default function CashboxPage(){
                     <td className="p-2 text-zinc-300">{generation.execution_id.slice(0,8)}</td>
                     <td className="text-center">{generation.tokens_used}</td>
                     <td className="text-center">{money(generation.infrastructure_cost_usd)}</td>
-                    <td className="text-center">{money(generation.company_profit_usd)}</td>
+                    <td className="text-center">{money(generation.company_profit_usd - generation.profitability_surplus_usd - generation.rounding_surplus_usd)}</td>
+                    <td className="text-center text-cyan-200">{money(generation.profitability_surplus_usd)}</td>
+                    <td className="text-center text-amber-200">{money(generation.rounding_surplus_usd)}</td>
+                    <td className="text-center font-semibold text-emerald-300">{money(generation.company_profit_usd)}</td>
                     <td className="text-center">{date(generation.created_at)}</td>
                   </tr>,
                 )}

@@ -16,6 +16,8 @@ type TokenBag = {
   profit_without_benefit_usd?: number;
   benefit_given_usd?: number;
   company_profit_usd?: number;
+  profitability_surplus_per_token_usd?: number;
+  profitability_surplus_usd?: number;
   coupon_code?: string | null;
   plan_name?: string | null;
   effective_token_value_usd?: number;
@@ -46,6 +48,7 @@ type FinanceBreakdown = {
   profit_rounding_surplus_usd?: number;
   profit_after_customer_benefits_usd?: number;
   rounding_surplus_for_company_usd?: number;
+  profitability_surplus_for_company_usd?: number;
   profit_applied?: boolean;
   billing_policy_key?: string;
   termination_status?: string;
@@ -171,6 +174,9 @@ const mergeTokenBags = (bags: TokenBag[]) => {
     current.company_profit_usd =
       Number(current.company_profit_usd || 0) +
       Number(bag.company_profit_usd || 0);
+    current.profitability_surplus_usd =
+      Number(current.profitability_surplus_usd || 0) +
+      Number(bag.profitability_surplus_usd || 0);
   });
 
   return Array.from(grouped.values());
@@ -302,7 +308,7 @@ export default function GenerationFinancesPage() {
       )}
 
       <div className="overflow-x-auto rounded-2xl border border-white/10 bg-zinc-950">
-        <table className="w-full min-w-[980px] text-sm">
+        <table className="w-full min-w-[1120px] text-sm">
           <thead className="bg-white/5 text-left text-zinc-400">
             <tr>
               <th className="p-3">Generación</th>
@@ -311,6 +317,7 @@ export default function GenerationFinancesPage() {
               <th>Tokens usados</th>
               <th>Para pagar al proveedor</th>
               <th>Beneficio entregado</th>
+              <th>Extra por rentabilidad</th>
               <th>Lo que ganó tu empresa</th>
               <th className="text-blue-300">Total de la generación</th>
               <th>Detalle</th>
@@ -319,7 +326,7 @@ export default function GenerationFinancesPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={9} className="p-8 text-center text-zinc-500">
+                <td colSpan={10} className="p-8 text-center text-zinc-500">
                   Cargando…
                 </td>
               </tr>
@@ -355,6 +362,9 @@ export default function GenerationFinancesPage() {
                     </td>
                     <td>{usd(item.infrastructure_cost_usd)}</td>
                     <td>{usd(benefit)}</td>
+                    <td className="text-cyan-300">
+                      {usd(Number(item.breakdown.profitability_surplus_for_company_usd || 0))}
+                    </td>
                     <td className="text-emerald-300">
                       {usd(item.gross_profit_usd)}
                     </td>
@@ -420,9 +430,14 @@ export default function GenerationFinancesPage() {
                 help="Es la parte de tu ganancia a la que renunciaste por el plan, paquete o cupón."
               />
               <FriendlyValue
+                label="Extra confirmado por mayor rentabilidad"
+                value={usd(Number(selected.breakdown.profitability_surplus_for_company_usd || 0))}
+                help="Aparece cuando los tokens usados venían de una bolsa con una ganancia normal segura menor que la ganancia objetivo de este módulo. No incluye redondeo y nunca recupera descuentos del cliente."
+              />
+              <FriendlyValue
                 label="Lo que realmente ganó tu empresa"
                 value={usd(selected.gross_profit_usd)}
-                help="Incluye la ganancia después de beneficios y cualquier centavo adicional generado por redondear tokens."
+                help="Incluye la ganancia después de beneficios, el extra confirmado por mayor rentabilidad y cualquier centavo adicional generado por redondear tokens."
               />
               <FriendlyValue
                 label="Total de esta generación"
@@ -467,6 +482,7 @@ export default function GenerationFinancesPage() {
                       <th>Beneficio aplicado</th>
                       <th>Lo que normalmente ganarías por token</th>
                       <th>Lo que ganaste por token</th>
+                      <th>Extra confirmado por este módulo</th>
                       <th>Lo que ganaste con esta bolsa</th>
                     </tr>
                   </thead>
@@ -512,8 +528,11 @@ export default function GenerationFinancesPage() {
                               ),
                             )}
                           </td>
+                          <td className="text-cyan-300">
+                            {usd(Number(bag.profitability_surplus_usd || 0))}
+                          </td>
                           <td>
-                            {usd(Number(bag.company_profit_usd || 0))}
+                            {usd(Number(bag.company_profit_usd || 0) + Number(bag.profitability_surplus_usd || 0))}
                           </td>
                         </tr>
                       ))}
@@ -556,7 +575,7 @@ export default function GenerationFinancesPage() {
                         </span>
                       </div>
 
-                      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
                         <MoneyPart
                           label="Tokens usados"
                           value={String(tokensUsed)}
@@ -578,9 +597,14 @@ export default function GenerationFinancesPage() {
                           help={promotional ? "USD 0: los tokens gratis no generan gasto operativo." : "Componente operativo congelado en esta bolsa para los tokens utilizados."}
                         />
                         <MoneyPart
-                          label="Ganancia"
+                          label="Ganancia de la bolsa"
                           value={usd(profitAmount)}
-                          help={promotional ? "USD 0: regalar tokens no crea ganancia." : "Ganancia real de estos tokens después de descuentos o beneficios."}
+                          help={promotional ? "USD 0: regalar tokens no crea ganancia." : "Ganancia de estos tokens según el snapshot histórico de la bolsa, después de descuentos o beneficios."}
+                        />
+                        <MoneyPart
+                          label="Extra por rentabilidad"
+                          value={usd(Number(bag.profitability_surplus_usd || 0))}
+                          help={promotional ? "USD 0: los tokens promocionales nunca crean ganancia comercial." : "Extra confirmado porque este módulo exige una ganancia por token mayor que la ganancia normal segura congelada en esta bolsa. Se mantiene separado del redondeo."}
                         />
                       </div>
 
@@ -636,6 +660,10 @@ export default function GenerationFinancesPage() {
                 <Row
                   label="Ganancia después de aplicar beneficios"
                   value={usd(Number(selected.breakdown.profit_after_customer_benefits_usd ?? selected.breakdown.company_profit_usd ?? 0))}
+                />
+                <Row
+                  label="Extra confirmado por mayor rentabilidad"
+                  value={usd(Number(selected.breakdown.profitability_surplus_for_company_usd || 0))}
                 />
                 <Row
                   label={selected.breakdown.profit_applied === false ? "Diferencia por cobrar un token entero" : "Centavos adicionales por redondear tokens"}
