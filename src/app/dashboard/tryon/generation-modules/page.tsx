@@ -38,14 +38,7 @@ type Port = { key: string; label: string; type: string; path: string; origin: st
 type ExecutionTarget = { provider: string; value: string; label: string; build_id: number; deployment_id?: string | null; runtime_name?: string | null; version?: string | null; image_tag?: string | null };
 type ExecutionTargetResponse = { items: Record<string, ExecutionTarget[]> };
 
-function createModelOutputRoleIds(module: GenerationModule) {
-  const raw = module.metadata?.create_model_output_roles;
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
-  return raw as Record<string, unknown>;
-}
-
 function generatedModuleContract(module: GenerationModule) {
-  const outputRoles = createModelOutputRoleIds(module);
   return {
     module: {
       id: module.id,
@@ -53,10 +46,6 @@ function generatedModuleContract(module: GenerationModule) {
       name: module.name,
       category: module.category,
       version: module.version,
-      output_roles: {
-        primary_image_output_id: outputRoles.primary_image_output_id ?? null,
-        identity_face_output_id: outputRoles.identity_face_output_id ?? null,
-      },
     },
     inputs: [...module.inputs]
       .sort((a, b) => a.position - b.position)
@@ -265,70 +254,14 @@ function ModuleEditor({ module, savedModule, hasUnsavedChanges, pricingRules, ex
       </div>
       <ContractEditor module={module} setModule={setModule}/>
 
-      {module.key === "create_model_woman" && (
-        <section className="rounded-2xl border border-fuchsia-500/15 bg-fuchsia-500/[.025] p-4">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[.22em] text-fuchsia-300/80">Outputs Create Model IA</p>
-            <h3 className="mt-1 text-sm font-semibold text-white">Qué imagen es cuál</h3>
-            <p className="mt-1 max-w-3xl text-xs leading-5 text-zinc-500">
-              Se guarda el ID estable del output. AppWeb usa ese ID para resolver su key real dentro de la ejecución; no depende del orden de SaveImage ni del nombre del archivo.
-            </p>
-          </div>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <Field label="Imagen principal / cuerpo">
-              <select
-                className="gm-input"
-                value={String(createModelOutputRoleIds(module).primary_image_output_id ?? "")}
-                onChange={e => setModule({
-                  ...module,
-                  metadata: {
-                    ...module.metadata,
-                    create_model_output_roles: {
-                      ...createModelOutputRoleIds(module),
-                      primary_image_output_id: e.target.value ? Number(e.target.value) : null,
-                    },
-                  },
-                })}
-              >
-                <option value="">Selecciona output</option>
-                {module.outputs.filter(item => item.id && ["image", "images"].includes(item.output_type)).map(item => (
-                  <option key={item.id} value={item.id}>#{item.id} · {item.name} · {item.key}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Rostro / identidad (oculto)">
-              <select
-                className="gm-input"
-                value={String(createModelOutputRoleIds(module).identity_face_output_id ?? "")}
-                onChange={e => setModule({
-                  ...module,
-                  metadata: {
-                    ...module.metadata,
-                    create_model_output_roles: {
-                      ...createModelOutputRoleIds(module),
-                      identity_face_output_id: e.target.value ? Number(e.target.value) : null,
-                    },
-                  },
-                })}
-              >
-                <option value="">Selecciona output</option>
-                {module.outputs.filter(item => item.id && ["image", "images"].includes(item.output_type)).map(item => (
-                  <option key={item.id} value={item.id}>#{item.id} · {item.name} · {item.key}</option>
-                ))}
-              </select>
-            </Field>
-          </div>
-        </section>
-      )}
-
       <section className="rounded-2xl border border-cyan-500/15 bg-cyan-500/[.025] p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[.22em] text-cyan-300/80">Contrato del módulo</p>
             <h3 className="mt-1 text-sm font-semibold text-white">JSON de inputs y outputs</h3>
             <p className="mt-1 max-w-3xl text-xs leading-5 text-zinc-500">
-              Describe los inputs y outputs reales del módulo, incluyendo ID, key, título, tipo y mapeo semántico de imágenes.
-              Este JSON permite identificar sin adivinar qué salida corresponde a la imagen principal y cuál al rostro/identidad.
+              Describe exactamente el contrato público del módulo. Incluye los inputs y los outputs reales creados en el módulo,
+              con sus IDs, keys, títulos, tipos y conexiones. No asigna significados especiales a ningún output.
             </p>
           </div>
           <button
