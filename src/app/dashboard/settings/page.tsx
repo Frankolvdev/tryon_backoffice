@@ -26,6 +26,7 @@ import { browserApiRequest } from "@/lib/api/browser-api";
 
 import { UserLibraryQuotaSetting } from "@/components/backoffice/system/user-library-quota-setting";
 import { GenerationDataResetCard } from "@/components/backoffice/system/generation-data-reset-card";
+import { GenerationLoadingProgressSetting } from "@/components/backoffice/system/generation-loading-progress-setting";
 
 import type {
   ConfigurationValidationResponse,
@@ -366,6 +367,11 @@ export default function SystemSettingsPage() {
                 </pre>
               </section>
             )}
+
+            <GenerationLoadingProgressSetting
+              setting={settings.find((item) => item.key === "generation_loading_progress_mode")}
+              onSaved={loadData}
+            />
 
             <GenerationDataResetCard />
 
