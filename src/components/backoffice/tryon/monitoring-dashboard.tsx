@@ -75,8 +75,6 @@ export function MonitoringDashboard() {
 
   useEffect(() => {
     void refresh();
-    const interval = window.setInterval(() => void refresh(), 30_000);
-    return () => window.clearInterval(interval);
   }, [refresh]);
 
   const summary = useMemo(() => {

@@ -21,13 +21,14 @@ import {
 import { toast } from "sonner";
 
 import { browserApiRequest } from "@/lib/api/browser-api";
+import { AdminPagination } from "@/components/backoffice/admin-pagination";
 import type {
   AdminNotification,
   AdminNotificationCountResponse,
   AdminNotificationListResponse,
 } from "@/types/admin-notification-center";
 
-const LIMIT = 100;
+const LIMIT = 50;
 
 function formatDate(value: string): string {
   const date = new Date(value);
@@ -69,6 +70,8 @@ export default function NotificationsPage() {
       requires_action: 0,
     });
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(0);
   const [priority, setPriority] = useState("");
   const [readFilter, setReadFilter] = useState("");
   const [selected, setSelected] =
@@ -82,13 +85,13 @@ export default function NotificationsPage() {
 
   const query = useMemo(() => {
     const params = new URLSearchParams({
-      skip: "0",
+      skip: String(page * LIMIT),
       limit: String(LIMIT),
       is_archived: "false",
     });
 
-    if (search.trim()) {
-      params.set("search", search.trim());
+    if (debouncedSearch.trim()) {
+      params.set("search", debouncedSearch.trim());
     }
 
     if (priority) {
@@ -100,7 +103,7 @@ export default function NotificationsPage() {
     }
 
     return params.toString();
-  }, [priority, readFilter, search]);
+  }, [debouncedSearch, page, priority, readFilter]);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -133,6 +136,11 @@ export default function NotificationsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 350);
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
   const updateItem = (
     updated: AdminNotification,
@@ -333,9 +341,10 @@ export default function NotificationsPage() {
             <input
               type="search"
               value={search}
-              onChange={(event) =>
-                setSearch(event.target.value)
-              }
+              onChange={(event) => {
+                setPage(0);
+                setSearch(event.target.value);
+              }}
               placeholder="Buscar..."
               className="h-11 w-full rounded-xl border border-white/8 bg-black/30 pr-4 pl-11 text-sm text-white"
             />
@@ -343,9 +352,10 @@ export default function NotificationsPage() {
 
           <select
             value={priority}
-            onChange={(event) =>
-              setPriority(event.target.value)
-            }
+            onChange={(event) => {
+              setPage(0);
+              setPriority(event.target.value);
+            }}
             className="h-11 rounded-xl border border-white/8 bg-[#09090a] px-4 text-sm text-zinc-300"
           >
             <option value="">
@@ -359,9 +369,10 @@ export default function NotificationsPage() {
 
           <select
             value={readFilter}
-            onChange={(event) =>
-              setReadFilter(event.target.value)
-            }
+            onChange={(event) => {
+              setPage(0);
+              setReadFilter(event.target.value);
+            }}
             className="h-11 rounded-xl border border-white/8 bg-[#09090a] px-4 text-sm text-zinc-300"
           >
             <option value="">
@@ -457,6 +468,14 @@ export default function NotificationsPage() {
                 ))}
               </div>
             )}
+            <AdminPagination
+              page={page}
+              pageSize={LIMIT}
+              total={list.total}
+              loading={isLoading}
+              label="notificaciones"
+              onPageChange={setPage}
+            />
           </div>
 
           <aside className="luxia-panel rounded-3xl p-6">

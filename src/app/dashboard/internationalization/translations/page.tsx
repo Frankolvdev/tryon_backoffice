@@ -12,12 +12,12 @@ import {
 import {
   useCallback,
   useEffect,
-  useMemo,
   useState,
 } from "react";
 
 import { TranslationEditorDialog } from "@/components/backoffice/i18n/translation-editor-dialog";
 import { browserApiRequest } from "@/lib/api/browser-api";
+import { AdminPagination } from "@/components/backoffice/admin-pagination";
 import type {
   I18nLocale,
   I18nLocaleListResponse,
@@ -25,15 +25,19 @@ import type {
   I18nTranslationListResponse,
 } from "@/types/admin-i18n";
 
-const LIMIT = 500;
+const LIMIT = 50;
 
 export default function TranslationsPage() {
   const [locales, setLocales] =
     useState<I18nLocale[]>([]);
   const [translations, setTranslations] =
     useState<I18nTranslation[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
   const [search, setSearch] =
     useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [namespaces, setNamespaces] = useState<string[]>([]);
   const [localeCode, setLocaleCode] =
     useState("");
   const [namespace, setNamespace] =
@@ -60,7 +64,7 @@ export default function TranslationsPage() {
     try {
       const params =
         new URLSearchParams({
-          skip: "0",
+          skip: String(page * LIMIT),
           limit: String(LIMIT),
         });
 
@@ -78,10 +82,10 @@ export default function TranslationsPage() {
         );
       }
 
-      if (search.trim()) {
+      if (debouncedSearch.trim()) {
         params.set(
           "search",
-          search.trim(),
+          debouncedSearch.trim(),
         );
       }
 
@@ -92,24 +96,14 @@ export default function TranslationsPage() {
         );
       }
 
-      const [
-        localeResponse,
-        translationResponse,
-      ] = await Promise.all([
-        browserApiRequest<I18nLocaleListResponse>(
-          "/api/admin/i18n/locales?active_only=false",
-        ),
-        browserApiRequest<I18nTranslationListResponse>(
-          `/api/admin/i18n/translations?${params.toString()}`,
-        ),
-      ]);
-
-      setLocales(
-        localeResponse.items,
+      const translationResponse = await browserApiRequest<I18nTranslationListResponse>(
+        `/api/admin/i18n/translations?${params.toString()}`,
       );
+
       setTranslations(
         translationResponse.items,
       );
+      setTotal(translationResponse.total);
 
       setSelected((current) =>
         current
@@ -135,24 +129,32 @@ export default function TranslationsPage() {
     activeOnly,
     localeCode,
     namespace,
-    search,
+    page,
+    debouncedSearch,
   ]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const namespaces = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          translations.map(
-            (item) => item.namespace,
-          ),
-        ),
-      ).sort(),
-    [translations],
-  );
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 350);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    void Promise.all([
+      browserApiRequest<I18nLocaleListResponse>(
+        "/api/admin/i18n/locales?active_only=false",
+      ),
+      browserApiRequest<string[]>(
+        "/api/admin/i18n/translations/namespaces",
+      ),
+    ]).then(([localeResponse, namespaceResponse]) => {
+      setLocales(localeResponse.items);
+      setNamespaces(namespaceResponse);
+    }).catch(() => undefined);
+  }, []);
 
   const saveTranslation = (
     saved: I18nTranslation,
@@ -240,11 +242,10 @@ export default function TranslationsPage() {
             />
             <input
               value={search}
-              onChange={(event) =>
-                setSearch(
-                  event.target.value,
-                )
-              }
+              onChange={(event) => {
+                setPage(0);
+                setSearch(event.target.value);
+              }}
               placeholder="Buscar clave o valor..."
               className="h-11 w-full rounded-xl border border-white/8 bg-black/30 pr-4 pl-11 text-sm text-white"
             />
@@ -252,11 +253,10 @@ export default function TranslationsPage() {
 
           <select
             value={localeCode}
-            onChange={(event) =>
-              setLocaleCode(
-                event.target.value,
-              )
-            }
+            onChange={(event) => {
+              setPage(0);
+              setLocaleCode(event.target.value);
+            }}
             className="h-11 rounded-xl border border-white/8 bg-[#09090a] px-4 text-sm text-zinc-300"
           >
             <option value="">
@@ -275,11 +275,10 @@ export default function TranslationsPage() {
 
           <select
             value={namespace}
-            onChange={(event) =>
-              setNamespace(
-                event.target.value,
-              )
-            }
+            onChange={(event) => {
+              setPage(0);
+              setNamespace(event.target.value);
+            }}
             className="h-11 rounded-xl border border-white/8 bg-[#09090a] px-4 text-sm text-zinc-300"
           >
             <option value="">
@@ -297,11 +296,10 @@ export default function TranslationsPage() {
 
           <select
             value={activeOnly}
-            onChange={(event) =>
-              setActiveOnly(
-                event.target.value,
-              )
-            }
+            onChange={(event) => {
+              setPage(0);
+              setActiveOnly(event.target.value);
+            }}
             className="h-11 rounded-xl border border-white/8 bg-[#09090a] px-4 text-sm text-zinc-300"
           >
             <option value="">
@@ -429,6 +427,14 @@ export default function TranslationsPage() {
                 </table>
               </div>
             )}
+            <AdminPagination
+              page={page}
+              pageSize={LIMIT}
+              total={total}
+              loading={isLoading}
+              label="traducciones"
+              onPageChange={setPage}
+            />
           </div>
 
           <aside className="luxia-panel rounded-3xl p-6">

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshCcw } from "lucide-react";
 import { browserApiRequest } from "@/lib/api/browser-api";
+import { AdminPagination } from "@/components/backoffice/admin-pagination";
 
 type TokenBag = {
   token_bag_id?: number;
@@ -80,6 +81,8 @@ type FinanceItem = {
   breakdown: FinanceBreakdown;
   created_at: string;
 };
+
+const PAGE_SIZE = 50;
 
 type Response = {
   items: FinanceItem[];
@@ -186,6 +189,7 @@ export default function GenerationFinancesPage() {
   const [data, setData] = useState<Response | null>(null);
   const [status, setStatus] = useState("");
   const [trace, setTrace] = useState("");
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<FinanceItem | null>(null);
@@ -194,7 +198,7 @@ export default function GenerationFinancesPage() {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ limit: "500" });
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), skip: String(page * PAGE_SIZE) });
       if (status) params.set("status", status);
       if (trace) params.set("traceability", trace);
       setData(
@@ -211,7 +215,7 @@ export default function GenerationFinancesPage() {
     } finally {
       setLoading(false);
     }
-  }, [status, trace]);
+  }, [page, status, trace]);
 
   useEffect(() => {
     void load();
@@ -281,7 +285,7 @@ export default function GenerationFinancesPage() {
       <div className="flex gap-3 rounded-2xl border border-white/10 bg-zinc-950 p-4">
         <select
           value={status}
-          onChange={(event) => setStatus(event.target.value)}
+          onChange={(event) => { setPage(0); setStatus(event.target.value); }}
           className="rounded-lg bg-zinc-900 px-3 py-2 text-sm text-white"
         >
           <option value="">Todos los estados</option>
@@ -291,7 +295,7 @@ export default function GenerationFinancesPage() {
         </select>
         <select
           value={trace}
-          onChange={(event) => setTrace(event.target.value)}
+          onChange={(event) => { setPage(0); setTrace(event.target.value); }}
           className="rounded-lg bg-zinc-900 px-3 py-2 text-sm text-white"
         >
           <option value="">Todo el historial</option>
@@ -386,6 +390,15 @@ export default function GenerationFinancesPage() {
           </tbody>
         </table>
       </div>
+
+      <AdminPagination
+        page={page}
+        pageSize={PAGE_SIZE}
+        total={data?.total ?? 0}
+        loading={loading}
+        label="generaciones"
+        onPageChange={setPage}
+      />
 
       {selected && (
         <div

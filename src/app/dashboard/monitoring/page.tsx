@@ -162,15 +162,6 @@ export default function MonitoringPage() {
 
   useEffect(() => {
     void load();
-
-    const intervalId =
-      window.setInterval(
-        () => void load(),
-        60_000,
-      );
-
-    return () =>
-      window.clearInterval(intervalId);
   }, [load]);
 
   return (

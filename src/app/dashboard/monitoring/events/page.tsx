@@ -21,6 +21,7 @@ import {
 
 import { OperationalEventResolution } from "@/components/backoffice/monitoring/operational-event-resolution";
 import { browserApiRequest } from "@/lib/api/browser-api";
+import { AdminPagination } from "@/components/backoffice/admin-pagination";
 import type {
   OperationalEvent,
   OperationalEventListResponse,
@@ -55,9 +56,13 @@ function formatDate(
     : date.toLocaleString("es-MX");
 }
 
+const PAGE_SIZE = 50;
+
 export default function OperationalEventsPage() {
   const [events, setEvents] =
     useState<OperationalEvent[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
   const [summary, setSummary] =
     useState<OperationalEventSummary | null>(
       null,
@@ -68,6 +73,7 @@ export default function OperationalEventsPage() {
     );
   const [search, setSearch] =
     useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [severity, setSeverity] =
     useState("");
   const [resolved, setResolved] =
@@ -86,8 +92,8 @@ export default function OperationalEventsPage() {
     try {
       const params =
         new URLSearchParams({
-          skip: "0",
-          limit: "500",
+          skip: String(page * PAGE_SIZE),
+          limit: String(PAGE_SIZE),
         });
 
       if (severity) {
@@ -105,10 +111,10 @@ export default function OperationalEventsPage() {
         params.set("source", source);
       }
 
-      if (search.trim()) {
+      if (debouncedSearch.trim()) {
         params.set(
           "search",
-          search.trim(),
+          debouncedSearch.trim(),
         );
       }
 
@@ -123,6 +129,7 @@ export default function OperationalEventsPage() {
         ]);
 
       setEvents(list.items);
+      setTotal(list.total);
       setSummary(summaryResponse);
       setSelected((current) =>
         current
@@ -142,6 +149,7 @@ export default function OperationalEventsPage() {
       setIsLoading(false);
     }
   }, [
+    page,
     resolved,
     search,
     severity,
@@ -151,6 +159,11 @@ export default function OperationalEventsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 350);
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
   const sources = useMemo(
     () =>
@@ -412,6 +425,14 @@ export default function OperationalEventsPage() {
                 ))}
               </div>
             )}
+            <AdminPagination
+              page={page}
+              pageSize={PAGE_SIZE}
+              total={total}
+              loading={isLoading}
+              label="eventos"
+              onPageChange={setPage}
+            />
           </div>
 
           <aside className="luxia-panel rounded-3xl p-6">

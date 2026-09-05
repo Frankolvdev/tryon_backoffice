@@ -23,6 +23,7 @@ type ExecutionListResponse = {
 };
 
 const ACTIVE_STATUSES = new Set<GenerationExecutionStatus>(["queued", "running"]);
+const PAGE_SIZE = 50;
 const TERMINAL_STATUSES = new Set<GenerationExecutionStatus>(["completed", "failed", "cancelled"]);
 
 function formatDate(value?: string | null) {
@@ -261,6 +262,8 @@ export default function UnifiedAiJobsPage() {
   const [executions, setExecutions] = useState<GenerationModuleExecution[]>([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(0);
   const [moduleId, setModuleId] = useState("");
   const [status, setStatus] = useState("");
   const [engine, setEngine] = useState("");
@@ -276,12 +279,27 @@ export default function UnifiedAiJobsPage() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const loadModules = useCallback(async () => {
+    try {
+      const moduleResponse = await browserApiRequest<GenerationModuleListResponse>("/api/admin/generation-modules?limit=500");
+      const moduleItems = Array.isArray(moduleResponse)
+        ? (moduleResponse as unknown as GenerationModule[])
+        : Array.isArray(moduleResponse.items)
+          ? moduleResponse.items
+          : [];
+      setModules(moduleItems);
+      setExpandedModules((current) => current.size ? current : new Set(moduleItems.map((item) => item.id)));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible cargar los módulos de IA.");
+    }
+  }, []);
+
   const load = useCallback(async (silent = false) => {
     if (!silent) setIsLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ limit: "500", skip: "0" });
-      if (search.trim()) params.set("search", search.trim());
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), skip: String(page * PAGE_SIZE) });
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
       if (moduleId) params.set("module_id", moduleId);
       if (status) params.set("status", status);
       if (engine) params.set("engine", engine);
@@ -289,21 +307,11 @@ export default function UnifiedAiJobsPage() {
       if (dateFrom) params.set("created_from", new Date(`${dateFrom}T00:00:00`).toISOString());
       if (dateTo) params.set("created_to", new Date(`${dateTo}T23:59:59`).toISOString());
 
-      const [moduleResponse, executionResponse] = await Promise.all([
-        browserApiRequest<GenerationModuleListResponse>("/api/admin/generation-modules?limit=500"),
-        browserApiRequest<ExecutionListResponse>(`/api/admin/generation-module-executions?${params}`),
-      ]);
-      const moduleItems = Array.isArray(moduleResponse)
-        ? (moduleResponse as unknown as GenerationModule[])
-        : Array.isArray(moduleResponse.items)
-          ? moduleResponse.items
-          : [];
-      setModules(moduleItems);
+      const executionResponse = await browserApiRequest<ExecutionListResponse>(`/api/admin/generation-module-executions?${params}`);
       const executionItems = Array.isArray(executionResponse.items) ? executionResponse.items : [];
       setExecutions(executionItems);
       setSelectedIds((current) => new Set([...current].filter((id) => executionItems.some((item) => item.id === id))));
       setTotal(Number(executionResponse.total ?? 0));
-      setExpandedModules((current) => current.size ? current : new Set(moduleItems.map((item) => item.id)));
       setSelected((current) => {
         if (!current) return null;
         return executionResponse.items.find((item) => item.id === current.id) ?? current;
@@ -313,14 +321,15 @@ export default function UnifiedAiJobsPage() {
     } finally {
       if (!silent) setIsLoading(false);
     }
-  }, [dateFrom, dateTo, engine, moduleId, search, status, userId]);
+  }, [dateFrom, dateTo, debouncedSearch, engine, moduleId, page, status, userId]);
 
+  useEffect(() => { void loadModules(); }, [loadModules]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
-    if (!executions.some((item) => ACTIVE_STATUSES.has(item.status) || Boolean(item.cancel_requested))) return;
-    const timer = window.setInterval(() => void load(true), 3000);
-    return () => window.clearInterval(timer);
-  }, [executions, load]);
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 350);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+  useEffect(() => { setPage(0); }, [dateFrom, dateTo, debouncedSearch, engine, moduleId, status, userId]);
 
   const modulesById = useMemo(() => new Map(modules.map((item) => [item.id, item])), [modules]);
   const grouped = useMemo(() => {
@@ -394,6 +403,7 @@ export default function UnifiedAiJobsPage() {
   }
 
   function clearFilters() {
+    setPage(0);
     setSearch(""); setModuleId(""); setStatus(""); setEngine(""); setUserId(""); setDateFrom(""); setDateTo("");
   }
 
@@ -412,7 +422,7 @@ export default function UnifiedAiJobsPage() {
         <h1 className="mt-2 text-3xl font-semibold text-white">Trabajos IA</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">Una sola vista para supervisar todas las ejecuciones de los módulos de generación, con progreso en vivo, usuario, motor, consumo, resultados, errores y acciones.</p>
       </div>
-      <button onClick={() => void load()} disabled={isLoading} className="flex h-11 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-zinc-300 hover:bg-white/[0.06] disabled:opacity-50">
+      <button onClick={() => void Promise.all([loadModules(), load()])} disabled={isLoading} className="flex h-11 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-zinc-300 hover:bg-white/[0.06] disabled:opacity-50">
         {isLoading ? <LoaderCircle size={16} className="animate-spin" /> : <RefreshCcw size={16} />} Actualizar
       </button>
     </header>
@@ -453,7 +463,7 @@ export default function UnifiedAiJobsPage() {
         return <section key={id} className="luxia-panel overflow-hidden rounded-3xl">
           <button onClick={()=>toggleModule(id)} className="flex w-full items-center justify-between gap-4 border-b border-white/6 p-5 text-left hover:bg-white/[0.02]">
             <div className="flex min-w-0 items-center gap-4">{isExpanded?<ChevronDown size={18}/>:<ChevronRight size={18}/>}<div><h2 className="font-semibold text-white">{module?.name ?? jobs[0]?.module_key}</h2><p className="mt-1 text-xs text-zinc-600">{module?.key ?? jobs[0]?.module_key} · {jobs.length} trabajo{jobs.length===1?"":"s"}{active?` · ${active} activo${active===1?"":"s"}`:""}</p></div></div>
-            {active>0&&<span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs text-blue-300">Actualización en vivo</span>}
+            {active>0&&<span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs text-blue-300">Activo</span>}
           </button>
           {isExpanded && <div className="overflow-x-auto"><table className="w-full min-w-[1120px] text-left text-sm"><thead className="text-[10px] uppercase tracking-wider text-zinc-600"><tr><th className="p-4">Seleccionar</th><th>Trabajo</th><th>Usuario</th><th>Motor</th><th>Estado</th><th>Progreso</th><th>Tokens</th><th>Tiempo backend</th><th>Tiempo real</th><th>Resultado / error</th><th className="pr-4">Acciones</th></tr></thead><tbody>{jobs.map((job)=>{
             const resources=dedupeResources(resultResources(job.outputs)); const busy=busyId===job.id;
@@ -469,6 +479,14 @@ export default function UnifiedAiJobsPage() {
       })}
     </div>}
 
+
+    {total > PAGE_SIZE && <section className="luxia-panel flex flex-col gap-3 rounded-3xl p-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-xs text-zinc-500">Página {page + 1} de {Math.max(1, Math.ceil(total / PAGE_SIZE))} · {total.toLocaleString("es-MX")} trabajos</p>
+      <div className="flex gap-2">
+        <button type="button" disabled={page === 0 || isLoading} onClick={() => setPage((current) => Math.max(0, current - 1))} className="h-10 rounded-xl border border-white/10 px-4 text-sm text-zinc-300 disabled:opacity-40">Anterior</button>
+        <button type="button" disabled={(page + 1) * PAGE_SIZE >= total || isLoading} onClick={() => setPage((current) => current + 1)} className="h-10 rounded-xl border border-white/10 px-4 text-sm text-zinc-300 disabled:opacity-40">Siguiente</button>
+      </div>
+    </section>}
 
     {billingSelected && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" onMouseDown={event=>{if(event.target===event.currentTarget)setBillingSelected(null)}}><section className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-emerald-500/20 bg-[#0b0b0d] p-6"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] uppercase tracking-[.2em] text-emerald-400">Desglose del cobro</p><h2 className="mt-2 text-xl font-semibold text-white">{billingSelected.module_key}</h2><p className="mt-1 font-mono text-[11px] text-zinc-600">{billingSelected.id}</p></div><button onClick={()=>setBillingSelected(null)} className="flex size-9 items-center justify-center rounded-xl border border-white/10 text-zinc-400"><XCircle size={17}/></button></div><div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><Detail label="Tokens cobrados" value={String(billingSelected.tokens_charged ?? 0)}/><Detail label="Tiempo backend" value={formatDuration(billingSelected.duration_ms)}/><Detail label="Tiempo real proveedor" value={formatDuration(billingSelected.real_provider_duration_ms)}/><Detail label="Inicio proveedor" value={formatDate(billingSelected.provider_started_at)}/><Detail label="Fin proveedor" value={formatDate(billingSelected.provider_finished_at)}/><Detail label="Estado" value={statusLabel(billingSelected.status)}/></div><div className="mt-6"><h3 className="text-sm font-semibold text-white">Cálculo guardado por el backend</h3><pre className="mt-3 max-h-[50vh] overflow-auto rounded-2xl border border-white/6 bg-black/30 p-4 text-[11px] leading-5 text-zinc-300">{prettyJson(billingSelected.billing_breakdown ?? {})}</pre></div></section></div>}
     {selected && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" onMouseDown={(e)=>{if(e.target===e.currentTarget)setSelected(null)}}><section className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-white/10 bg-[#0b0b0d] p-6 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] uppercase tracking-[.2em] text-red-500">Detalle de ejecución</p><h2 className="mt-2 text-xl font-semibold text-white">{modulesById.get(selected.module_id)?.name ?? selected.module_key}</h2><p className="mt-1 font-mono text-[11px] text-zinc-600">{selected.id}</p></div><button onClick={()=>setSelected(null)} className="flex size-9 items-center justify-center rounded-xl border border-white/10 text-zinc-400 hover:text-white"><XCircle size={17}/></button></div><div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><Detail label="Estado" value={statusLabel(selected.status)}/><Detail label="Motor" value={engineLabel(selected.engine)}/><Detail label="Cola" value={`${selected.queue_name || queueLabel(selected)}${selected.queue_position ? ` · posición ${selected.queue_position}` : ""}`}/><Detail label="Estado proveedor" value={providerState(selected)}/><Detail label="Origen" value={originLabel(selected)}/><Detail label="Usuario" value={selected.user_id?`#${selected.user_id}`:"Administrador"}/><Detail label="Job remoto" value={selected.provider_job_id || "—"}/><Detail label="Endpoint remoto" value={selected.provider_endpoint_id || "—"}/><Detail label="Intentos de despacho" value={String(selected.dispatch_attempts ?? 0)}/><Detail label="Heartbeat" value={formatDate(selected.heartbeat_at)}/><Detail label="Duración backend" value={formatDuration(selected.duration_ms)}/><Detail label="Tiempo real" value={formatDuration(selected.real_provider_duration_ms)}/><Detail label="Cancelación solicitada" value={selected.cancel_requested?"Sí":"No"}/></div><div className="mt-6"><h3 className="text-sm font-semibold text-white">Pasos</h3><div className="mt-3 space-y-2">{safeSteps(selected).map((step)=><div key={step.step_key} className="rounded-2xl border border-white/6 bg-black/20 p-4"><div className="flex justify-between gap-4"><div><p className="text-sm text-white">{step.step_name}</p><p className="mt-1 text-xs text-zinc-600">{step.step_type} · {step.step_key}</p></div><span className={`h-fit rounded-full border px-2.5 py-1 text-[10px] uppercase ${statusClass(step.status)}`}>{statusLabel(step.status)}</span></div>{step.error&&<p className="mt-3 text-xs text-red-300">{step.error}</p>}</div>)}</div></div><div className="mt-6 grid gap-4 lg:grid-cols-2"><section><h3 className="text-sm font-semibold text-white">Entradas</h3><pre className="mt-3 max-h-64 overflow-auto rounded-2xl border border-white/6 bg-black/30 p-4 text-[11px] leading-5 text-zinc-400">{prettyJson(selected.inputs)}</pre></section><section><h3 className="text-sm font-semibold text-white">Salidas</h3><pre className="mt-3 max-h-64 overflow-auto rounded-2xl border border-white/6 bg-black/30 p-4 text-[11px] leading-5 text-zinc-400">{prettyJson(selected.outputs)}</pre></section></div><div className="mt-6"><h3 className="text-sm font-semibold text-white">Rastreo de tiempos</h3>{timingRows(selected).length?<div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{timingRows(selected).map((row)=><div key={row.label} className="rounded-2xl border border-white/6 bg-black/20 p-4" title={row.hint}><p className="text-[10px] uppercase tracking-wider text-zinc-600">{row.label}</p><p className="mt-2 text-sm font-semibold text-white">{row.value}</p>{row.hint&&<p className="mt-2 text-[10px] leading-4 text-zinc-600">{row.hint}</p>}</div>)}</div>:<p className="mt-3 text-xs text-zinc-600">Esta ejecución todavía no contiene métricas de rastreo detallado.</p>}{transportFiles(selected).length>0&&<div className="mt-5"><h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Archivos únicos del transporte</h4><div className="mt-3 space-y-2">{transportFiles(selected).map((file)=><div key={file.file_id} className="rounded-2xl border border-white/6 bg-black/20 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-mono text-xs text-white">{file.file_id}</p><p className="text-xs text-zinc-500">{formatBytes(file.size_bytes)} · {file.occurrence_count??0} ocurrencia{file.occurrence_count===1?"":"s"}</p></div>{file.filenames.length>0&&<p className="mt-2 text-[11px] text-zinc-500">Nombres: {file.filenames.join(", ")}</p>}{file.node_ids.length>0&&<p className="mt-1 text-[11px] text-zinc-600">Nodos: {file.node_ids.join(", ")}</p>}{file.sha256&&<p className="mt-1 truncate font-mono text-[10px] text-zinc-700" title={file.sha256}>SHA-256: {file.sha256}</p>}<div className="mt-3 space-y-1">{file.paths.map((path)=><p key={path} className="break-all font-mono text-[10px] text-zinc-500">{path}</p>)}</div></div>)}</div></div>}<h4 className="mt-5 text-xs font-semibold uppercase tracking-wider text-zinc-500">JSON técnico</h4><pre className="mt-3 max-h-72 overflow-auto rounded-2xl border border-white/6 bg-black/30 p-4 text-[11px] leading-5 text-zinc-400">{prettyJson({provider_metrics:selected.provider_metrics ?? {},runtime_metrics:selected.runtime_metrics ?? {}})}</pre></div><div className="mt-6"><h3 className="text-sm font-semibold text-white">Registro</h3><div className="mt-3 max-h-60 space-y-2 overflow-auto rounded-2xl border border-white/6 bg-black/30 p-4 font-mono text-[11px]">{safeLogs(selected).length?safeLogs(selected).map((log,index)=><p key={`${log.timestamp}-${index}`} className={log.level==="error"?"text-red-300":log.level==="warning"?"text-amber-300":"text-zinc-500"}>[{formatDate(log.timestamp)}] {log.message}</p>):<p className="text-zinc-600">Sin eventos registrados.</p>}</div></div></section></div>}

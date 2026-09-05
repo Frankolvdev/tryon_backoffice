@@ -95,18 +95,6 @@ export function NotificationButton() {
 
   useEffect(() => {
     void load();
-
-    const intervalId =
-      window.setInterval(
-        () => {
-          void load();
-        },
-        60_000,
-      );
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
   }, [load]);
 
   useEffect(() => {
@@ -181,9 +169,10 @@ export function NotificationButton() {
         aria-label="Abrir notificaciones"
         aria-expanded={isOpen}
         onClick={() =>
-          setIsOpen(
-            (current) => !current,
-          )
+          setIsOpen((current) => {
+            if (!current) void load();
+            return !current;
+          })
         }
         className="relative flex size-10 items-center justify-center rounded-xl border border-white/7 bg-white/[0.025] text-zinc-500 transition hover:border-red-500/15 hover:bg-red-950/20 hover:text-white"
       >

@@ -13,13 +13,13 @@ import {
 import {
   useCallback,
   useEffect,
-  useMemo,
   useState,
 } from "react";
 import { toast } from "sonner";
 
 import { NotificationDeliveryDialog } from "@/components/backoffice/notifications/notification-delivery-dialog";
 import { browserApiRequest } from "@/lib/api/browser-api";
+import { AdminPagination } from "@/components/backoffice/admin-pagination";
 
 import type {
   AdminNotification,
@@ -29,6 +29,7 @@ import type {
   AdminNotificationDelivery,
   AdminNotificationDeliveryListResponse,
 } from "@/types/admin-notification-deliveries";
+import type { AdminNotificationSettings } from "@/types/admin-notification-preferences";
 
 function statusClass(status: string): string {
   if (status === "delivered") {
@@ -49,9 +50,14 @@ function statusClass(status: string): string {
   return "border-red-500/15 bg-red-950/15 text-red-400";
 }
 
+const PAGE_SIZE = 50;
+
 export default function NotificationDeliveriesPage() {
   const [notifications, setNotifications] =
     useState<AdminNotification[]>([]);
+  const [notificationTotal, setNotificationTotal] = useState(0);
+  const [notificationPage, setNotificationPage] = useState(0);
+  const [deliveryPage, setDeliveryPage] = useState(0);
   const [selectedNotificationId, setSelectedNotificationId] =
     useState<number | null>(null);
   const [deliveries, setDeliveries] =
@@ -59,9 +65,11 @@ export default function NotificationDeliveriesPage() {
       items: [],
       total: 0,
       skip: 0,
-      limit: 500,
+      limit: PAGE_SIZE,
     });
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [channelOptions, setChannelOptions] = useState<string[]>([]);
   const [status, setStatus] = useState("");
   const [channel, setChannel] = useState("");
   const [selectedDelivery, setSelectedDelivery] =
@@ -82,10 +90,11 @@ export default function NotificationDeliveriesPage() {
     try {
       const response =
         await browserApiRequest<AdminNotificationListResponse>(
-          "/api/admin/notifications?skip=0&limit=500&is_archived=false&include_expired=true",
+          `/api/admin/notifications?skip=${notificationPage * PAGE_SIZE}&limit=${PAGE_SIZE}&is_archived=false&include_expired=true`,
         );
 
       setNotifications(response.items);
+      setNotificationTotal(response.total);
 
       setSelectedNotificationId((current) =>
         current ??
@@ -101,7 +110,7 @@ export default function NotificationDeliveriesPage() {
     } finally {
       setLoadingNotifications(false);
     }
-  }, []);
+  }, [notificationPage]);
 
   const loadDeliveries = useCallback(async () => {
     if (selectedNotificationId === null) {
@@ -109,7 +118,7 @@ export default function NotificationDeliveriesPage() {
         items: [],
         total: 0,
         skip: 0,
-        limit: 500,
+        limit: PAGE_SIZE,
       });
       return;
     }
@@ -119,7 +128,13 @@ export default function NotificationDeliveriesPage() {
     try {
       setDeliveries(
         await browserApiRequest<AdminNotificationDeliveryListResponse>(
-          `/api/admin/notifications/${selectedNotificationId}/deliveries?skip=0&limit=500`,
+          `/api/admin/notifications/${selectedNotificationId}/deliveries?${new URLSearchParams({
+            skip: String(deliveryPage * PAGE_SIZE),
+            limit: String(PAGE_SIZE),
+            ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
+            ...(status ? { status } : {}),
+            ...(channel ? { channel_type: channel } : {}),
+          }).toString()}`,
         ),
       );
     } catch (error) {
@@ -131,7 +146,7 @@ export default function NotificationDeliveriesPage() {
     } finally {
       setLoadingDeliveries(false);
     }
-  }, [selectedNotificationId]);
+  }, [channel, debouncedSearch, deliveryPage, selectedNotificationId, status]);
 
   useEffect(() => {
     void loadNotifications();
@@ -141,69 +156,28 @@ export default function NotificationDeliveriesPage() {
     void loadDeliveries();
   }, [loadDeliveries]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 350);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    void browserApiRequest<AdminNotificationSettings>(
+      "/api/admin/notification-preferences",
+    ).then((settings) => {
+      setChannelOptions(Array.from(new Set(settings.channels.map((item) => item.channel_type))).sort());
+    }).catch(() => undefined);
+  }, []);
+
   const selectedNotification =
     notifications.find(
       (item) =>
         item.id === selectedNotificationId,
     ) ?? null;
 
-  const visibleDeliveries = useMemo(() => {
-    const normalized =
-      search.trim().toLowerCase();
+  const visibleDeliveries = deliveries.items;
 
-    return deliveries.items.filter(
-      (delivery) => {
-        if (
-          status &&
-          delivery.status !== status
-        ) {
-          return false;
-        }
-
-        if (
-          channel &&
-          delivery.channel_type !== channel
-        ) {
-          return false;
-        }
-
-        if (!normalized) {
-          return true;
-        }
-
-        return [
-          delivery.id,
-          delivery.channel_type,
-          delivery.status,
-          delivery.destination ?? "",
-          delivery.provider_message_id ?? "",
-          delivery.error_type ?? "",
-          delivery.error_message ?? "",
-        ].some((value) =>
-          String(value)
-            .toLowerCase()
-            .includes(normalized),
-        );
-      },
-    );
-  }, [
-    channel,
-    deliveries.items,
-    search,
-    status,
-  ]);
-
-  const channels = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          deliveries.items.map(
-            (item) => item.channel_type,
-          ),
-        ),
-      ).sort(),
-    [deliveries.items],
-  );
+  const channels = channelOptions;
 
   return (
     <div>
@@ -285,11 +259,10 @@ export default function NotificationDeliveriesPage() {
                 value={
                   selectedNotificationId ?? ""
                 }
-                onChange={(event) =>
-                  setSelectedNotificationId(
-                    Number(event.target.value),
-                  )
-                }
+                onChange={(event) => {
+                  setDeliveryPage(0);
+                  setSelectedNotificationId(Number(event.target.value));
+                }}
                 className="h-12 w-full rounded-xl border border-white/8 bg-[#09090a] px-4 text-sm text-zinc-300"
               >
                 {notifications.length === 0 && (
@@ -311,6 +284,18 @@ export default function NotificationDeliveriesPage() {
                 )}
               </select>
             </label>
+            <AdminPagination
+              page={notificationPage}
+              pageSize={PAGE_SIZE}
+              total={notificationTotal}
+              loading={loadingNotifications}
+              label="notificaciones"
+              onPageChange={(nextPage) => {
+                setNotificationPage(nextPage);
+                setDeliveryPage(0);
+                setSelectedNotificationId(null);
+              }}
+            />
 
             {selectedNotification && (
               <div className="mt-4 rounded-2xl border border-white/7 bg-black/20 p-4">
@@ -335,9 +320,10 @@ export default function NotificationDeliveriesPage() {
                 <input
                   type="search"
                   value={search}
-                  onChange={(event) =>
-                    setSearch(event.target.value)
-                  }
+                  onChange={(event) => {
+                    setDeliveryPage(0);
+                    setSearch(event.target.value);
+                  }}
                   placeholder="Buscar entrega..."
                   className="h-11 w-full rounded-xl border border-white/8 bg-black/30 pr-4 pl-11 text-sm text-white"
                 />
@@ -345,9 +331,10 @@ export default function NotificationDeliveriesPage() {
 
               <select
                 value={status}
-                onChange={(event) =>
-                  setStatus(event.target.value)
-                }
+                onChange={(event) => {
+                  setDeliveryPage(0);
+                  setStatus(event.target.value);
+                }}
                 className="h-11 rounded-xl border border-white/8 bg-[#09090a] px-4 text-sm text-zinc-300"
               >
                 <option value="">
@@ -363,9 +350,10 @@ export default function NotificationDeliveriesPage() {
 
               <select
                 value={channel}
-                onChange={(event) =>
-                  setChannel(event.target.value)
-                }
+                onChange={(event) => {
+                  setDeliveryPage(0);
+                  setChannel(event.target.value);
+                }}
                 className="h-11 rounded-xl border border-white/8 bg-[#09090a] px-4 text-sm text-zinc-300"
               >
                 <option value="">
@@ -491,6 +479,14 @@ export default function NotificationDeliveriesPage() {
                 </table>
               </div>
             )}
+            <AdminPagination
+              page={deliveryPage}
+              pageSize={PAGE_SIZE}
+              total={deliveries.total}
+              loading={loadingDeliveries}
+              label="entregas"
+              onPageChange={setDeliveryPage}
+            />
           </section>
         </>
       )}

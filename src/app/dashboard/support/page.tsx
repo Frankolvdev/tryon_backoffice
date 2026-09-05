@@ -3,7 +3,6 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useState,
 } from "react";
 import {
@@ -21,11 +20,26 @@ import {
 
 import { SupportTicketEditor } from "@/components/backoffice/support/support-ticket-editor";
 import { browserApiRequest } from "@/lib/api/browser-api";
+import { AdminPagination } from "@/components/backoffice/admin-pagination";
 import type {
   SupportTicket,
 } from "@/types/admin-support";
 
-const LIMIT = 200;
+const LIMIT = 50;
+
+type SupportTicketPage = {
+  items: SupportTicket[];
+  total: number;
+  skip: number;
+  limit: number;
+  summary: {
+    total: number;
+    open: number;
+    in_progress: number;
+    resolved: number;
+    urgent: number;
+  };
+};
 
 function statusClass(
   status: string,
@@ -74,8 +88,18 @@ function formatDate(
 export default function SupportDashboardPage() {
   const [tickets, setTickets] =
     useState<SupportTicket[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
+  const [summary, setSummary] = useState({
+    total: 0,
+    open: 0,
+    in_progress: 0,
+    resolved: 0,
+    urgent: 0,
+  });
   const [search, setSearch] =
     useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] =
     useState("");
   const [priority, setPriority] =
@@ -94,28 +118,24 @@ export default function SupportDashboardPage() {
     setErrorMessage(null);
 
     try {
-      const response =
-        await browserApiRequest<
-          SupportTicket[]
-        >(
-          `/api/admin/support-tickets?skip=0&limit=${LIMIT}`,
-        );
+      const params = new URLSearchParams({
+        skip: String(page * LIMIT),
+        limit: String(LIMIT),
+      });
+      if (status) params.set("status", status);
+      if (priority) params.set("priority", priority);
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
 
-      setTickets(response);
+      const response = await browserApiRequest<SupportTicketPage>(
+        `/api/admin/support-tickets/page?${params.toString()}`,
+      );
 
+      setTickets(response.items);
+      setTotal(response.total);
+      setSummary(response.summary);
       setSelected((current) => {
-        if (!current) {
-          return response[0] ?? null;
-        }
-
-        return (
-          response.find(
-            (item) =>
-              item.id === current.id,
-          ) ??
-          response[0] ??
-          null
-        );
+        if (!current) return response.items[0] ?? null;
+        return response.items.find((item) => item.id === current.id) ?? response.items[0] ?? null;
       });
     } catch (error) {
       setErrorMessage(
@@ -126,80 +146,25 @@ export default function SupportDashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [debouncedSearch, page, priority, status]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const visibleTickets = useMemo(() => {
-    const normalized =
-      search.trim().toLowerCase();
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 350);
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
-    return tickets.filter((ticket) => {
-      if (
-        status &&
-        ticket.status !== status
-      ) {
-        return false;
-      }
-
-      if (
-        priority &&
-        ticket.priority !== priority
-      ) {
-        return false;
-      }
-
-      if (!normalized) {
-        return true;
-      }
-
-      return [
-        ticket.id,
-        ticket.user_id ?? "",
-        ticket.subject,
-        ticket.message,
-        ticket.status,
-        ticket.priority,
-        ticket.admin_notes ?? "",
-      ].some((value) =>
-        String(value)
-          .toLowerCase()
-          .includes(normalized),
-      );
-    });
-  }, [
-    priority,
-    search,
-    status,
-    tickets,
-  ]);
-
-  const counters = useMemo(() => {
-    return {
-      total: tickets.length,
-      open: tickets.filter(
-        (ticket) =>
-          ticket.status === "open",
-      ).length,
-      inProgress: tickets.filter(
-        (ticket) =>
-          ticket.status ===
-          "in_progress",
-      ).length,
-      resolved: tickets.filter(
-        (ticket) =>
-          ticket.status === "resolved" ||
-          ticket.status === "closed",
-      ).length,
-      urgent: tickets.filter(
-        (ticket) =>
-          ticket.priority === "urgent" ||
-          ticket.priority === "critical",
-      ).length,
-    };
-  }, [tickets]);
+  const visibleTickets = tickets;
+  const counters = {
+    total: summary.total,
+    open: summary.open,
+    inProgress: summary.in_progress,
+    resolved: summary.resolved,
+    urgent: summary.urgent,
+  };
 
   return (
     <div>
@@ -309,11 +274,10 @@ export default function SupportDashboardPage() {
             <input
               type="search"
               value={search}
-              onChange={(event) =>
-                setSearch(
-                  event.target.value,
-                )
-              }
+              onChange={(event) => {
+                setPage(0);
+                setSearch(event.target.value);
+              }}
               placeholder="Buscar ticket..."
               className="h-11 w-full rounded-xl border border-white/8 bg-black/30 pr-4 pl-11 text-sm text-white"
             />
@@ -321,9 +285,10 @@ export default function SupportDashboardPage() {
 
           <select
             value={status}
-            onChange={(event) =>
-              setStatus(event.target.value)
-            }
+            onChange={(event) => {
+              setPage(0);
+              setStatus(event.target.value);
+            }}
             className="h-11 rounded-xl border border-white/8 bg-[#09090a] px-4 text-sm text-zinc-300"
           >
             <option value="">
@@ -345,11 +310,10 @@ export default function SupportDashboardPage() {
 
           <select
             value={priority}
-            onChange={(event) =>
-              setPriority(
-                event.target.value,
-              )
-            }
+            onChange={(event) => {
+              setPage(0);
+              setPriority(event.target.value);
+            }}
             className="h-11 rounded-xl border border-white/8 bg-[#09090a] px-4 text-sm text-zinc-300"
           >
             <option value="">
@@ -502,6 +466,14 @@ export default function SupportDashboardPage() {
                   </table>
                 </div>
               )}
+              <AdminPagination
+                page={page}
+                pageSize={LIMIT}
+                total={total}
+                loading={isLoading}
+                label="tickets"
+                onPageChange={setPage}
+              />
             </div>
 
             <aside className="luxia-panel rounded-3xl p-6">
