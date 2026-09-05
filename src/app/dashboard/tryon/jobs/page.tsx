@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Clock3,
-  Coins, Cpu, Eye, FilterX, LoaderCircle, RefreshCcw, RotateCcw, Search,
+  Coins, Cpu, Download, Eye, ExternalLink, FilterX, LoaderCircle, RefreshCcw, RotateCcw, Search,
   Square, Trash2, UserRound, XCircle, DollarSign,
 } from "lucide-react";
 
@@ -106,6 +106,40 @@ function metricNumber(item: GenerationModuleExecution, key: string): number | nu
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function runtimeMetricNumber(item: GenerationModuleExecution, key: string): number | null {
+  const value = item.runtime_metrics?.[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+type TransportFileDiagnostic = {
+  file_id: string;
+  sha256?: string;
+  size_bytes?: number;
+  occurrence_count?: number;
+  paths: string[];
+  filenames: string[];
+  node_ids: Array<string | number>;
+};
+
+function transportFiles(item: GenerationModuleExecution): TransportFileDiagnostic[] {
+  const value = item.runtime_metrics?.transport_unique_files;
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const record = entry as Record<string, unknown>;
+    if (typeof record.file_id !== "string") return [];
+    return [{
+      file_id: record.file_id,
+      sha256: typeof record.sha256 === "string" ? record.sha256 : undefined,
+      size_bytes: typeof record.size_bytes === "number" ? record.size_bytes : undefined,
+      occurrence_count: typeof record.occurrence_count === "number" ? record.occurrence_count : undefined,
+      paths: Array.isArray(record.paths) ? record.paths.filter((path): path is string => typeof path === "string") : [],
+      filenames: Array.isArray(record.filenames) ? record.filenames.filter((name): name is string => typeof name === "string") : [],
+      node_ids: Array.isArray(record.node_ids) ? record.node_ids.filter((node): node is string | number => typeof node === "string" || typeof node === "number") : [],
+    }];
+  });
+}
+
 function timingRows(item: GenerationModuleExecution): Array<{label:string; value:string; hint?:string}> {
   const rows: Array<{label:string; value:string; hint?:string}> = [];
   const push = (label:string, key:string, hint?:string) => {
@@ -118,7 +152,15 @@ function timingRows(item: GenerationModuleExecution): Array<{label:string; value
   const payloadBytes = metricNumber(item, "modal_return_payload_base64_approx_bytes");
   if (payloadBytes != null) rows.push({ label: "Payload base64 de retorno", value: formatBytes(payloadBytes), hint: "Tamaño aproximado solo del contenido base64 retornado por Modal; no incluye todo el overhead del protocolo." });
   const payloadFiles = metricNumber(item, "modal_return_payload_generation_file_occurrences");
-  if (payloadFiles != null) rows.push({ label: "Archivos en payload", value: String(Math.round(payloadFiles)), hint: "Cuenta ocurrencias, por lo que revela si el mismo archivo aparece repetido en outputs/steps/context." });
+  if (payloadFiles != null) rows.push({ label: "Archivos pesados en payload", value: String(Math.round(payloadFiles)), hint: "Archivos únicos que realmente cargaron base64 en la respuesta Modal." });
+  const logicalFiles = runtimeMetricNumber(item, "transport_generation_file_occurrences");
+  if (logicalFiles != null) rows.push({ label: "Ocurrencias lógicas", value: String(Math.round(logicalFiles)), hint: "Apariciones de archivos encontradas en outputs, steps y context antes de deduplicar." });
+  const uniqueFiles = runtimeMetricNumber(item, "transport_unique_file_count");
+  if (uniqueFiles != null) rows.push({ label: "Archivos únicos", value: String(Math.round(uniqueFiles)), hint: "Contenidos diferentes identificados por SHA-256 y enviados una sola vez." });
+  const duplicateFiles = runtimeMetricNumber(item, "transport_duplicate_file_occurrences");
+  if (duplicateFiles != null) rows.push({ label: "Duplicados eliminados", value: String(Math.round(duplicateFiles)), hint: "Copias lógicas que fueron sustituidas por file_ref sin repetir base64." });
+  const savedBytes = runtimeMetricNumber(item, "transport_saved_declared_file_bytes");
+  if (savedBytes != null) rows.push({ label: "Binario ahorrado", value: formatBytes(savedBytes), hint: "Bytes de contenido que no se repitieron gracias al registro files + file_ref." });
   push("Cola → inicio runtime", "modal_queue_to_runtime_ms", "Disponible cuando el runtime desplegado entrega timestamps internos.");
   if (metricNumber(item, "modal_result_delivery_ms") != null) {
     push("Entrega Modal → Backend", "modal_result_delivery_ms", "Desde que Modal está listo para devolver el payload hasta que Backend lo recibe.");
@@ -140,16 +182,79 @@ function statusClass(status: string) {
   return "border-red-500/20 bg-red-500/10 text-red-300";
 }
 
-function resultLinks(value: unknown, prefix = "Resultado"): Array<{ label: string; href: string }> {
-  if (typeof value === "string" && (/^https?:\/\//.test(value) || value.startsWith("/"))) {
-    return [{ label: prefix, href: value }];
+function resultResources(value: unknown, prefix = "Resultado"): Array<{ label: string; fileId?: number; href?: string }> {
+  if (Array.isArray(value)) return value.flatMap((item, index) => resultResources(item, `${prefix} ${index + 1}`));
+  if (!value || typeof value !== "object") return [];
+
+  const record = value as Record<string, unknown>;
+  const rawFileId = record.storage_file_id;
+  const fileId = typeof rawFileId === "number" ? rawFileId : (typeof rawFileId === "string" && /^\d+$/.test(rawFileId) ? Number(rawFileId) : null);
+  if (fileId && Number.isInteger(fileId) && fileId > 0) {
+    return [{ label: typeof record.filename === "string" && record.filename ? record.filename : prefix, fileId }];
   }
-  if (Array.isArray(value)) return value.flatMap((item, index) => resultLinks(item, `${prefix} ${index + 1}`));
-  if (value && typeof value === "object") {
-    return Object.entries(value as Record<string, unknown>).flatMap(([key, item]) => resultLinks(item, key));
-  }
-  return [];
+
+  const legacyUrl = [record.preview_url, record.download_url, record.public_url, record.source_url, record.url]
+    .find((item): item is string => typeof item === "string" && (/^https?:\/\//.test(item) || item.startsWith("/")));
+  if (legacyUrl) return [{ label: typeof record.filename === "string" && record.filename ? record.filename : prefix, href: legacyUrl }];
+
+  return Object.entries(record)
+    .filter(([key]) => !["preview_url", "download_url", "public_url", "source_url", "url"].includes(key))
+    .flatMap(([key, item]) => resultResources(item, key));
 }
+
+function dedupeResources(resources: Array<{ label: string; fileId?: number; href?: string }>) {
+  const seen = new Set<string>();
+  return resources.filter((resource) => {
+    const key = resource.fileId ? `file:${resource.fileId}` : `url:${resource.href ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return Boolean(resource.fileId || resource.href);
+  });
+}
+
+function resourceUrl(resource: { fileId?: number; href?: string }, download: boolean) {
+  if (resource.fileId) return `/api/admin/storage/files/${encodeURIComponent(String(resource.fileId))}/content?download=${download ? "1" : "0"}`;
+  return resource.href ?? "";
+}
+
+function openResources(resources: Array<{ fileId?: number; href?: string }>) {
+  const fileIds = resources.map((resource) => resource.fileId).filter((fileId): fileId is number => typeof fileId === "number");
+  if (fileIds.length === resources.length && fileIds.length > 1) {
+    const params = new URLSearchParams({ ids: fileIds.join(",") });
+    window.open(`/dashboard/tryon/jobs/resources?${params.toString()}`, "_blank", "noopener,noreferrer");
+    return;
+  }
+  const url = resources.length === 1 ? resourceUrl(resources[0], false) : "";
+  if (url) {
+    window.open(url, "_blank", "noopener,noreferrer");
+    return;
+  }
+  for (const resource of resources) {
+    const fallbackUrl = resourceUrl(resource, false);
+    if (fallbackUrl) window.open(fallbackUrl, "_blank", "noopener,noreferrer");
+  }
+}
+
+function downloadResources(resources: Array<{ label: string; fileId?: number; href?: string }>) {
+  const fileIds = resources.map((resource) => resource.fileId).filter((fileId): fileId is number => typeof fileId === "number");
+  if (fileIds.length === resources.length && fileIds.length > 1) {
+    const params = new URLSearchParams({ ids: fileIds.join(",") });
+    window.location.href = `/api/admin/storage/files/download-bundle?${params.toString()}`;
+    return;
+  }
+  for (const resource of resources) {
+    const url = resourceUrl(resource, true);
+    if (!url) continue;
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = resource.label || "resource";
+    anchor.rel = "noreferrer";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  }
+}
+
 
 export default function UnifiedAiJobsPage() {
   const [modules, setModules] = useState<GenerationModule[]>([]);
@@ -351,7 +456,7 @@ export default function UnifiedAiJobsPage() {
             {active>0&&<span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs text-blue-300">Actualización en vivo</span>}
           </button>
           {isExpanded && <div className="overflow-x-auto"><table className="w-full min-w-[1120px] text-left text-sm"><thead className="text-[10px] uppercase tracking-wider text-zinc-600"><tr><th className="p-4">Seleccionar</th><th>Trabajo</th><th>Usuario</th><th>Motor</th><th>Estado</th><th>Progreso</th><th>Tokens</th><th>Tiempo backend</th><th>Tiempo real</th><th>Resultado / error</th><th className="pr-4">Acciones</th></tr></thead><tbody>{jobs.map((job)=>{
-            const links=resultLinks(job.outputs).slice(0,2); const busy=busyId===job.id;
+            const resources=dedupeResources(resultResources(job.outputs)); const busy=busyId===job.id;
             return <tr key={job.id} className="border-t border-white/5 align-top"><td className="p-4"><input type="checkbox" checked={selectedIds.has(job.id)} onChange={()=>toggleExecution(job.id)} className="size-4 accent-red-600"/></td><td className="pt-4"><p className="font-medium text-white">{job.module_key}</p><p className="mt-1 max-w-40 truncate font-mono text-[10px] text-zinc-700" title={job.id}>{job.id}</p><p className="mt-1 text-[10px] text-zinc-600">{formatDate(job.created_at)}</p></td><td><div className="pt-4"><div className="flex items-center gap-2 text-zinc-300"><UserRound size={14}/>{originLabel(job)}</div><p className="mt-1 text-[10px] text-zinc-600">{job.user_id?`Usuario #${job.user_id}`:"Administrador"}</p></div></td><td className="pt-4 text-zinc-400"><Cpu size={14} className="mr-2 inline"/>{engineLabel(job.engine)}<p className="mt-1 text-[10px] text-zinc-600">{job.queue_name || queueLabel(job)}{job.queue_position ? ` · #${job.queue_position}` : ""}</p></td><td className="pt-4"><span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase ${statusClass(job.status)}`}>{statusLabel(job.status)}</span></td><td className="pt-4"><div className="w-32"><div className="flex justify-between text-[10px] text-zinc-600"><span>{job.progress}%</span><span>{safeSteps(job).filter(s=>s.status==="completed").length}/{safeSteps(job).length}</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full bg-red-600 transition-all" style={{width:`${job.progress}%`}}/></div></div></td><td className="pt-4 text-zinc-400">
               <span>{job.tokens_charged??0} cobrados</span>
               {(job.result_locked || job.billing_breakdown?.result_locked) && (
@@ -359,14 +464,14 @@ export default function UnifiedAiJobsPage() {
                   +{job.estimated_pending_tokens ?? job.billing_breakdown?.estimated_pending_tokens ?? "?"} pendientes
                 </p>
               )}
-            </td><td className="pt-4 text-zinc-500">{formatDuration(job.duration_ms)}</td><td className="pt-4 text-zinc-300">{formatDuration(job.real_provider_duration_ms)}</td><td className="max-w-xs pt-4">{job.error?<p className="line-clamp-2 text-xs text-red-300" title={job.error}>{job.error}</p>:(job.result_locked || job.billing_breakdown?.result_locked)?<div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-2"><p className="text-xs font-semibold text-amber-300">Resultado bloqueado</p><p className="mt-1 text-[10px] text-zinc-500">Generado correctamente; conciliación pendiente por saldo insuficiente.</p></div>:links.length?<div className="flex flex-col gap-1">{links.map((link)=><a key={`${link.label}-${link.href}`} href={link.href} target="_blank" rel="noreferrer" className="truncate text-xs text-blue-300 hover:text-blue-200">{link.label}</a>)}</div>:<span className="text-xs text-zinc-600">{ACTIVE_STATUSES.has(job.status)?"Procesando...":"Sin archivo visible"}</span>}</td><td className="pr-4 pt-3"><div className="flex gap-2"><button onClick={()=>setSelected(job)} className="flex size-9 items-center justify-center rounded-lg border border-white/10 text-zinc-400 hover:text-white" title="Ver detalle"><Eye size={15}/></button><button onClick={()=>setBillingSelected(job)} className="flex size-9 items-center justify-center rounded-lg border border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/10" title="Desglose del cobro"><DollarSign size={15}/></button>{ACTIVE_STATUSES.has(job.status)&&<button disabled={busy} onClick={()=>void jobAction(job,"cancel")} className="flex size-9 items-center justify-center rounded-lg border border-white/10 text-zinc-400 hover:text-red-300 disabled:opacity-40" title="Cancelar">{busy?<LoaderCircle size={15} className="animate-spin"/>:<Square size={14}/>}</button>}{TERMINAL_STATUSES.has(job.status)&&<button disabled={busy} onClick={()=>void jobAction(job,"retry")} className="flex size-9 items-center justify-center rounded-lg bg-red-600 text-white hover:bg-red-500 disabled:opacity-40" title="Reintentar">{busy?<LoaderCircle size={15} className="animate-spin"/>:<RotateCcw size={15}/>}</button>}</div></td></tr>})}</tbody></table></div>}
+            </td><td className="pt-4 text-zinc-500">{formatDuration(job.duration_ms)}</td><td className="pt-4 text-zinc-300">{formatDuration(job.real_provider_duration_ms)}</td><td className="max-w-xs pt-4">{job.error?<p className="line-clamp-2 text-xs text-red-300" title={job.error}>{job.error}</p>:(job.result_locked || job.billing_breakdown?.result_locked)?<div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-2"><p className="text-xs font-semibold text-amber-300">Resultado bloqueado</p><p className="mt-1 text-[10px] text-zinc-500">Generado correctamente; conciliación pendiente por saldo insuficiente.</p></div>:resources.length?<div className="flex flex-col gap-2"><button type="button" onClick={()=>openResources(resources)} className="inline-flex items-center gap-1.5 text-xs text-blue-300 hover:text-blue-200"><ExternalLink size={12}/>Open resources{resources.length>1?` (${resources.length})`:""}</button><button type="button" onClick={()=>downloadResources(resources)} className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white"><Download size={12}/>Download resources{resources.length>1?` (${resources.length})`:""}</button></div>:<span className="text-xs text-zinc-600">{ACTIVE_STATUSES.has(job.status)?"Procesando...":"Sin archivo visible"}</span>}</td><td className="pr-4 pt-3"><div className="flex gap-2"><button onClick={()=>setSelected(job)} className="flex size-9 items-center justify-center rounded-lg border border-white/10 text-zinc-400 hover:text-white" title="Ver detalle"><Eye size={15}/></button><button onClick={()=>setBillingSelected(job)} className="flex size-9 items-center justify-center rounded-lg border border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/10" title="Desglose del cobro"><DollarSign size={15}/></button>{ACTIVE_STATUSES.has(job.status)&&<button disabled={busy} onClick={()=>void jobAction(job,"cancel")} className="flex size-9 items-center justify-center rounded-lg border border-white/10 text-zinc-400 hover:text-red-300 disabled:opacity-40" title="Cancelar">{busy?<LoaderCircle size={15} className="animate-spin"/>:<Square size={14}/>}</button>}{TERMINAL_STATUSES.has(job.status)&&<button disabled={busy} onClick={()=>void jobAction(job,"retry")} className="flex size-9 items-center justify-center rounded-lg bg-red-600 text-white hover:bg-red-500 disabled:opacity-40" title="Reintentar">{busy?<LoaderCircle size={15} className="animate-spin"/>:<RotateCcw size={15}/>}</button>}</div></td></tr>})}</tbody></table></div>}
         </section>
       })}
     </div>}
 
 
     {billingSelected && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" onMouseDown={event=>{if(event.target===event.currentTarget)setBillingSelected(null)}}><section className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-emerald-500/20 bg-[#0b0b0d] p-6"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] uppercase tracking-[.2em] text-emerald-400">Desglose del cobro</p><h2 className="mt-2 text-xl font-semibold text-white">{billingSelected.module_key}</h2><p className="mt-1 font-mono text-[11px] text-zinc-600">{billingSelected.id}</p></div><button onClick={()=>setBillingSelected(null)} className="flex size-9 items-center justify-center rounded-xl border border-white/10 text-zinc-400"><XCircle size={17}/></button></div><div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><Detail label="Tokens cobrados" value={String(billingSelected.tokens_charged ?? 0)}/><Detail label="Tiempo backend" value={formatDuration(billingSelected.duration_ms)}/><Detail label="Tiempo real proveedor" value={formatDuration(billingSelected.real_provider_duration_ms)}/><Detail label="Inicio proveedor" value={formatDate(billingSelected.provider_started_at)}/><Detail label="Fin proveedor" value={formatDate(billingSelected.provider_finished_at)}/><Detail label="Estado" value={statusLabel(billingSelected.status)}/></div><div className="mt-6"><h3 className="text-sm font-semibold text-white">Cálculo guardado por el backend</h3><pre className="mt-3 max-h-[50vh] overflow-auto rounded-2xl border border-white/6 bg-black/30 p-4 text-[11px] leading-5 text-zinc-300">{prettyJson(billingSelected.billing_breakdown ?? {})}</pre></div></section></div>}
-    {selected && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" onMouseDown={(e)=>{if(e.target===e.currentTarget)setSelected(null)}}><section className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-white/10 bg-[#0b0b0d] p-6 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] uppercase tracking-[.2em] text-red-500">Detalle de ejecución</p><h2 className="mt-2 text-xl font-semibold text-white">{modulesById.get(selected.module_id)?.name ?? selected.module_key}</h2><p className="mt-1 font-mono text-[11px] text-zinc-600">{selected.id}</p></div><button onClick={()=>setSelected(null)} className="flex size-9 items-center justify-center rounded-xl border border-white/10 text-zinc-400 hover:text-white"><XCircle size={17}/></button></div><div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><Detail label="Estado" value={statusLabel(selected.status)}/><Detail label="Motor" value={engineLabel(selected.engine)}/><Detail label="Cola" value={`${selected.queue_name || queueLabel(selected)}${selected.queue_position ? ` · posición ${selected.queue_position}` : ""}`}/><Detail label="Estado proveedor" value={providerState(selected)}/><Detail label="Origen" value={originLabel(selected)}/><Detail label="Usuario" value={selected.user_id?`#${selected.user_id}`:"Administrador"}/><Detail label="Job remoto" value={selected.provider_job_id || "—"}/><Detail label="Endpoint remoto" value={selected.provider_endpoint_id || "—"}/><Detail label="Intentos de despacho" value={String(selected.dispatch_attempts ?? 0)}/><Detail label="Heartbeat" value={formatDate(selected.heartbeat_at)}/><Detail label="Duración backend" value={formatDuration(selected.duration_ms)}/><Detail label="Tiempo real" value={formatDuration(selected.real_provider_duration_ms)}/><Detail label="Cancelación solicitada" value={selected.cancel_requested?"Sí":"No"}/></div><div className="mt-6"><h3 className="text-sm font-semibold text-white">Pasos</h3><div className="mt-3 space-y-2">{safeSteps(selected).map((step)=><div key={step.step_key} className="rounded-2xl border border-white/6 bg-black/20 p-4"><div className="flex justify-between gap-4"><div><p className="text-sm text-white">{step.step_name}</p><p className="mt-1 text-xs text-zinc-600">{step.step_type} · {step.step_key}</p></div><span className={`h-fit rounded-full border px-2.5 py-1 text-[10px] uppercase ${statusClass(step.status)}`}>{statusLabel(step.status)}</span></div>{step.error&&<p className="mt-3 text-xs text-red-300">{step.error}</p>}</div>)}</div></div><div className="mt-6 grid gap-4 lg:grid-cols-2"><section><h3 className="text-sm font-semibold text-white">Entradas</h3><pre className="mt-3 max-h-64 overflow-auto rounded-2xl border border-white/6 bg-black/30 p-4 text-[11px] leading-5 text-zinc-400">{prettyJson(selected.inputs)}</pre></section><section><h3 className="text-sm font-semibold text-white">Salidas</h3><pre className="mt-3 max-h-64 overflow-auto rounded-2xl border border-white/6 bg-black/30 p-4 text-[11px] leading-5 text-zinc-400">{prettyJson(selected.outputs)}</pre></section></div><div className="mt-6"><h3 className="text-sm font-semibold text-white">Rastreo de tiempos</h3>{timingRows(selected).length?<div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{timingRows(selected).map((row)=><div key={row.label} className="rounded-2xl border border-white/6 bg-black/20 p-4" title={row.hint}><p className="text-[10px] uppercase tracking-wider text-zinc-600">{row.label}</p><p className="mt-2 text-sm font-semibold text-white">{row.value}</p>{row.hint&&<p className="mt-2 text-[10px] leading-4 text-zinc-600">{row.hint}</p>}</div>)}</div>:<p className="mt-3 text-xs text-zinc-600">Esta ejecución todavía no contiene métricas de rastreo detallado.</p>}<h4 className="mt-5 text-xs font-semibold uppercase tracking-wider text-zinc-500">JSON técnico</h4><pre className="mt-3 max-h-72 overflow-auto rounded-2xl border border-white/6 bg-black/30 p-4 text-[11px] leading-5 text-zinc-400">{prettyJson({provider_metrics:selected.provider_metrics ?? {},runtime_metrics:selected.runtime_metrics ?? {}})}</pre></div><div className="mt-6"><h3 className="text-sm font-semibold text-white">Registro</h3><div className="mt-3 max-h-60 space-y-2 overflow-auto rounded-2xl border border-white/6 bg-black/30 p-4 font-mono text-[11px]">{safeLogs(selected).length?safeLogs(selected).map((log,index)=><p key={`${log.timestamp}-${index}`} className={log.level==="error"?"text-red-300":log.level==="warning"?"text-amber-300":"text-zinc-500"}>[{formatDate(log.timestamp)}] {log.message}</p>):<p className="text-zinc-600">Sin eventos registrados.</p>}</div></div></section></div>}
+    {selected && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" onMouseDown={(e)=>{if(e.target===e.currentTarget)setSelected(null)}}><section className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-white/10 bg-[#0b0b0d] p-6 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] uppercase tracking-[.2em] text-red-500">Detalle de ejecución</p><h2 className="mt-2 text-xl font-semibold text-white">{modulesById.get(selected.module_id)?.name ?? selected.module_key}</h2><p className="mt-1 font-mono text-[11px] text-zinc-600">{selected.id}</p></div><button onClick={()=>setSelected(null)} className="flex size-9 items-center justify-center rounded-xl border border-white/10 text-zinc-400 hover:text-white"><XCircle size={17}/></button></div><div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><Detail label="Estado" value={statusLabel(selected.status)}/><Detail label="Motor" value={engineLabel(selected.engine)}/><Detail label="Cola" value={`${selected.queue_name || queueLabel(selected)}${selected.queue_position ? ` · posición ${selected.queue_position}` : ""}`}/><Detail label="Estado proveedor" value={providerState(selected)}/><Detail label="Origen" value={originLabel(selected)}/><Detail label="Usuario" value={selected.user_id?`#${selected.user_id}`:"Administrador"}/><Detail label="Job remoto" value={selected.provider_job_id || "—"}/><Detail label="Endpoint remoto" value={selected.provider_endpoint_id || "—"}/><Detail label="Intentos de despacho" value={String(selected.dispatch_attempts ?? 0)}/><Detail label="Heartbeat" value={formatDate(selected.heartbeat_at)}/><Detail label="Duración backend" value={formatDuration(selected.duration_ms)}/><Detail label="Tiempo real" value={formatDuration(selected.real_provider_duration_ms)}/><Detail label="Cancelación solicitada" value={selected.cancel_requested?"Sí":"No"}/></div><div className="mt-6"><h3 className="text-sm font-semibold text-white">Pasos</h3><div className="mt-3 space-y-2">{safeSteps(selected).map((step)=><div key={step.step_key} className="rounded-2xl border border-white/6 bg-black/20 p-4"><div className="flex justify-between gap-4"><div><p className="text-sm text-white">{step.step_name}</p><p className="mt-1 text-xs text-zinc-600">{step.step_type} · {step.step_key}</p></div><span className={`h-fit rounded-full border px-2.5 py-1 text-[10px] uppercase ${statusClass(step.status)}`}>{statusLabel(step.status)}</span></div>{step.error&&<p className="mt-3 text-xs text-red-300">{step.error}</p>}</div>)}</div></div><div className="mt-6 grid gap-4 lg:grid-cols-2"><section><h3 className="text-sm font-semibold text-white">Entradas</h3><pre className="mt-3 max-h-64 overflow-auto rounded-2xl border border-white/6 bg-black/30 p-4 text-[11px] leading-5 text-zinc-400">{prettyJson(selected.inputs)}</pre></section><section><h3 className="text-sm font-semibold text-white">Salidas</h3><pre className="mt-3 max-h-64 overflow-auto rounded-2xl border border-white/6 bg-black/30 p-4 text-[11px] leading-5 text-zinc-400">{prettyJson(selected.outputs)}</pre></section></div><div className="mt-6"><h3 className="text-sm font-semibold text-white">Rastreo de tiempos</h3>{timingRows(selected).length?<div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{timingRows(selected).map((row)=><div key={row.label} className="rounded-2xl border border-white/6 bg-black/20 p-4" title={row.hint}><p className="text-[10px] uppercase tracking-wider text-zinc-600">{row.label}</p><p className="mt-2 text-sm font-semibold text-white">{row.value}</p>{row.hint&&<p className="mt-2 text-[10px] leading-4 text-zinc-600">{row.hint}</p>}</div>)}</div>:<p className="mt-3 text-xs text-zinc-600">Esta ejecución todavía no contiene métricas de rastreo detallado.</p>}{transportFiles(selected).length>0&&<div className="mt-5"><h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Archivos únicos del transporte</h4><div className="mt-3 space-y-2">{transportFiles(selected).map((file)=><div key={file.file_id} className="rounded-2xl border border-white/6 bg-black/20 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-mono text-xs text-white">{file.file_id}</p><p className="text-xs text-zinc-500">{formatBytes(file.size_bytes)} · {file.occurrence_count??0} ocurrencia{file.occurrence_count===1?"":"s"}</p></div>{file.filenames.length>0&&<p className="mt-2 text-[11px] text-zinc-500">Nombres: {file.filenames.join(", ")}</p>}{file.node_ids.length>0&&<p className="mt-1 text-[11px] text-zinc-600">Nodos: {file.node_ids.join(", ")}</p>}{file.sha256&&<p className="mt-1 truncate font-mono text-[10px] text-zinc-700" title={file.sha256}>SHA-256: {file.sha256}</p>}<div className="mt-3 space-y-1">{file.paths.map((path)=><p key={path} className="break-all font-mono text-[10px] text-zinc-500">{path}</p>)}</div></div>)}</div></div>}<h4 className="mt-5 text-xs font-semibold uppercase tracking-wider text-zinc-500">JSON técnico</h4><pre className="mt-3 max-h-72 overflow-auto rounded-2xl border border-white/6 bg-black/30 p-4 text-[11px] leading-5 text-zinc-400">{prettyJson({provider_metrics:selected.provider_metrics ?? {},runtime_metrics:selected.runtime_metrics ?? {}})}</pre></div><div className="mt-6"><h3 className="text-sm font-semibold text-white">Registro</h3><div className="mt-3 max-h-60 space-y-2 overflow-auto rounded-2xl border border-white/6 bg-black/30 p-4 font-mono text-[11px]">{safeLogs(selected).length?safeLogs(selected).map((log,index)=><p key={`${log.timestamp}-${index}`} className={log.level==="error"?"text-red-300":log.level==="warning"?"text-amber-300":"text-zinc-500"}>[{formatDate(log.timestamp)}] {log.message}</p>):<p className="text-zinc-600">Sin eventos registrados.</p>}</div></div></section></div>}
   </div>;
 }
 
