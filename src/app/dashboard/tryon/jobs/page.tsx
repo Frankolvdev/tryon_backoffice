@@ -31,6 +31,16 @@ function formatDate(value?: string | null) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString("es-MX");
 }
 
+function formatBytes(bytes?: number | null) {
+  if (typeof bytes !== "number" || !Number.isFinite(bytes) || bytes < 0) return "—";
+  if (bytes < 1024) return `${Math.round(bytes)} B`;
+  const units = ["KB", "MB", "GB"];
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit += 1; }
+  return `${value.toFixed(value >= 10 ? 1 : 2)} ${units[unit]}`;
+}
+
 function formatDuration(ms?: number | null) {
   if (ms == null) return "—";
   if (ms < 1000) return `${ms} ms`;
@@ -104,6 +114,11 @@ function timingRows(item: GenerationModuleExecution): Array<{label:string; value
   };
   push("Espera Backend / FunctionCall", "backend_modal_wait_ms", "Desde que Backend empieza a esperar el FunctionCall hasta recibir el resultado.");
   push("Runtime exacto Modal", "modal_runtime_exact_ms", "Tiempo medido dentro del runtime Modal.");
+  push("Post-runtime dentro de Modal", "modal_post_runtime_ms", "Trabajo diagnóstico entre el retorno del GenerationRuntime y el inicio del return de la Function.");
+  const payloadBytes = metricNumber(item, "modal_return_payload_base64_approx_bytes");
+  if (payloadBytes != null) rows.push({ label: "Payload base64 de retorno", value: formatBytes(payloadBytes), hint: "Tamaño aproximado solo del contenido base64 retornado por Modal; no incluye todo el overhead del protocolo." });
+  const payloadFiles = metricNumber(item, "modal_return_payload_generation_file_occurrences");
+  if (payloadFiles != null) rows.push({ label: "Archivos en payload", value: String(Math.round(payloadFiles)), hint: "Cuenta ocurrencias, por lo que revela si el mismo archivo aparece repetido en outputs/steps/context." });
   push("Cola → inicio runtime", "modal_queue_to_runtime_ms", "Disponible cuando el runtime desplegado entrega timestamps internos.");
   if (metricNumber(item, "modal_result_delivery_ms") != null) {
     push("Entrega Modal → Backend", "modal_result_delivery_ms", "Desde que Modal está listo para devolver el payload hasta que Backend lo recibe.");
