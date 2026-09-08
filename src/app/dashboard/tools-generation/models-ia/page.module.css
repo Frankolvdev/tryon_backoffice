@@ -5,3 +5,5 @@
 .media{border:0;padding:0;width:100%;display:block;text-align:initial;cursor:default}.mediaPlayable{cursor:pointer}.playBadge{position:absolute;right:10px;bottom:10px;width:32px;height:32px;border-radius:999px;display:grid;place-items:center;background:rgba(0,0,0,.72);border:1px solid rgba(255,255,255,.15);color:#fff;backdrop-filter:blur(8px);box-shadow:0 6px 18px rgba(0,0,0,.35)}
 
 .storageField{display:flex;flex-direction:column;gap:5px;min-width:0}.storageField>span,.cardStorage label>span{font-size:10px;font-weight:750;color:#858590}.cardStorage{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;margin-top:8px}.cardStorage>label:first-child{display:flex;flex:1;min-width:0;flex-direction:column;gap:5px}.cardStorage .select{padding:7px 8px;font-size:10px}.cardStorage .toggle{flex:0 0 auto;padding-bottom:7px}
+
+.bodyMedia{aspect-ratio:3/4;background:#08080a}.bodyMedia img,.bodyMedia video{object-fit:contain}

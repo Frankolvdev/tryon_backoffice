@@ -1,4 +1,15 @@
-export type ModelGenerationToolKey = "eyebrows" | "lips" | "hairstyle";
+export type ModelGenerationToolKey =
+  | "eyebrows"
+  | "lips"
+  | "hairstyle"
+  | "hips"
+  | "ass"
+  | "breasts"
+  | "height"
+  | "bubble_butt"
+  | "waist"
+  | "slim"
+  | "thick";
 export type ModelGenerationStorageMode = "auto" | "local" | "amazon_s3" | "cloudflare_r2";
 
 export interface ModelGenerationAsset {

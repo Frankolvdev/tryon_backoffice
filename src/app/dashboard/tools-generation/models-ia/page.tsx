@@ -9,11 +9,20 @@ import AncestryAssetsPage from "../ancestry-assets/page";
 import styles from "./page.module.css";
 
 const API = "/api/admin/tools-generation/model-assets";
+const BODY_TOOLS = new Set<ModelGenerationToolKey>(["hips","ass","breasts","height","bubble_butt","waist","slim","thick"]);
 const TABS: {key:"ancestry"|ModelGenerationToolKey; label:string; description:string}[] = [
   {key:"ancestry",label:"Ancestry",description:"Biblioteca de ascendencias existente. Se renderiza sin modificar su implementación."},
   {key:"eyebrows",label:"Eyebrows",description:"Previews de formas de cejas. Solo título, valor y media."},
   {key:"lips",label:"Lips",description:"Previews de formas de labios. Solo título, valor y media."},
   {key:"hairstyle",label:"Hairstyle",description:"Previews de estilos de cabello. Solo título, valor y media."},
+  {key:"hips",label:"Hips",description:"Presets visuales para ancho de caderas. Puede quedar vacío: AppWeb debe mostrar solo el control."},
+  {key:"ass",label:"Ass",description:"Presets visuales para volumen de glúteos. Puede quedar vacío: AppWeb debe mostrar solo el control."},
+  {key:"breasts",label:"Breasts",description:"Presets visuales para tamaño de busto. Puede quedar vacío: AppWeb debe mostrar solo el control."},
+  {key:"height",label:"Height",description:"Previews opcionales para altura. Si no hay assets activos, AppWeb usa únicamente el slider."},
+  {key:"bubble_butt",label:"Bubble Butt",description:"Presets visuales para forma y proyección del glúteo, separados del volumen general."},
+  {key:"waist",label:"Waist",description:"Presets visuales para ancho de cintura. Puede quedar vacío: AppWeb debe mostrar solo el control."},
+  {key:"slim",label:"Slim",description:"Assets opcionales del modo corporal global Slim."},
+  {key:"thick",label:"Thick",description:"Assets opcionales del modo corporal global Thick / Curvy."},
 ];
 
 async function posterFromVideo(file: File): Promise<File> {
@@ -75,8 +84,8 @@ function ToolManager({tool}:{tool:ModelGenerationToolKey}){
   const [storage,setStorage]=useState<ModelGenerationStorageOptions>({active_provider:"local",modes:["auto","local","amazon_s3","cloudflare_r2"]});
   const [loading,setLoading]=useState(true); const [busy,setBusy]=useState<number|"new"|null>(null);
   const [playingId,setPlayingId]=useState<number|null>(null);
-  const [title,setTitle]=useState(""); const [value,setValue]=useState(""); const [newVideo,setNewVideo]=useState<File|null>(null); const [mode,setMode]=useState<ModelGenerationStorageMode>("auto");
-  const newVideoRef=useRef<HTMLInputElement>(null);
+  const [title,setTitle]=useState(""); const [value,setValue]=useState(""); const [newMedia,setNewMedia]=useState<File|null>(null); const [mode,setMode]=useState<ModelGenerationStorageMode>("auto");
+  const newMediaRef=useRef<HTMLInputElement>(null);
   const fileRefs=useRef(new Map<string,HTMLInputElement>());
   const load=useCallback(async()=>{setLoading(true);try{const [list,opts]=await Promise.all([browserApiRequest<ModelGenerationAssetList>(`${API}?tool_key=${tool}`),browserApiRequest<ModelGenerationStorageOptions>(`${API}/storage-options`)]);setItems(list.items);setStorage(opts)}catch(e){toast.error(e instanceof Error?e.message:"No se pudo cargar Models IA") }finally{setLoading(false)}},[tool]);
   useEffect(()=>{void load()},[load]);
@@ -85,18 +94,21 @@ function ToolManager({tool}:{tool:ModelGenerationToolKey}){
 
   async function create(){
     if(!title.trim()||!value.trim()){toast.error("Título y valor son obligatorios.");return}
-    if(!newVideo){toast.error("Selecciona un video para crear la preview.");return}
+    if(!newMedia){toast.error("Selecciona una imagen o video para crear la preview.");return}
     setBusy("new");
     try{
-      const poster=await posterFromVideo(newVideo);
+      const isVideo=newMedia.type.startsWith("video/");
+      const poster=isVideo?await posterFromVideo(newMedia):newMedia;
       const key=title.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
       const created=await browserApiRequest<ModelGenerationAsset>(API,{method:"POST",body:JSON.stringify({tool_key:tool,asset_key:key,title:title.trim(),value:value.trim(),sort_order:(items.length+1)*10,storage_mode:mode,is_active:true})});
-      const vfd=new FormData();vfd.set("kind","video");vfd.set("media",newVideo);
-      await browserApiRequest(`${API}/${created.id}/media`,{method:"POST",body:vfd});
+      if(isVideo){
+        const vfd=new FormData();vfd.set("kind","video");vfd.set("media",newMedia);
+        await browserApiRequest(`${API}/${created.id}/media`,{method:"POST",body:vfd});
+      }
       const pfd=new FormData();pfd.set("kind","poster");pfd.set("media",poster);
       await browserApiRequest(`${API}/${created.id}/media`,{method:"POST",body:pfd});
-      setTitle("");setValue("");setNewVideo(null);if(newVideoRef.current)newVideoRef.current.value="";
-      await load();toast.success("Opción, video y poster automático creados");
+      setTitle("");setValue("");setNewMedia(null);if(newMediaRef.current)newMediaRef.current.value="";
+      await load();toast.success(isVideo?"Opción, video y poster automático creados":"Opción e imagen creadas");
     }catch(e){toast.error(e instanceof Error?e.message:"No se pudo crear") }finally{setBusy(null)}
   }
   async function patch(item:ModelGenerationAsset,patch:Record<string,unknown>){setBusy(item.id);try{await browserApiRequest(`${API}/${item.id}`,{method:"PATCH",body:JSON.stringify(patch)});await load()}catch(e){toast.error(e instanceof Error?e.message:"No se pudo guardar") }finally{setBusy(null)}}
@@ -133,12 +145,12 @@ function ToolManager({tool}:{tool:ModelGenerationToolKey}){
           {storage.modes.map(storageMode=><option key={storageMode} value={storageMode}>{storageMode==="auto"?`Automatic (${activeLabel})`:storageMode}</option>)}
         </select>
       </label>
-      <button type="button" className={styles.videoPicker} onClick={()=>newVideoRef.current?.click()}><Film size={14}/><span>{newVideo?newVideo.name:"Seleccionar video"}</span></button>
-      <input ref={newVideoRef} className={styles.hidden} type="file" accept="video/mp4,video/webm,video/quicktime" onChange={e=>setNewVideo(e.target.files?.[0]||null)}/>
+      <button type="button" className={styles.videoPicker} onClick={()=>newMediaRef.current?.click()}>{newMedia?.type.startsWith("image/")?<ImageIcon size={14}/>:<Film size={14}/>}<span>{newMedia?newMedia.name:"Seleccionar imagen o video"}</span></button>
+      <input ref={newMediaRef} className={styles.hidden} type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" onChange={e=>setNewMedia(e.target.files?.[0]||null)}/>
       <button className={styles.btn} onClick={()=>void create()} disabled={busy==="new"}>{busy==="new"?<Loader2 size={14}/>:<Plus size={14}/>} Agregar</button>
     </div>
     {loading?<div className={styles.empty}><Loader2 size={18}/> Cargando…</div>:<div className={styles.grid}>{ordered.map(item=><article className={styles.card} key={item.id}>
-      <button type="button" className={`${styles.media} ${item.video_url?styles.mediaPlayable:""}`} onClick={()=>{if(item.video_url)setPlayingId(current=>current===item.id?null:item.id)}} aria-label={item.video_url?`${playingId===item.id?"Pausar":"Reproducir"} ${item.title}`:item.title}>
+      <button type="button" className={`${styles.media} ${BODY_TOOLS.has(tool)?styles.bodyMedia:""} ${item.video_url?styles.mediaPlayable:""}`} onClick={()=>{if(item.video_url)setPlayingId(current=>current===item.id?null:item.id)}} aria-label={item.video_url?`${playingId===item.id?"Pausar":"Reproducir"} ${item.title}`:item.title}>
         {playingId===item.id&&item.video_url?
           <video key={`${item.id}-${item.video_url}`} src={item.video_url} poster={item.poster_url||undefined} muted loop playsInline autoPlay/>:
           item.poster_url?<img src={item.poster_url} alt={item.title}/>:<div className={styles.empty}>Sin preview</div>}
