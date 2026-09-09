@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AppProviders } from "@/components/providers/app-providers";
+import { BrandingBootstrap } from "@/components/backoffice/platform-brand";
 import { appConfig } from "@/config/app";
 
 import "./globals.css";
@@ -28,7 +29,7 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <body className="antialiased">
-        <AppProviders>{children}</AppProviders>
+        <AppProviders><BrandingBootstrap />{children}</AppProviders>
       </body>
     </html>
   );

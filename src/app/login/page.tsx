@@ -5,11 +5,10 @@ import {
   Database,
   LockKeyhole,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 
 import { LoginForm } from "@/components/auth/login-form";
-import { appConfig } from "@/config/app";
+import { PlatformBrand } from "@/components/backoffice/platform-brand";
 
 export const metadata: Metadata = {
   title: "Acceso administrativo",
@@ -46,24 +45,7 @@ export default function LoginPage() {
       <div className="relative mx-auto grid min-h-screen max-w-[1600px] lg:grid-cols-[1.05fr_0.95fr]">
         <section className="relative hidden overflow-hidden border-r border-white/5 lg:flex lg:flex-col lg:justify-between lg:p-14 xl:p-20">
           <div>
-            <div className="flex items-center gap-4">
-              <div className="luxia-red-glow flex size-12 items-center justify-center rounded-2xl border border-red-500/20 bg-red-950/30">
-                <Sparkles
-                  size={24}
-                  className="text-red-400"
-                />
-              </div>
-
-              <div>
-                <p className="text-xl font-semibold tracking-[0.22em] text-white">
-                  {appConfig.name}
-                </p>
-
-                <p className="mt-1 text-[10px] font-semibold tracking-[0.3em] text-red-500 uppercase">
-                  AI Fashion Studio
-                </p>
-              </div>
-            </div>
+            <PlatformBrand />
 
             <div className="mt-28 max-w-2xl">
               <p className="text-xs font-semibold tracking-[0.32em] text-red-500 uppercase">
@@ -109,24 +91,7 @@ export default function LoginPage() {
 
         <section className="flex min-h-screen items-center justify-center px-5 py-10 sm:px-8 lg:px-14">
           <div className="w-full max-w-[460px]">
-            <div className="mb-10 flex items-center gap-4 lg:hidden">
-              <div className="luxia-red-glow flex size-11 items-center justify-center rounded-2xl border border-red-500/20 bg-red-950/30">
-                <Sparkles
-                  size={22}
-                  className="text-red-400"
-                />
-              </div>
-
-              <div>
-                <p className="text-lg font-semibold tracking-[0.2em] text-white">
-                  {appConfig.name}
-                </p>
-
-                <p className="text-[9px] font-semibold tracking-[0.28em] text-red-500 uppercase">
-                  Backoffice
-                </p>
-              </div>
-            </div>
+            <div className="mb-10 lg:hidden"><PlatformBrand /></div>
 
             <div className="luxia-panel rounded-[28px] p-6 sm:p-9">
               <div className="flex size-12 items-center justify-center rounded-2xl border border-red-500/15 bg-red-950/20 text-red-400">
