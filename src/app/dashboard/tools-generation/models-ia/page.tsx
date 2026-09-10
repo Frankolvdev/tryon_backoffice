@@ -15,6 +15,7 @@ const TABS: {key:"ancestry"|ModelGenerationToolKey; label:string; description:st
   {key:"eyebrows",label:"Eyebrows",description:"Previews de formas de cejas. Solo título, valor y media."},
   {key:"lips",label:"Lips",description:"Previews de formas de labios. Solo título, valor y media."},
   {key:"hairstyle",label:"Hairstyle",description:"Previews de estilos de cabello. Solo título, valor y media."},
+  {key:"facial_structures",label:"Estructuras faciales",description:"Banco privado de referencias faciales para Create Model. Nunca se publica al AppWeb."},
   {key:"hips",label:"Hips",description:"Previews del slider de caderas. Position define su punto visual dentro del rango."},
   {key:"butt_size",label:"Butt Size",description:"Previews SFW del slider de tamaño. Position define su punto visual dentro del rango."},
   {key:"breasts",label:"Breasts",description:"Previews del slider de busto. Position define su punto visual dentro del rango."},
@@ -77,6 +78,29 @@ async function posterFromVideo(file: File): Promise<File> {
   }
 }
 
+
+function FaceStructureManager(){
+  const PAGE_SIZE=24;
+  const [items,setItems]=useState<ModelGenerationAsset[]>([]);
+  const [total,setTotal]=useState(0); const [page,setPage]=useState(0);
+  const [storage,setStorage]=useState<ModelGenerationStorageOptions>({active_provider:"local",modes:["auto","local","amazon_s3","cloudflare_r2"]});
+  const [mode,setMode]=useState<ModelGenerationStorageMode>("auto"); const [loading,setLoading]=useState(true); const [busy,setBusy]=useState(false); const [dragging,setDragging]=useState(false);
+  const picker=useRef<HTMLInputElement>(null);
+  const load=useCallback(async()=>{setLoading(true);try{const [list,opts]=await Promise.all([browserApiRequest<ModelGenerationAssetList>(`${API}?tool_key=facial_structures&skip=${page*PAGE_SIZE}&limit=${PAGE_SIZE}`),browserApiRequest<ModelGenerationStorageOptions>(`${API}/storage-options`)]);setItems(list.items);setTotal(list.total);setStorage(opts)}catch(e){toast.error(e instanceof Error?e.message:"No se pudo cargar el banco facial")}finally{setLoading(false)}},[page]);
+  useEffect(()=>{void load()},[load]);
+  async function uploadFiles(files:File[]){const images=files.filter(file=>file.type.startsWith("image/"));if(!images.length){toast.error("Selecciona imágenes válidas.");return}setBusy(true);try{const fd=new FormData();for(const file of images)fd.append("media",file);fd.set("storage_mode",mode);await browserApiRequest(`${API}/facial-structures/batch`,{method:"POST",body:fd});toast.success(`${images.length} referencia${images.length===1?"":"s"} subida${images.length===1?"":"s"} y normalizada${images.length===1?"":"s"} a 512×720`);setPage(0);await load()}catch(e){toast.error(e instanceof Error?e.message:"No se pudieron subir las referencias")}finally{setBusy(false)}}
+  async function remove(item:ModelGenerationAsset){if(!confirm("¿Eliminar esta estructura facial?"))return;try{await browserApiRequest(`${API}/${item.id}`,{method:"DELETE"});await load()}catch(e){toast.error(e instanceof Error?e.message:"No se pudo eliminar")}}
+  const activeLabel=storage.active_provider.replaceAll("_"," "); const pages=Math.max(1,Math.ceil(total/PAGE_SIZE));
+  return <section className={styles.panel}>
+    <div className={styles.toolbar}><div><h2>Estructuras faciales</h2><p>Banco privado. Cada archivo se recorta y optimiza automáticamente a 512×720.</p></div><span className={styles.status}>{total.toLocaleString("es-MX")} referencias</span></div>
+    <div className={styles.faceControls}><label className={styles.storageField}><span>Destino de storage</span><select className={styles.select} value={mode} onChange={e=>setMode(e.target.value as ModelGenerationStorageMode)}>{storage.modes.map(m=><option key={m} value={m}>{m==="auto"?`Automatic (${activeLabel})`:m}</option>)}</select></label></div>
+    <div className={`${styles.dropzone} ${dragging?styles.dropzoneActive:""}`} onDragEnter={e=>{e.preventDefault();setDragging(true)}} onDragOver={e=>e.preventDefault()} onDragLeave={e=>{e.preventDefault();if(e.currentTarget===e.target)setDragging(false)}} onDrop={e=>{e.preventDefault();setDragging(false);void uploadFiles(Array.from(e.dataTransfer.files))}}>
+      <Upload size={28}/><strong>Arrastra aquí una o muchas imágenes</strong><span>También puedes seleccionarlas desde móvil o escritorio.</span><button type="button" className={styles.btn} disabled={busy} onClick={()=>picker.current?.click()}>{busy?<Loader2 size={14}/>:<Plus size={14}/>} Seleccionar imágenes</button><input ref={picker} className={styles.hidden} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value="";void uploadFiles(files)}}/>
+    </div>
+    {loading?<div className={styles.empty}><Loader2 size={18}/> Cargando…</div>:<div className={styles.faceGrid}>{items.map((item,index)=><article className={styles.faceCard} key={item.id}>{item.poster_url?<img src={item.poster_url} alt={`Estructura facial ${page*PAGE_SIZE+index+1}`}/>:<div className={styles.empty}>Sin imagen</div>}<div className={styles.faceCardBar}><span>#{page*PAGE_SIZE+index+1}</span><label className={styles.toggle}><input type="checkbox" checked={item.is_active} onChange={async e=>{await browserApiRequest(`${API}/${item.id}`,{method:"PATCH",body:JSON.stringify({is_active:e.target.checked})});await load()}}/> activa</label><button className={styles.danger} onClick={()=>void remove(item)}><Trash2 size={12}/></button></div></article>)}</div>}
+    {total>PAGE_SIZE&&<div className={styles.pagination}><span>Página {page+1} de {pages}</span><div><button className={styles.ghost} disabled={page===0||loading} onClick={()=>setPage(p=>Math.max(0,p-1))}>Anterior</button><button className={styles.ghost} disabled={page+1>=pages||loading} onClick={()=>setPage(p=>p+1)}>Siguiente</button></div></div>}
+  </section>
+}
 
 function ToolManager({tool}:{tool:ModelGenerationToolKey}){
   const [items,setItems]=useState<ModelGenerationAsset[]>([]);
@@ -186,6 +210,6 @@ export default function ModelsIaPage(){
   return <div className={styles.shell}>
     <header className={styles.head}><div><div className={styles.eyebrow}>Tools Generation</div><h1>Models IA</h1><p>Biblioteca central de previews para la creación de identidad. Ancestry permanece blindado; las nuevas herramientas comparten el mismo patrón de media y publicación.</p></div><div className={styles.global}><a className={styles.ghost} href="/api/admin/tools-generation/model-assets-bundle-export"><Download size={14}/> Exportar todo</a><button className={styles.btn} onClick={()=>importRef.current?.click()} disabled={importing}>{importing?<Loader2 size={14}/>:<Upload size={14}/>} Importar todo</button><input ref={importRef} className={styles.hidden} type="file" accept=".zip,application/zip" onChange={importBundle}/></div></header>
     <nav className={styles.tabs}>{TABS.map(tab=><button key={tab.key} className={`${styles.tab} ${active===tab.key?styles.tabActive:""}`} onClick={()=>setActive(tab.key)}>{tab.label}</button>)}</nav>
-    {active==="ancestry"?<div className={styles.ancestryWrap}><div className={styles.notice}>Ancestry se reutiliza directamente desde su vista existente. No se modifica su lógica, catálogo, API ni comportamiento.</div><AncestryAssetsPage/></div>:<ToolManager tool={active}/>} 
+    {active==="ancestry"?<div className={styles.ancestryWrap}><div className={styles.notice}>Ancestry se reutiliza directamente desde su vista existente. No se modifica su lógica, catálogo, API ni comportamiento.</div><AncestryAssetsPage/></div>:active==="facial_structures"?<FaceStructureManager/>:<ToolManager tool={active}/>} 
   </div>
 }

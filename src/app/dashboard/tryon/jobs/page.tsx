@@ -301,6 +301,7 @@ export default function UnifiedAiJobsPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [expandedModules, setExpandedModules] = useState<Set<number>>(new Set());
+  const defaultExpandedResolvedRef = useRef(false);
   const [selected, setSelected] = useState<GenerationModuleExecution | null>(null);
   const [billingSelected, setBillingSelected] = useState<GenerationModuleExecution | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -318,7 +319,6 @@ export default function UnifiedAiJobsPage() {
           ? moduleResponse.items
           : [];
       setModules(moduleItems);
-      setExpandedModules((current) => current.size ? current : new Set(moduleItems.map((item) => item.id)));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No fue posible cargar los módulos de IA.");
     }
@@ -362,6 +362,11 @@ export default function UnifiedAiJobsPage() {
       const executionItems = responses.flatMap(({ response }) => Array.isArray(response.items) ? response.items : []);
       const totals = Object.fromEntries(responses.map(({ moduleId, response }) => [moduleId, Number(response.total ?? 0)]));
       setExecutions(executionItems);
+      if (!defaultExpandedResolvedRef.current && executionItems.length) {
+        const newest = [...executionItems].sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime())[0];
+        setExpandedModules(new Set([newest.module_id]));
+        defaultExpandedResolvedRef.current = true;
+      }
       setModuleTotals(totals);
       setTotal(Object.values(totals).reduce((sum, value) => sum + value, 0));
       setSelectedIds((current) => new Set([...current].filter((id) => executionItems.some((item) => item.id === id))));
@@ -417,9 +422,9 @@ export default function UnifiedAiJobsPage() {
       map.set(execution.module_id, current);
     }
     return [...map.entries()].sort((a, b) => {
-      const aName = modulesById.get(a[0])?.name ?? a[1][0]?.module_key ?? "";
-      const bName = modulesById.get(b[0])?.name ?? b[1][0]?.module_key ?? "";
-      return aName.localeCompare(bName, "es");
+      const newestA = Math.max(...a[1].map(item=>new Date(item.created_at).getTime()));
+      const newestB = Math.max(...b[1].map(item=>new Date(item.created_at).getTime()));
+      return newestB-newestA;
     });
   }, [executions, modulesById]);
 

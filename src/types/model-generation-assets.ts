@@ -2,6 +2,7 @@ export type ModelGenerationToolKey =
   | "eyebrows"
   | "lips"
   | "hairstyle"
+  | "facial_structures"
   | "hips"
   | "butt_size"
   | "breasts"
