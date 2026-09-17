@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Download, Film, Image as ImageIcon, Loader2, Pause, Play, Plus, Trash2, Upload } from "lucide-react";
+import { Download, Film, Image as ImageIcon, Loader2, Pause, Play, Plus, Sparkles, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { browserApiRequest } from "@/lib/api/browser-api";
 import type { ModelGenerationAsset, ModelGenerationAssetList, ModelGenerationStorageMode, ModelGenerationStorageOptions, ModelGenerationToolKey } from "@/types/model-generation-assets";
@@ -84,16 +84,28 @@ function FaceStructureManager(){
   const [items,setItems]=useState<ModelGenerationAsset[]>([]);
   const [total,setTotal]=useState(0); const [page,setPage]=useState(0);
   const [storage,setStorage]=useState<ModelGenerationStorageOptions>({active_provider:"local",modes:["auto","local","amazon_s3","cloudflare_r2"]});
-  const [mode,setMode]=useState<ModelGenerationStorageMode>("auto"); const [loading,setLoading]=useState(true); const [busy,setBusy]=useState(false); const [dragging,setDragging]=useState(false);
+  const [mode,setMode]=useState<ModelGenerationStorageMode>("auto"); const [loading,setLoading]=useState(true); const [busy,setBusy]=useState(false); const [cleaning,setCleaning]=useState(false); const [dragging,setDragging]=useState(false);
   const picker=useRef<HTMLInputElement>(null);
   const load=useCallback(async()=>{setLoading(true);try{const [list,opts]=await Promise.all([browserApiRequest<ModelGenerationAssetList>(`${API}?tool_key=facial_structures&skip=${page*PAGE_SIZE}&limit=${PAGE_SIZE}`),browserApiRequest<ModelGenerationStorageOptions>(`${API}/storage-options`)]);setItems(list.items);setTotal(list.total);setStorage(opts)}catch(e){toast.error(e instanceof Error?e.message:"No se pudo cargar el banco facial")}finally{setLoading(false)}},[page]);
   useEffect(()=>{void load()},[load]);
   async function uploadFiles(files:File[]){const images=files.filter(file=>file.type.startsWith("image/"));if(!images.length){toast.error("Selecciona imágenes válidas.");return}setBusy(true);try{const fd=new FormData();for(const file of images)fd.append("media",file);fd.set("storage_mode",mode);await browserApiRequest(`${API}/facial-structures/batch`,{method:"POST",body:fd});toast.success(`${images.length} referencia${images.length===1?"":"s"} subida${images.length===1?"":"s"} y normalizada${images.length===1?"":"s"} a 512×720`);setPage(0);await load()}catch(e){toast.error(e instanceof Error?e.message:"No se pudieron subir las referencias")}finally{setBusy(false)}}
+  async function cleanupDuplicates(){
+    if(!confirm("¿Limpiar imágenes duplicadas de Estructuras faciales? Se conservará la referencia más antigua de cada copia exacta. Ninguna otra categoría será modificada."))return;
+    setCleaning(true);
+    try{
+      const result=await browserApiRequest<{checked:number;removed:number;duplicate_groups:number;skipped:number;storage_cleanup_failed?:number}>(`${API}/facial-structures/cleanup-duplicates`,{method:"POST"});
+      if(result.removed>0)toast.success(`Se eliminaron ${result.removed} referencia${result.removed===1?" duplicada":"s duplicadas"}.`);
+      else toast.success("No se encontraron imágenes duplicadas exactas.");
+      if(result.skipped>0)toast.warning(`${result.skipped} referencia${result.skipped===1?" no pudo":"s no pudieron"} revisarse.`);
+      if(result.storage_cleanup_failed)toast.warning("Los registros duplicados se eliminaron, pero algunos archivos físicos requieren revisión.");
+      if(page===0)await load();else setPage(0);
+    }catch(e){toast.error(e instanceof Error?e.message:"No se pudo limpiar el banco facial")}finally{setCleaning(false)}
+  }
   async function remove(item:ModelGenerationAsset){if(!confirm("¿Eliminar esta estructura facial?"))return;try{await browserApiRequest(`${API}/${item.id}`,{method:"DELETE"});await load()}catch(e){toast.error(e instanceof Error?e.message:"No se pudo eliminar")}}
   const activeLabel=storage.active_provider.replaceAll("_"," "); const pages=Math.max(1,Math.ceil(total/PAGE_SIZE));
   return <section className={styles.panel}>
     <div className={styles.toolbar}><div><h2>Estructuras faciales</h2><p>Banco privado. Cada archivo se recorta y optimiza automáticamente a 512×720.</p></div><span className={styles.status}>{total.toLocaleString("es-MX")} referencias</span></div>
-    <div className={styles.faceControls}><label className={styles.storageField}><span>Destino de storage</span><select className={styles.select} value={mode} onChange={e=>setMode(e.target.value as ModelGenerationStorageMode)}>{storage.modes.map(m=><option key={m} value={m}>{m==="auto"?`Automatic (${activeLabel})`:m}</option>)}</select></label></div>
+    <div className={styles.faceControls}><button type="button" className={styles.cleanupButton} disabled={busy||cleaning} onClick={()=>void cleanupDuplicates()}>{cleaning?<Loader2 className={styles.spinner} size={14}/>:<Sparkles size={14}/>} {cleaning?"Revisando…":"Limpiar duplicados"}</button><label className={styles.storageField}><span>Destino de storage</span><select className={styles.select} value={mode} onChange={e=>setMode(e.target.value as ModelGenerationStorageMode)}>{storage.modes.map(m=><option key={m} value={m}>{m==="auto"?`Automatic (${activeLabel})`:m}</option>)}</select></label></div>
     <div className={`${styles.dropzone} ${dragging?styles.dropzoneActive:""}`} onDragEnter={e=>{e.preventDefault();setDragging(true)}} onDragOver={e=>e.preventDefault()} onDragLeave={e=>{e.preventDefault();if(e.currentTarget===e.target)setDragging(false)}} onDrop={e=>{e.preventDefault();setDragging(false);void uploadFiles(Array.from(e.dataTransfer.files))}}>
       <Upload size={28}/><strong>Arrastra aquí una o muchas imágenes</strong><span>También puedes seleccionarlas desde móvil o escritorio.</span><button type="button" className={styles.btn} disabled={busy} onClick={()=>picker.current?.click()}>{busy?<Loader2 size={14}/>:<Plus size={14}/>} Seleccionar imágenes</button><input ref={picker} className={styles.hidden} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value="";void uploadFiles(files)}}/>
     </div>
