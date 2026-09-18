@@ -79,16 +79,30 @@ async function posterFromVideo(file: File): Promise<File> {
 }
 
 
+const FACE_GROUPS = [
+  {key:"east_asian",label:"East Asian"},
+  {key:"southeast_asian",label:"Southeast Asian"},
+  {key:"south_central_asian",label:"South / Central Asian"},
+  {key:"middle_eastern_north_african",label:"Middle Eastern / North African"},
+  {key:"african_afrodescendant",label:"African / Afro-descendant"},
+  {key:"european",label:"European"},
+  {key:"latin_caribbean",label:"Latin / Caribbean"},
+  {key:"mixed_pacific",label:"Mixed / Pacific"},
+] as const;
+type FaceGroupKey = typeof FACE_GROUPS[number]["key"];
+const FACE_PAGE_SIZES = [12,24,48,96] as const;
+
 function FaceStructureManager(){
-  const PAGE_SIZE=24;
   const [items,setItems]=useState<ModelGenerationAsset[]>([]);
   const [total,setTotal]=useState(0); const [page,setPage]=useState(0);
+  const [faceGroup,setFaceGroup]=useState<FaceGroupKey>("east_asian");
+  const [pageSize,setPageSize]=useState<number>(24);
   const [storage,setStorage]=useState<ModelGenerationStorageOptions>({active_provider:"local",modes:["auto","local","amazon_s3","cloudflare_r2"]});
   const [mode,setMode]=useState<ModelGenerationStorageMode>("auto"); const [loading,setLoading]=useState(true); const [busy,setBusy]=useState(false); const [cleaning,setCleaning]=useState(false); const [dragging,setDragging]=useState(false);
   const picker=useRef<HTMLInputElement>(null);
-  const load=useCallback(async()=>{setLoading(true);try{const [list,opts]=await Promise.all([browserApiRequest<ModelGenerationAssetList>(`${API}?tool_key=facial_structures&skip=${page*PAGE_SIZE}&limit=${PAGE_SIZE}`),browserApiRequest<ModelGenerationStorageOptions>(`${API}/storage-options`)]);setItems(list.items);setTotal(list.total);setStorage(opts)}catch(e){toast.error(e instanceof Error?e.message:"No se pudo cargar el banco facial")}finally{setLoading(false)}},[page]);
+  const load=useCallback(async()=>{setLoading(true);try{const query=new URLSearchParams({tool_key:"facial_structures",face_group:faceGroup,skip:String(page*pageSize),limit:String(pageSize)});const [list,opts]=await Promise.all([browserApiRequest<ModelGenerationAssetList>(`${API}?${query.toString()}`),browserApiRequest<ModelGenerationStorageOptions>(`${API}/storage-options`)]);setItems(list.items);setTotal(list.total);setStorage(opts)}catch(e){toast.error(e instanceof Error?e.message:"No se pudo cargar el banco facial")}finally{setLoading(false)}},[faceGroup,page,pageSize]);
   useEffect(()=>{void load()},[load]);
-  async function uploadFiles(files:File[]){const images=files.filter(file=>file.type.startsWith("image/"));if(!images.length){toast.error("Selecciona imágenes válidas.");return}setBusy(true);try{const fd=new FormData();for(const file of images)fd.append("media",file);fd.set("storage_mode",mode);await browserApiRequest(`${API}/facial-structures/batch`,{method:"POST",body:fd});toast.success(`${images.length} referencia${images.length===1?"":"s"} subida${images.length===1?"":"s"} y normalizada${images.length===1?"":"s"} a 512×720`);setPage(0);await load()}catch(e){toast.error(e instanceof Error?e.message:"No se pudieron subir las referencias")}finally{setBusy(false)}}
+  async function uploadFiles(files:File[]){const images=files.filter(file=>file.type.startsWith("image/"));if(!images.length){toast.error("Selecciona imágenes válidas.");return}setBusy(true);try{const fd=new FormData();for(const file of images)fd.append("media",file);fd.set("storage_mode",mode);fd.set("face_group",faceGroup);await browserApiRequest(`${API}/facial-structures/batch`,{method:"POST",body:fd});toast.success(`${images.length} referencia${images.length===1?"":"s"} subida${images.length===1?"":"s"} y normalizada${images.length===1?"":"s"} a 512×720`);if(page!==0)setPage(0);else await load()}catch(e){toast.error(e instanceof Error?e.message:"No se pudieron subir las referencias")}finally{setBusy(false)}}
   async function cleanupDuplicates(){
     if(!confirm("¿Limpiar imágenes duplicadas de Estructuras faciales? Se conservará la referencia más antigua de cada copia exacta. Ninguna otra categoría será modificada."))return;
     setCleaning(true);
@@ -102,15 +116,18 @@ function FaceStructureManager(){
     }catch(e){toast.error(e instanceof Error?e.message:"No se pudo limpiar el banco facial")}finally{setCleaning(false)}
   }
   async function remove(item:ModelGenerationAsset){if(!confirm("¿Eliminar esta estructura facial?"))return;try{await browserApiRequest(`${API}/${item.id}`,{method:"DELETE"});await load()}catch(e){toast.error(e instanceof Error?e.message:"No se pudo eliminar")}}
-  const activeLabel=storage.active_provider.replaceAll("_"," "); const pages=Math.max(1,Math.ceil(total/PAGE_SIZE));
+  async function moveToGroup(item:ModelGenerationAsset,nextGroup:FaceGroupKey){try{await browserApiRequest(`${API}/${item.id}`,{method:"PATCH",body:JSON.stringify({metadata:{...item.metadata,face_group:nextGroup}})});toast.success("Referencia movida");await load()}catch(e){toast.error(e instanceof Error?e.message:"No se pudo mover la referencia")}}
+  const activeLabel=storage.active_provider.replaceAll("_"," "); const pages=Math.max(1,Math.ceil(total/pageSize));
+  useEffect(()=>{if(page>=pages)setPage(Math.max(0,pages-1))},[page,pages]);
   return <section className={styles.panel}>
     <div className={styles.toolbar}><div><h2>Estructuras faciales</h2><p>Banco privado. Cada archivo se recorta y optimiza automáticamente a 512×720.</p></div><span className={styles.status}>{total.toLocaleString("es-MX")} referencias</span></div>
-    <div className={styles.faceControls}><button type="button" className={styles.cleanupButton} disabled={busy||cleaning} onClick={()=>void cleanupDuplicates()}>{cleaning?<Loader2 className={styles.spinner} size={14}/>:<Sparkles size={14}/>} {cleaning?"Revisando…":"Limpiar duplicados"}</button><label className={styles.storageField}><span>Destino de storage</span><select className={styles.select} value={mode} onChange={e=>setMode(e.target.value as ModelGenerationStorageMode)}>{storage.modes.map(m=><option key={m} value={m}>{m==="auto"?`Automatic (${activeLabel})`:m}</option>)}</select></label></div>
+    <div className={styles.faceGroupTabs} role="tablist" aria-label="Grupos de estructuras faciales">{FACE_GROUPS.map(group=><button type="button" role="tab" aria-selected={faceGroup===group.key} className={`${styles.faceGroupTab} ${faceGroup===group.key?styles.faceGroupTabActive:""}`} key={group.key} onClick={()=>{setFaceGroup(group.key);setPage(0)}}>{group.label}</button>)}</div>
+    <div className={styles.faceControls}><button type="button" className={styles.cleanupButton} disabled={busy||cleaning} onClick={()=>void cleanupDuplicates()}>{cleaning?<Loader2 className={styles.spinner} size={14}/>:<Sparkles size={14}/>} {cleaning?"Revisando…":"Limpiar duplicados"}</button><label className={styles.storageField}><span>Destino de storage</span><select className={styles.select} value={mode} onChange={e=>setMode(e.target.value as ModelGenerationStorageMode)}>{storage.modes.map(m=><option key={m} value={m}>{m==="auto"?`Automatic (${activeLabel})`:m}</option>)}</select></label><label className={styles.storageField}><span>Mostrar por página</span><select className={styles.select} value={pageSize} onChange={e=>{setPageSize(Number(e.target.value));setPage(0)}}>{FACE_PAGE_SIZES.map(size=><option key={size} value={size}>{size}</option>)}</select></label></div>
     <div className={`${styles.dropzone} ${dragging?styles.dropzoneActive:""}`} onDragEnter={e=>{e.preventDefault();setDragging(true)}} onDragOver={e=>e.preventDefault()} onDragLeave={e=>{e.preventDefault();if(e.currentTarget===e.target)setDragging(false)}} onDrop={e=>{e.preventDefault();setDragging(false);void uploadFiles(Array.from(e.dataTransfer.files))}}>
       <Upload size={28}/><strong>Arrastra aquí una o muchas imágenes</strong><span>También puedes seleccionarlas desde móvil o escritorio.</span><button type="button" className={styles.btn} disabled={busy} onClick={()=>picker.current?.click()}>{busy?<Loader2 size={14}/>:<Plus size={14}/>} Seleccionar imágenes</button><input ref={picker} className={styles.hidden} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value="";void uploadFiles(files)}}/>
     </div>
-    {loading?<div className={styles.empty}><Loader2 size={18}/> Cargando…</div>:<div className={styles.faceGrid}>{items.map((item,index)=><article className={styles.faceCard} key={item.id}>{item.poster_url?<img src={item.poster_url} alt={`Estructura facial ${page*PAGE_SIZE+index+1}`}/>:<div className={styles.empty}>Sin imagen</div>}<div className={styles.faceCardBar}><span>#{page*PAGE_SIZE+index+1}</span><label className={styles.toggle}><input type="checkbox" checked={item.is_active} onChange={async e=>{await browserApiRequest(`${API}/${item.id}`,{method:"PATCH",body:JSON.stringify({is_active:e.target.checked})});await load()}}/> activa</label><button className={styles.danger} onClick={()=>void remove(item)}><Trash2 size={12}/></button></div></article>)}</div>}
-    {total>PAGE_SIZE&&<div className={styles.pagination}><span>Página {page+1} de {pages}</span><div><button className={styles.ghost} disabled={page===0||loading} onClick={()=>setPage(p=>Math.max(0,p-1))}>Anterior</button><button className={styles.ghost} disabled={page+1>=pages||loading} onClick={()=>setPage(p=>p+1)}>Siguiente</button></div></div>}
+    {loading?<div className={styles.empty}><Loader2 size={18}/> Cargando…</div>:items.length?<div className={styles.faceGrid}>{items.map((item,index)=><article className={styles.faceCard} key={item.id}>{item.poster_url?<img src={item.poster_url} alt={`Estructura facial ${page*pageSize+index+1}`}/>:<div className={styles.empty}>Sin imagen</div>}<select aria-label="Grupo facial" className={styles.faceCardGroup} value={String(item.metadata.face_group||faceGroup)} onChange={e=>void moveToGroup(item,e.target.value as FaceGroupKey)}>{FACE_GROUPS.map(group=><option key={group.key} value={group.key}>{group.label}</option>)}</select><div className={styles.faceCardBar}><span>#{page*pageSize+index+1}</span><label className={styles.toggle}><input type="checkbox" checked={item.is_active} onChange={async e=>{await browserApiRequest(`${API}/${item.id}`,{method:"PATCH",body:JSON.stringify({is_active:e.target.checked})});await load()}}/> activa</label><button className={styles.danger} onClick={()=>void remove(item)}><Trash2 size={12}/></button></div></article>)}</div>:<div className={styles.empty}>No hay referencias en este grupo.</div>}
+    <div className={styles.pagination}><span>Página {page+1} de {pages} · {total.toLocaleString("es-MX")} elementos</span><div><button className={styles.ghost} disabled={page===0||loading} onClick={()=>setPage(p=>Math.max(0,p-1))}>Anterior</button><button className={styles.ghost} disabled={page+1>=pages||loading} onClick={()=>setPage(p=>p+1)}>Siguiente</button></div></div>
   </section>
 }
 
