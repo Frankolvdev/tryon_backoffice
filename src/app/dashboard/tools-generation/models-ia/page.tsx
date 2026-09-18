@@ -80,14 +80,14 @@ async function posterFromVideo(file: File): Promise<File> {
 
 
 const FACE_GROUPS = [
-  {key:"east_asian",label:"East Asian"},
-  {key:"southeast_asian",label:"Southeast Asian"},
-  {key:"south_central_asian",label:"South / Central Asian"},
-  {key:"middle_eastern_north_african",label:"Middle Eastern / North African"},
-  {key:"african_afrodescendant",label:"African / Afro-descendant"},
-  {key:"european",label:"European"},
-  {key:"latin_caribbean",label:"Latin / Caribbean"},
-  {key:"mixed_pacific",label:"Mixed / Pacific"},
+  {key:"east_asian",label:"Asia Oriental",countryCodes:["CN","HK","JP","KP","KR","MO","MN","TW"]},
+  {key:"southeast_asian",label:"Sudeste Asiático",countryCodes:["BN","KH","ID","LA","MY","MM","PH","SG","TH","TL","VN"]},
+  {key:"south_central_asian",label:"Asia del Sur y Central",countryCodes:["AF","BD","BT","IN","KZ","KG","MV","NP","PK","LK","TJ","TM","UZ"]},
+  {key:"middle_eastern_north_african",label:"Medio Oriente y Norte de África",countryCodes:["AE","AM","AZ","BH","DZ","EG","EH","GE","IL","IQ","IR","JO","KW","LB","LY","MA","MR","OM","PS","QA","SA","SY","TN","TR","YE"]},
+  {key:"african_afrodescendant",label:"África y Afrodescendientes",countryCodes:["AO","BF","BI","BJ","BW","CD","CF","CG","CI","CM","CV","DJ","ER","ET","GA","GH","GM","GN","GQ","GW","HT","KE","KM","LR","LS","MG","ML","MU","MW","MZ","NA","NE","NG","RE","RW","SC","SD","SH","SL","SN","SO","SS","ST","SZ","TD","TG","TZ","UG","YT","ZA","ZM","ZW"]},
+  {key:"european",label:"Europa",countryCodes:["AD","AL","AT","AX","BA","BE","BG","BY","CH","CY","CZ","DE","DK","EE","ES","FI","FO","FR","GB","GG","GI","GR","HR","HU","IE","IM","IS","IT","JE","LI","LT","LU","LV","MC","MD","ME","MK","MT","NL","NO","PL","PT","RO","RS","RU","SE","SI","SJ","SK","SM","UA","VA"]},
+  {key:"latin_caribbean",label:"Latinoamérica y Caribe",countryCodes:["AG","AI","AR","AW","BB","BL","BO","BQ","BR","BS","BZ","CL","CO","CR","CU","CW","DM","DO","EC","FK","GF","GD","GP","GT","GY","HN","JM","KN","KY","LC","MF","MQ","MS","MX","NI","PA","PE","PM","PR","PY","SR","SV","SX","TC","TT","UY","VC","VE","VG","VI"]},
+  {key:"mixed_pacific",label:"América y Pacífico",countryCodes:["AS","AQ","AU","BM","BV","IO","CA","CX","CC","CK","FJ","PF","TF","GL","GU","HM","KI","MH","FM","NR","NC","NZ","NU","NF","MP","PW","PG","PN","WS","SB","GS","TK","TO","TV","US","UM","VU","WF"]},
 ] as const;
 type FaceGroupKey = typeof FACE_GROUPS[number]["key"];
 const FACE_PAGE_SIZES = [12,24,48,96] as const;
@@ -96,6 +96,7 @@ function FaceStructureManager(){
   const [items,setItems]=useState<ModelGenerationAsset[]>([]);
   const [total,setTotal]=useState(0); const [page,setPage]=useState(0);
   const [faceGroup,setFaceGroup]=useState<FaceGroupKey>("east_asian");
+  const [hoveredFaceGroup,setHoveredFaceGroup]=useState<FaceGroupKey|null>(null);
   const [pageSize,setPageSize]=useState<number>(24);
   const [storage,setStorage]=useState<ModelGenerationStorageOptions>({active_provider:"local",modes:["auto","local","amazon_s3","cloudflare_r2"]});
   const [mode,setMode]=useState<ModelGenerationStorageMode>("auto"); const [loading,setLoading]=useState(true); const [busy,setBusy]=useState(false); const [cleaning,setCleaning]=useState(false); const [dragging,setDragging]=useState(false);
@@ -118,10 +119,12 @@ function FaceStructureManager(){
   async function remove(item:ModelGenerationAsset){if(!confirm("¿Eliminar esta estructura facial?"))return;try{await browserApiRequest(`${API}/${item.id}`,{method:"DELETE"});await load()}catch(e){toast.error(e instanceof Error?e.message:"No se pudo eliminar")}}
   async function moveToGroup(item:ModelGenerationAsset,nextGroup:FaceGroupKey){try{await browserApiRequest(`${API}/${item.id}`,{method:"PATCH",body:JSON.stringify({metadata:{...item.metadata,face_group:nextGroup}})});toast.success("Referencia movida");await load()}catch(e){toast.error(e instanceof Error?e.message:"No se pudo mover la referencia")}}
   const activeLabel=storage.active_provider.replaceAll("_"," "); const pages=Math.max(1,Math.ceil(total/pageSize));
+  const hoveredGroup=FACE_GROUPS.find(group=>group.key===hoveredFaceGroup);
+  const regionNames=useMemo(()=>new Intl.DisplayNames(["es"],{type:"region"}),[]);
   useEffect(()=>{if(page>=pages)setPage(Math.max(0,pages-1))},[page,pages]);
   return <section className={styles.panel}>
     <div className={styles.toolbar}><div><h2>Estructuras faciales</h2><p>Banco privado. Cada archivo se recorta y optimiza automáticamente a 512×720.</p></div><span className={styles.status}>{total.toLocaleString("es-MX")} referencias</span></div>
-    <div className={styles.faceGroupTabs} role="tablist" aria-label="Grupos de estructuras faciales">{FACE_GROUPS.map(group=><button type="button" role="tab" aria-selected={faceGroup===group.key} className={`${styles.faceGroupTab} ${faceGroup===group.key?styles.faceGroupTabActive:""}`} key={group.key} onClick={()=>{setFaceGroup(group.key);setPage(0)}}>{group.label}</button>)}</div>
+    <div className={styles.faceGroupTabsArea} onMouseLeave={()=>setHoveredFaceGroup(null)}><div className={styles.faceGroupTabs} role="tablist" aria-label="Grupos de estructuras faciales">{FACE_GROUPS.map(group=><button type="button" role="tab" aria-selected={faceGroup===group.key} aria-describedby={hoveredFaceGroup===group.key?"face-group-countries":undefined} className={`${styles.faceGroupTab} ${faceGroup===group.key?styles.faceGroupTabActive:""}`} key={group.key} onMouseEnter={()=>setHoveredFaceGroup(group.key)} onFocus={()=>setHoveredFaceGroup(group.key)} onClick={()=>{setFaceGroup(group.key);setHoveredFaceGroup(group.key);setPage(0)}}>{group.label}</button>)}</div>{hoveredGroup&&<div id="face-group-countries" role="tooltip" className={styles.faceGroupTooltip}><strong>{hoveredGroup.label}</strong><span>Incluye {hoveredGroup.countryCodes.length} países y territorios:</span><p>{hoveredGroup.countryCodes.map(code=>regionNames.of(code)||code).join(", ")}.</p></div>}</div>
     <div className={styles.faceControls}><button type="button" className={styles.cleanupButton} disabled={busy||cleaning} onClick={()=>void cleanupDuplicates()}>{cleaning?<Loader2 className={styles.spinner} size={14}/>:<Sparkles size={14}/>} {cleaning?"Revisando…":"Limpiar duplicados"}</button><label className={styles.storageField}><span>Destino de storage</span><select className={styles.select} value={mode} onChange={e=>setMode(e.target.value as ModelGenerationStorageMode)}>{storage.modes.map(m=><option key={m} value={m}>{m==="auto"?`Automatic (${activeLabel})`:m}</option>)}</select></label><label className={styles.storageField}><span>Mostrar por página</span><select className={styles.select} value={pageSize} onChange={e=>{setPageSize(Number(e.target.value));setPage(0)}}>{FACE_PAGE_SIZES.map(size=><option key={size} value={size}>{size}</option>)}</select></label></div>
     <div className={`${styles.dropzone} ${dragging?styles.dropzoneActive:""}`} onDragEnter={e=>{e.preventDefault();setDragging(true)}} onDragOver={e=>e.preventDefault()} onDragLeave={e=>{e.preventDefault();if(e.currentTarget===e.target)setDragging(false)}} onDrop={e=>{e.preventDefault();setDragging(false);void uploadFiles(Array.from(e.dataTransfer.files))}}>
       <Upload size={28}/><strong>Arrastra aquí una o muchas imágenes</strong><span>También puedes seleccionarlas desde móvil o escritorio.</span><button type="button" className={styles.btn} disabled={busy} onClick={()=>picker.current?.click()}>{busy?<Loader2 size={14}/>:<Plus size={14}/>} Seleccionar imágenes</button><input ref={picker} className={styles.hidden} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value="";void uploadFiles(files)}}/>
